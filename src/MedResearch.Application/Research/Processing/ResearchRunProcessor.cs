@@ -120,7 +120,7 @@ public sealed class ResearchRunProcessor
             workerInstanceId);
 
         await _stageExecutor.ExecuteAsync(
-            new ResearchStageExecutionContext(run.Id, stage, claimedRun.ResearchQuestion, workerInstanceId),
+            new ResearchStageExecutionContext(run.Id, run.ResearchQuestionId, stage, claimedRun.ResearchQuestion, workerInstanceId),
             cancellationToken);
 
         _logger.LogInformation(

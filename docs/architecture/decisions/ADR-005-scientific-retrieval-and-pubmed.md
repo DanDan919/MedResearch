@@ -1,6 +1,6 @@
 # ADR-005: Add Provider-Neutral Scientific Retrieval with PubMed as the First Source
 
-Status: Accepted
+Status: Accepted; query-generation portion superseded by ADR-006
 Date: 2026-08-30
 
 ## Context
@@ -14,7 +14,7 @@ External source data is untrusted. Missing PubMed metadata must remain missing, 
 Define provider-neutral Application contracts for scientific retrieval:
 
 - `IScientificLiteratureSource` searches a source using scientific search semantics and returns normalized `ScientificStudyCandidate` records.
-- `IScientificSearchQueryBuilder` converts the current research question into a deterministic bounded query for now.
+- `IScientificSearchQueryBuilder` converted the current research question into a deterministic bounded query for the initial PubMed milestone. This part is superseded by ADR-006; Searching now consumes persisted `ResearchPlan.SearchQueries`.
 - `IScientificSearchResultStore` persists search provenance, normalized studies, and run-to-study discovery links.
 
 Implement only PubMed in Infrastructure. PubMed-specific HTTP endpoints, ESearch JSON parsing, EFetch XML parsing, API key handling, and HttpClient configuration remain in Infrastructure.
@@ -57,6 +57,6 @@ Treat `Study` as global scientific identity. Deduplicate by stable identifiers, 
 
 The `Searching` stage now performs real PubMed retrieval and persists normalized study metadata, search provenance, and discovery links. Future scientific sources can implement `IScientificLiteratureSource` without exposing provider transport details to Application.
 
-The deterministic query builder is intentionally simple and not scientifically optimal. A future AI Research Planner can replace it with structured search planning while remaining separate from source adapters and LLM adapters.
+The initial deterministic query builder was intentionally simple and not scientifically optimal. ADR-006 replaces it with structured AI research planning while keeping source adapters and LLM adapters separate.
 
 Rate handling is conservative and local to the PubMed adapter. There is no distributed rate limiter yet. Automatic retries are not implemented in this milestone; source failures follow the existing safe run failure path.

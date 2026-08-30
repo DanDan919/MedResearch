@@ -25,6 +25,7 @@ public sealed record ScientificStudyCandidate(
 public sealed record ScientificSearchPersistenceRequest(
     Guid SearchExecutionId,
     Guid ResearchRunId,
+    Guid? ResearchPlanId,
     string Source,
     string Query,
     DateTimeOffset SearchedAt,

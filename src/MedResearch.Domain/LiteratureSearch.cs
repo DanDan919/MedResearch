@@ -10,7 +10,8 @@ public sealed class LiteratureSearch
         DateTimeOffset searchedAt,
         int resultCount,
         int persistedStudyCount,
-        int duplicateStudyCount)
+        int duplicateStudyCount,
+        Guid? researchPlanId = null)
     {
         if (id == Guid.Empty)
         {
@@ -20,6 +21,11 @@ public sealed class LiteratureSearch
         if (researchRunId == Guid.Empty)
         {
             throw new ArgumentException("Research run id cannot be empty.", nameof(researchRunId));
+        }
+
+        if (researchPlanId == Guid.Empty)
+        {
+            throw new ArgumentException("Research plan id cannot be empty when provided.", nameof(researchPlanId));
         }
 
         if (string.IsNullOrWhiteSpace(source))
@@ -49,6 +55,7 @@ public sealed class LiteratureSearch
 
         Id = id;
         ResearchRunId = researchRunId;
+        ResearchPlanId = researchPlanId;
         Source = source.Trim();
         Query = query.Trim();
         SearchedAt = searchedAt;
@@ -60,6 +67,8 @@ public sealed class LiteratureSearch
     public Guid Id { get; }
 
     public Guid ResearchRunId { get; }
+
+    public Guid? ResearchPlanId { get; }
 
     public string Source { get; }
 

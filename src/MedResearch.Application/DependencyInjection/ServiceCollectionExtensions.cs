@@ -1,5 +1,5 @@
 using MedResearch.Application.Research;
-using MedResearch.Application.Research.Literature;
+using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,9 +11,9 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<CreateResearchUseCase>();
         services.AddScoped<GetResearchUseCase>();
+        services.AddScoped<IResearchPlanner, ResearchPlanner>();
         services.AddScoped<ResearchRunProcessor>();
         services.AddScoped<IResearchStageExecutor, ScientificResearchStageExecutor>();
-        services.AddSingleton<IScientificSearchQueryBuilder, DeterministicScientificSearchQueryBuilder>();
 
         return services;
     }

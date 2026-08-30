@@ -29,9 +29,10 @@ Before significant changes, read:
 14. Validate external data before allowing it into trusted domain state.
 15. LLM output must NEVER be treated as trusted input.
 16. Future LLM structured output must be schema validated.
-17. Missing scientific data must remain missing/null rather than being guessed.
-18. Every scientific claim in the future synthesis layer must be traceable to its source.
-19. Medical output must be framed as evidence synthesis, not diagnosis or treatment advice.
+17. Do not send unrelated persisted data to external LLM providers without explicit approval.
+18. Missing scientific data must remain missing/null rather than being guessed.
+19. Every scientific claim in the future synthesis layer must be traceable to its source.
+20. Medical output must be framed as evidence synthesis, not diagnosis or treatment advice.
 
 ## Development Trail
 

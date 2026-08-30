@@ -20,6 +20,9 @@ internal sealed class LiteratureSearchConfiguration : IEntityTypeConfiguration<L
             .HasColumnName("research_run_id")
             .IsRequired();
 
+        builder.Property(search => search.ResearchPlanId)
+            .HasColumnName("research_plan_id");
+
         builder.Property(search => search.Source)
             .HasColumnName("source")
             .HasMaxLength(64)
@@ -52,7 +55,15 @@ internal sealed class LiteratureSearchConfiguration : IEntityTypeConfiguration<L
             .HasForeignKey(search => search.ResearchRunId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<ResearchPlan>()
+            .WithMany()
+            .HasForeignKey(search => search.ResearchPlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(search => new { search.ResearchRunId, search.SearchedAt })
             .HasDatabaseName("ix_literature_searches_research_run_id_searched_at");
+
+        builder.HasIndex(search => search.ResearchPlanId)
+            .HasDatabaseName("ix_literature_searches_research_plan_id");
     }
 }

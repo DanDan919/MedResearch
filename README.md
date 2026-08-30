@@ -6,9 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, and the first real scientific literature retrieval implementation through PubMed/NCBI E-utilities.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor uses a deterministic query derived from the question during `Searching`, retrieves bounded PubMed metadata, normalizes it, and persists studies plus search provenance. It does not yet implement AI research planning, LLM extraction, RAG, evidence scoring, diagnosis, treatment recommendations, or synthesis workflows.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. It does not yet implement LLM extraction, RAG, evidence scoring, diagnosis, treatment recommendations, or synthesis workflows.
 
 ## Stack Direction
 
@@ -16,13 +16,14 @@ A client can submit a research question, receive a queued research run id, and r
 - ASP.NET Core Web API
 - ASP.NET Core hosted background service
 - EF Core and PostgreSQL
+- OpenAI Responses API for strict structured planning output
 - PubMed retrieval through official NCBI E-utilities
 - Docker Compose for local development
 - xUnit
 - Testcontainers for PostgreSQL integration tests
 - Structured logging through `ILogger`
 - Separate worker executable later only if lifecycle or deployment needs justify it
-- LLM APIs later behind provider-neutral abstractions
+- Additional LLM/scientific providers later behind provider-neutral abstractions
 - pgvector later only if needed
 
 ## Repository Layout
@@ -48,7 +49,7 @@ docs/
 
 ## Local Development
 
-Copy `.env.example` to `.env` if you want to override local ports or development database values. The checked-in values are development-only defaults and are not production secrets.
+Copy `.env.example` to `.env` if you want to override local ports, development database values, OpenAI credentials, or PubMed options. The checked-in values are development-only defaults and placeholders, not production secrets.
 
 ```bash
 docker compose up --build
@@ -64,6 +65,15 @@ The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, s
 
 Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`.
 
+AI planning can be configured with:
+
+- `AI:Provider`, currently only `OpenAI`
+- `AI:BaseUrl`, default `https://api.openai.com/v1/`
+- `AI:Model`, externally supplied
+- `AI:ApiKey`, externally supplied secret
+- `AI:TimeoutSeconds`, default 30
+- `AI:MaxOutputTokens`, default 2000
+
 PubMed can be configured with:
 
 - `PubMed:BaseUrl`
@@ -74,7 +84,7 @@ PubMed can be configured with:
 - `PubMed:ApiKey`
 - `PubMed:RequestIntervalMilliseconds` development default: 350
 
-Use `.env` for local secrets such as a real NCBI API key. Do not commit `.env`.
+Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`.
 
 ## Research API
 
@@ -106,15 +116,25 @@ GET /api/research/{researchRunId}
 
 The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, and server failures use ASP.NET Core Problem Details responses.
 
+## Research Planning
+
+`Planning` uses a provider-neutral Application boundary for strict structured generation. Infrastructure currently implements that boundary with the OpenAI Responses API using JSON Schema structured output.
+
+The planner output is treated as untrusted external input. It is deserialized, validated by Application, and only then persisted as `ResearchPlan`. The authoritative `ResearchQuestion` remains separate; the LLM-generated `originalQuestion` field must match the stored question after whitespace normalization and cannot overwrite it.
+
+The prompt version is `research-planner-v1`. The planner is allowed to produce question decomposition and search strategy only. It must not produce PMIDs, DOIs, invented papers, authors, effect sizes, sample sizes, confidence intervals, p-values, evidence grades, diagnoses, treatments, or scientific conclusions.
+
 ## Scientific Retrieval
 
 `Searching` currently uses PubMed only. The flow is:
 
 ```text
-ResearchQuestion -> deterministic PubMed query -> ESearch PMIDs -> EFetch XML -> normalized Study candidates -> PostgreSQL
+ResearchQuestion -> ResearchPlan -> SearchQueries -> ESearch PMIDs -> EFetch XML -> normalized Study candidates -> PostgreSQL
 ```
 
-Stored metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
+Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
+
+Stored study metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
 
 ## EF Core Migrations
 
@@ -145,7 +165,7 @@ dotnet test
 docker compose config
 ```
 
-Application, Infrastructure, and API tests run without Docker. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application, Infrastructure, and API tests run without Docker. Planner tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

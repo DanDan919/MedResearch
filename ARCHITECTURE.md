@@ -21,13 +21,13 @@ Application / Domain
 - `MedResearch.Infrastructure` may reference Application and Domain.
 - `MedResearch.Api` composes Application and Infrastructure.
 
-Domain must not reference EF Core, ASP.NET Core, HTTP clients, LLM SDKs, PostgreSQL libraries, NCBI transport models, or other external-system concerns.
+Domain must not reference EF Core, ASP.NET Core, HTTP clients, LLM SDKs, PostgreSQL libraries, NCBI transport models, OpenAI transport models, API keys, or other external-system concerns.
 
 ## Project Responsibilities
 
-- `MedResearch.Domain`: core research concepts, invariants, lifecycle rules, scientific metadata identity, and domain behavior.
-- `MedResearch.Application`: use-case orchestration, application services, provider-neutral ports, transactions, and workflow coordination.
-- `MedResearch.Infrastructure`: EF Core persistence, PostgreSQL configuration, hosted worker adapter, PubMed/NCBI integration, external scientific APIs later, LLM clients later, and other adapters.
+- `MedResearch.Domain`: core research concepts, invariants, lifecycle rules, accepted research plans, scientific metadata identity, and domain behavior.
+- `MedResearch.Application`: use-case orchestration, application services, provider-neutral ports, validation of external structured output, transactions, and workflow coordination.
+- `MedResearch.Infrastructure`: EF Core persistence, PostgreSQL configuration, hosted worker adapter, OpenAI structured-generation adapter, PubMed/NCBI integration, external scientific APIs later, and other adapters.
 - `MedResearch.Api`: HTTP endpoints, request/response contracts, authentication, authorization, API composition, Problem Details responses, hosted worker process, and health check exposure.
 
 Controllers and endpoints should not contain business rules.
@@ -39,17 +39,19 @@ Implemented use cases are:
 - `CreateResearchUseCase`: validates and records a research question, creates a linked queued `ResearchRun`, and logs the created run.
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
-- `ScientificResearchStageExecutor`: performs real scientific retrieval during `Searching` and deterministic no-op behavior for stages that are not implemented yet.
+- `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
+- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, and deterministic no-op behavior for stages that are not implemented yet.
 
 Application defines ports that reflect current use cases:
 
 - `IResearchStore`: create/read boundary for the HTTP research API.
 - `IResearchRunQueue`: worker-specific boundary for claiming queued runs and persisting progress/failure state.
+- `IStructuredLlmClient`: provider-neutral boundary for strict structured generation.
+- `IResearchPlanStore`: persistence boundary for accepted research plans.
 - `IScientificLiteratureSource`: provider-neutral scientific search boundary.
 - `IScientificSearchResultStore`: persistence boundary for normalized scientific candidates, search provenance, and discovery links.
-- `IScientificSearchQueryBuilder`: deterministic query creation for now; a future Research Planner can replace this without changing source adapters.
 
-These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL and PubMed adapters.
+These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, and PubMed adapters.
 
 ## HTTP API
 
@@ -73,7 +75,53 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Searching` retrieves real PubMed metadata. Planning, Extracting, Evaluating, and Synthesizing remain deterministic placeholders and do not generate fake evidence.
+`Planning` now produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. Extracting, Evaluating, and Synthesizing remain deterministic placeholders and do not generate fake evidence.
+
+## AI Research Planning
+
+Application depends on provider-neutral structured-generation contracts. Infrastructure currently provides one implementation: OpenAI through the Responses API.
+
+Current planning flow:
+
+```text
+ResearchQuestion
+  -> ResearchPlanner
+  -> IStructuredLlmClient
+  -> OpenAI Responses API strict JSON Schema output
+  -> ResearchPlanDraft
+  -> Application validation
+  -> ResearchPlan persistence
+```
+
+The LLM is an untrusted planning component, not a scientific authority. It is allowed to decompose the question and propose search strategy only. It must not produce PMIDs, DOIs, invented paper titles, invented authors, effect sizes, sample sizes, confidence intervals, p-values, evidence grades, diagnoses, treatments, or scientific conclusions.
+
+The external LLM input is narrowly scoped to the current submitted research question and planner instructions. Retrieved article abstracts, evidence, unrelated research runs, database records, API keys, authentication headers, and raw provider payloads are not sent as part of this milestone.
+
+The prompt version is `research-planner-v1`. The prompt lives in `ResearchPlannerPrompt` rather than being buried inside the service method. It defines role, allowed task, prohibited behavior, uncertainty behavior, allowed study-type labels, and search-query constraints.
+
+Validation remains mandatory even with provider-side schema enforcement. Application validates at least:
+
+- the LLM-provided `originalQuestion` matches the authoritative stored question after whitespace normalization;
+- search queries are present;
+- search query count is at most five;
+- search query length is at most 300 characters;
+- blank search queries are rejected;
+- duplicate queries are removed case-insensitively;
+- list fields are bounded;
+- optional text fields are bounded;
+- preferred study types must use supported labels;
+- query text must not contain obvious stable study identifiers such as PMID or DOI.
+
+OpenAI configuration lives under `AI`:
+
+- `Provider`, currently only `OpenAI`
+- `BaseUrl`, default `https://api.openai.com/v1/`
+- `Model`, externally supplied
+- `ApiKey`, externally supplied secret
+- `TimeoutSeconds`, default 30
+- `MaxOutputTokens`, default 2000 and bounded in code
+
+If OpenAI is selected but model or API key configuration is missing, the provider call fails clearly and the existing run failure path records a safe external failure reason. The app does not silently substitute fake AI behavior.
 
 ## Scientific Retrieval
 
@@ -82,8 +130,8 @@ Application depends on provider-neutral scientific retrieval contracts. Infrastr
 Current PubMed flow:
 
 ```text
-ResearchQuestion
-  -> deterministic bounded query
+ResearchPlan.SearchQueries
+  -> sequential source search requests
   -> ESearch db=pubmed returns PMIDs
   -> EFetch db=pubmed retmode=xml returns article metadata
   -> PubMed transport parsing in Infrastructure
@@ -91,7 +139,7 @@ ResearchQuestion
   -> PostgreSQL persistence
 ```
 
-The deterministic query builder trims and bounds the original research question. It is not scientifically optimal; a later AI Research Planner may produce structured search plans and multiple optimized queries. Scientific source adapters and future LLM adapters must remain separate concerns.
+The previous deterministic question-to-query builder has been removed. Searching does not derive PubMed queries directly from the raw research question; it consumes the accepted `ResearchPlan.SearchQueries` produced during Planning.
 
 PubMed configuration lives under `PubMed`:
 
@@ -103,11 +151,13 @@ PubMed configuration lives under `PubMed`:
 - optional `ApiKey`
 - `RequestIntervalMilliseconds`, default 350
 
-The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. No live PubMed tests run by default.
+The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. Multiple planned queries are also executed sequentially. No live PubMed tests run by default.
+
+A valid plan may produce zero PubMed results. Zero-result searches are persisted and the pipeline may continue to later placeholder stages without fabricating studies or evidence.
 
 ## Scientific Data Integrity
 
-External source data is untrusted input. PubMed transport models remain in Infrastructure and are normalized before crossing into Application-facing contracts.
+External source data is untrusted input. OpenAI and PubMed transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
 
 The system stores values reported by PubMed when available:
 
@@ -132,7 +182,9 @@ Missing values stay missing. The system does not infer missing DOI, PMID, author
 - DOI is used where appropriate.
 - Fuzzy title matching is not used.
 
-`LiteratureSearch` records which source was searched, the query sent, when it ran, how many results were returned, how many studies were newly persisted, and how many were duplicates.
+`ResearchPlan` records accepted structured planning output for one research run, including provider, model, prompt version, and generated timestamp.
+
+`LiteratureSearch` records which source was searched, which query was sent, when it ran, how many results were returned, how many studies were newly persisted, how many were duplicates, and the optional `ResearchPlanId` that produced the query.
 
 `ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered during one research run.
 
@@ -152,17 +204,17 @@ The transaction boundary is intentionally short:
 begin transaction
 claim one queued run and persist Planning
 commit
-execute deterministic/external stage work outside the transaction
+execute external stage work outside the transaction
 persist each lifecycle transition separately
 ```
 
-The worker does not hold a database lock for the full pipeline, which keeps the design compatible with external operations.
+The worker does not hold a database lock for the full pipeline, which keeps the design compatible with external LLM and scientific API operations.
 
 ## Failure And Cancellation
 
 If processing fails, Application logs the full exception internally and asks Infrastructure to persist the run as `Failed` with a safe failure reason. The API can then observe the failed state through `GET /api/research/{researchRunId}`.
 
-PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures are converted into source exceptions and follow the same safe run failure path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
+OpenAI configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures follow the existing safe run failure path. PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures follow the same path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
 
 If the process crashes after claiming a run and before completing or failing it, the run can remain in an in-progress state. Automatic lease/recovery is not implemented yet and is tracked as technical debt.
 
@@ -172,6 +224,7 @@ Persistence is implemented in `MedResearch.Infrastructure` with EF Core and Npgs
 
 - `ResearchQuestion`
 - `ResearchRun`
+- `ResearchPlan`
 - `Study`
 - `Evidence`
 - `LiteratureSearch`
@@ -183,22 +236,27 @@ Migrations:
 
 - `20260830063109_InitialCreate`
 - `20260830114130_AddLiteratureSearchProvenance`
+- `20260830160612_AddStructuredResearchPlans`
 
 ## Database Schema
 
 - `research_questions`: GUID primary key, required question text, creation timestamp.
 - `research_runs`: GUID primary key, required `research_question_id` FK, string-backed status, created/started/completed timestamps, optional failure reason.
+- `research_plans`: GUID primary key, required `research_run_id` and `research_question_id` FKs, authoritative original question, optional PICO-like text fields, array fields for outcomes, preferred study types, search queries, and exclusion hints, plus provider, model, prompt version, and generated timestamp.
 - `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, journal, publication date/date parts, publication types, and authors.
-- `literature_searches`: GUID primary key, required `research_run_id` FK, source, query, searched timestamp, result count, persisted count, duplicate count.
+- `literature_searches`: GUID primary key, required `research_run_id` FK, optional `research_plan_id` FK, source, query, searched timestamp, result count, persisted count, duplicate count.
 - `research_study_discoveries`: GUID primary key, required FKs to research run, literature search, and study, plus source identifier and discovery timestamp.
 - `evidence`: GUID primary key, required `study_id` FK, required claim and direction, optional confidence.
 
 Indexes and constraints are intentionally limited to current lookup/query needs:
 
 - `research_runs(status, created_at)` for run status/queue-style queries.
+- unique `research_plans(research_run_id)` because one accepted plan belongs to one run.
+- `research_plans(research_question_id)` for question-to-plan lookup.
 - filtered unique `studies(doi)` for DOI deduplication when DOI is present.
 - filtered unique `studies(pmid)` for PMID deduplication when PMID is present.
 - `literature_searches(research_run_id, searched_at)` for run provenance lookup.
+- `literature_searches(research_plan_id)` for plan provenance lookup.
 - unique `research_study_discoveries(research_run_id, study_id)` so one run does not link the same global study twice.
 - EF-created FK indexes for relationships.
 
@@ -213,13 +271,14 @@ Docker Compose defines:
 - `postgres`: PostgreSQL 17 Alpine with development-only defaults.
 - `api`: MedResearch API image built from `src/MedResearch.Api/Dockerfile`; it hosts both HTTP endpoints and the background research worker.
 
-The compose API service enables config-gated startup migrations with `Database__ApplyMigrationsOnStartup=true`. This is a local development convenience, not a production migration strategy.
+The compose API service enables config-gated startup migrations with `Database__ApplyMigrationsOnStartup=true`. This is a local development convenience, not a production migration strategy. OpenAI model and API key values are supplied through environment variables or `.env`; committed configuration contains placeholders only.
 
 ## Initial Domain Concepts
 
 - `ResearchQuestion`: a scientific or medical research question with an id, trimmed question text, and creation timestamp. Empty or whitespace-only questions are rejected.
 - `ResearchRun`: one execution of a future evidence pipeline for a question. Runs begin queued and move through explicit lifecycle methods.
 - `ResearchRunStatus`: typed lifecycle states: queued, planning, searching, extracting, evaluating, synthesizing, completed, failed, and cancelled.
+- `ResearchPlan`: validated structured planning output for decomposition and search strategy. It is not evidence or synthesis.
 - `Study`: normalized scientific metadata reported by external sources. Missing source data remains missing.
 - `LiteratureSearch`: minimal reproducibility record for a source query run during a research run.
 - `ResearchStudyDiscovery`: association between one research run/search execution and a global study.
@@ -228,12 +287,13 @@ The compose API service enables config-gated startup migrations with `Database__
 ## Current Limitations
 
 - No Crossref, Europe PMC, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
-- No AI Research Planner exists yet; PubMed uses a deterministic query from the original question.
-- No LLM integration exists yet.
-- No RAG/vector search exists yet.
+- OpenAI is the only implemented LLM provider.
+- No live OpenAI smoke test is configured or run by default.
+- No LLM extraction, evidence synthesis output, or RAG/vector search exists yet.
 - No automatic recovery exists yet for runs left in progress after a process crash.
 - Study quality evaluation and evidence synthesis are not modeled beyond minimal placeholders.
 - PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.
+- OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - Rate limiting is conservative and local to the process; no distributed rate limiter exists.
 - Production migration strategy is not decided yet.
 - OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.

@@ -1,9 +1,13 @@
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Literature;
+using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Literature.Persistence;
 using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
+using MedResearch.Infrastructure.Planning.Persistence;
 using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Research.Processing;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +34,23 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IResearchStore, EfResearchStore>();
         services.AddScoped<IResearchRunQueue, PostgreSqlResearchRunQueue>();
+        services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
+
+        var openAIOptions = CreateOpenAIOptions(configuration);
+        if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"AI provider '{openAIOptions.Provider}' is not supported. Supported provider: OpenAI.");
+        }
+
+        services.AddSingleton(Options.Create(openAIOptions));
+        services.AddHttpClient<OpenAIStructuredLlmClient>(client =>
+        {
+            client.BaseAddress = new Uri(openAIOptions.BaseUrl, UriKind.Absolute);
+            client.Timeout = openAIOptions.Timeout;
+        });
+        services.AddScoped<IStructuredLlmClient>(provider =>
+            provider.GetRequiredService<OpenAIStructuredLlmClient>());
 
         var pubMedOptions = CreatePubMedOptions(configuration);
         services.AddSingleton(Options.Create(pubMedOptions));
@@ -83,6 +103,29 @@ public static class ServiceCollectionExtensions
         {
             Enabled = enabled,
             IdleDelayMilliseconds = idleDelayMilliseconds
+        };
+    }
+
+    private static OpenAIOptions CreateOpenAIOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(OpenAIOptions.SectionName);
+
+        return new OpenAIOptions
+        {
+            Provider = string.IsNullOrWhiteSpace(section["Provider"])
+                ? "OpenAI"
+                : section["Provider"]!,
+            BaseUrl = string.IsNullOrWhiteSpace(section["BaseUrl"])
+                ? "https://api.openai.com/v1/"
+                : section["BaseUrl"]!,
+            Model = string.IsNullOrWhiteSpace(section["Model"])
+                ? null
+                : section["Model"],
+            ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
+                ? null
+                : section["ApiKey"],
+            TimeoutSeconds = TryReadInt(section["TimeoutSeconds"], 30),
+            MaxOutputTokens = TryReadInt(section["MaxOutputTokens"], 2_000)
         };
     }
 

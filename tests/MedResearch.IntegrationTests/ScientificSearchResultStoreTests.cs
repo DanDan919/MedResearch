@@ -144,6 +144,7 @@ public sealed class ScientificSearchResultStoreTests
         return new ScientificSearchPersistenceRequest(
             searchExecutionId,
             researchRunId,
+            null,
             "PubMed",
             query,
             DateTimeOffset.UtcNow,

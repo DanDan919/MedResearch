@@ -78,7 +78,8 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             request.SearchedAt,
             request.ResultCount,
             persistedCount,
-            duplicateCount));
+            duplicateCount,
+            request.ResearchPlanId));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -202,5 +203,3 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             .ToArray();
     }
 }
-
-
