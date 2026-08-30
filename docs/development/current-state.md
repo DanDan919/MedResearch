@@ -26,6 +26,8 @@ Date: 2026-08-30
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`
   - development-only defaults in `.env.example`
+  - `docker compose config` validates successfully
+  - runtime startup is currently blocked by the local Docker Desktop engine being unreachable
 - Minimal Domain concepts:
   - `ResearchQuestion`
   - `ResearchRun`
@@ -34,7 +36,15 @@ Date: 2026-08-30
   - `Evidence`
   - `EvidenceDirection`
 - Domain unit tests for question validation and research run lifecycle behavior.
-- PostgreSQL integration tests using Testcontainers. They run against real PostgreSQL when Docker is reachable and are skipped when the Docker engine is unavailable.
+- PostgreSQL integration tests using Testcontainers. They run against real PostgreSQL when Docker is reachable and are currently skipped because the Docker Desktop engine is unavailable.
+
+## Environment Status
+
+- GitHub remote is configured as `https://github.com/DanDan919/MedResearch.git`.
+- Push is not operational yet: GitHub returns `Repository not found` for the configured remote.
+- GitHub CLI (`gh`) is not installed, so this environment cannot create `DanDan919/MedResearch` through `gh` or inspect `gh` authentication.
+- Docker CLI and Docker Compose are installed, but Docker Desktop engine is not reachable at `//./pipe/dockerDesktopLinuxEngine`.
+- Application/database health check runtime verification has not passed because the Docker Compose stack cannot start while the engine is unavailable.
 
 ## Next Logical Milestone
 
@@ -51,3 +61,4 @@ Introduce the first real application use case: submitting a research question an
 - Evidence synthesis output.
 - RAG/vector search.
 - Production migration strategy.
+

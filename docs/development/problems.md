@@ -29,3 +29,13 @@ Decision / fix: Kept PostgreSQL integration tests on Testcontainers and added `X
 Verification: `dotnet test MedResearch.slnx --no-build` passes with PostgreSQL integration tests reported as skipped when Docker is unavailable.
 Remaining concerns: Run the full integration suite, `docker compose up -d --build`, and `/health` verification again when Docker Desktop is running.
 
+Date: 2026-08-30
+Area: GitHub remote/push
+Problem: The local repository cannot be pushed to the configured GitHub remote.
+Observed behavior: `git ls-remote --heads origin` and `git push -u origin main` both returned `Repository not found` for `https://github.com/DanDan919/MedResearch.git`.
+Root cause: The GitHub repository either does not exist or is not accessible with credentials available to this environment. GitHub CLI (`gh`) is not installed, so repository creation and authentication inspection through `gh` are unavailable.
+Decision / fix: Kept the configured remote URL because it matches the requested owner/repository path. Did not create or overwrite any remote repository.
+Verification: Local branch `main` remains clean with commits ready to push once the repository exists and credentials have access.
+Remaining concerns: Create or grant access to `DanDan919/MedResearch`, then run `git push -u origin main`.
+
+
