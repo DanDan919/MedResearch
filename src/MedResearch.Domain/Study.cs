@@ -5,7 +5,7 @@ public sealed class Study
     public Study(
         Guid id,
         string title,
-        string? abstractText,
+        string? @abstract,
         string? doi,
         string? pmid,
         string? journal,
@@ -29,7 +29,7 @@ public sealed class Study
 
         Id = id;
         Title = title.Trim();
-        Abstract = string.IsNullOrWhiteSpace(abstractText) ? null : abstractText.Trim();
+        Abstract = string.IsNullOrWhiteSpace(@abstract) ? null : @abstract.Trim();
         Doi = string.IsNullOrWhiteSpace(doi) ? null : doi.Trim();
         Pmid = string.IsNullOrWhiteSpace(pmid) ? null : pmid.Trim();
         Journal = string.IsNullOrWhiteSpace(journal) ? null : journal.Trim();
@@ -53,3 +53,4 @@ public sealed class Study
 
     public string Source { get; }
 }
+

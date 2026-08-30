@@ -1,6 +1,6 @@
 # Architecture
 
-MedResearch starts as a modular, layered monolith. The system should remain simple until concrete needs justify more infrastructure.
+MedResearch is a modular, layered monolith. The system should remain simple until concrete needs justify more infrastructure.
 
 ## Dependency Direction
 
@@ -27,10 +27,50 @@ Domain must not reference EF Core, ASP.NET Core, HTTP clients, LLM SDKs, Postgre
 
 - `MedResearch.Domain`: core research concepts, invariants, lifecycle rules, value decisions, and domain behavior.
 - `MedResearch.Application`: use-case orchestration, application services, ports, transactions, and workflow coordination.
-- `MedResearch.Infrastructure`: persistence, external scientific APIs, background processing implementation, LLM clients, and other adapters.
-- `MedResearch.Api`: HTTP endpoints, request/response contracts, authentication, authorization, and API composition.
+- `MedResearch.Infrastructure`: EF Core persistence, PostgreSQL configuration, external scientific APIs later, background processing implementation later, LLM clients later, and other adapters.
+- `MedResearch.Api`: HTTP endpoints, request/response contracts, authentication, authorization, API composition, and health check exposure.
 
 Controllers and endpoints should not contain business rules.
+
+## Persistence
+
+Persistence is implemented in `MedResearch.Infrastructure` with EF Core and Npgsql. `MedResearchDbContext` exposes sets for:
+
+- `ResearchQuestion`
+- `ResearchRun`
+- `Study`
+- `Evidence`
+
+Entity mappings live in separate `IEntityTypeConfiguration<T>` classes under `src/MedResearch.Infrastructure/Persistence/Configurations`.
+
+The first migration is `InitialCreate` under `src/MedResearch.Infrastructure/Persistence/Migrations`.
+
+## Database Schema
+
+- `research_questions`: GUID primary key, required question text, creation timestamp.
+- `research_runs`: GUID primary key, required `research_question_id` FK, string-backed status, created/started/completed timestamps, optional failure reason.
+- `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, journal, and publication date.
+- `evidence`: GUID primary key, required `study_id` FK, required claim and direction, optional confidence.
+
+Indexes are intentionally limited to current lookup/query needs:
+
+- `research_runs(status, created_at)` for run status/queue-style queries.
+- `studies(doi)` for DOI lookup when DOI is present.
+- `studies(pmid)` for PMID lookup when PMID is present.
+- EF-created FK indexes for relationships.
+
+## Health Checks
+
+The API maps standard ASP.NET Core health checks at `/health`. Infrastructure registers a DbContext health check named `postgresql`, so the endpoint proves the API can reach the configured PostgreSQL database.
+
+## Local Docker Environment
+
+Docker Compose defines:
+
+- `postgres`: PostgreSQL 17 Alpine with development-only defaults.
+- `api`: MedResearch API image built from `src/MedResearch.Api/Dockerfile`.
+
+The compose API service enables config-gated startup migrations with `Database__ApplyMigrationsOnStartup=true`. This is a local development convenience, not a production migration strategy.
 
 ## Initial Domain Concepts
 
@@ -52,9 +92,10 @@ A non-terminal run may be failed with a required failure reason or cancelled. Co
 
 ## Current Limitations
 
-- No database or EF Core model has been added yet.
+- No application use case exists yet for submitting research questions.
 - No PubMed, Crossref, or other scientific source integration exists yet.
 - No background worker exists yet.
 - No LLM integration exists yet.
 - No RAG/vector search exists yet.
 - Study quality evaluation and evidence synthesis are not modeled beyond minimal placeholders.
+- Production migration strategy is not decided yet.
