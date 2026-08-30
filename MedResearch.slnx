@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MedResearch.Api/MedResearch.Api.csproj" />
+    <Project Path="src/MedResearch.Application/MedResearch.Application.csproj" />
+    <Project Path="src/MedResearch.Domain/MedResearch.Domain.csproj" />
+    <Project Path="src/MedResearch.Infrastructure/MedResearch.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MedResearch.Application.Tests/MedResearch.Application.Tests.csproj" />
+    <Project Path="tests/MedResearch.Domain.Tests/MedResearch.Domain.Tests.csproj" />
+    <Project Path="tests/MedResearch.IntegrationTests/MedResearch.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

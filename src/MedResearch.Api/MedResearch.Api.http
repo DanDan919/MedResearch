@@ -1,0 +1,4 @@
+@MedResearch.Api_HostAddress = http://localhost:5059
+
+GET {{MedResearch.Api_HostAddress}}/health
+Accept: application/json
