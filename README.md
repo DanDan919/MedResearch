@@ -6,7 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution skeleton, PostgreSQL persistence through EF Core, and a Docker Compose development environment. It does not yet implement research planning, scientific search, LLM extraction, RAG, or synthesis workflows.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, and the first end-to-end research API use case. A client can submit a research question, receive a queued research run id, and retrieve the run state.
+
+It does not yet implement research planning, scientific search, PubMed/Crossref integration, LLM extraction, RAG, background processing, or synthesis workflows.
 
 ## Stack Direction
 
@@ -16,7 +18,7 @@ This repository currently contains the documentation system, layered .NET soluti
 - Docker Compose for local development
 - xUnit
 - Testcontainers for PostgreSQL integration tests
-- Structured logging later
+- Structured logging through `ILogger`
 - Background workers later
 - LLM APIs later
 - pgvector later only if needed
@@ -57,6 +59,36 @@ GET /health
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts.
 
+## Research API
+
+Create a queued research run from a question:
+
+```text
+POST /api/research
+Content-Type: application/json
+
+{
+  "question": "Does chronic sleep deprivation impair working memory in adults?"
+}
+```
+
+Successful responses return `201 Created`, a `Location` header, and the queued run id:
+
+```json
+{
+  "researchRunId": "00000000-0000-0000-0000-000000000000",
+  "status": "Queued"
+}
+```
+
+Retrieve the current run state:
+
+```text
+GET /api/research/{researchRunId}
+```
+
+Invalid questions and missing runs use ASP.NET Core Problem Details responses.
+
 ## EF Core Migrations
 
 Restore local tools before running EF commands on a fresh machine:
@@ -86,7 +118,7 @@ dotnet test
 docker compose config
 ```
 
-Integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application and API tests run without Docker by using the Application persistence abstraction. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

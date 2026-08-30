@@ -28,9 +28,28 @@ Domain must not reference EF Core, ASP.NET Core, HTTP clients, LLM SDKs, Postgre
 - `MedResearch.Domain`: core research concepts, invariants, lifecycle rules, value decisions, and domain behavior.
 - `MedResearch.Application`: use-case orchestration, application services, ports, transactions, and workflow coordination.
 - `MedResearch.Infrastructure`: EF Core persistence, PostgreSQL configuration, external scientific APIs later, background processing implementation later, LLM clients later, and other adapters.
-- `MedResearch.Api`: HTTP endpoints, request/response contracts, authentication, authorization, API composition, and health check exposure.
+- `MedResearch.Api`: HTTP endpoints, request/response contracts, authentication, authorization, API composition, Problem Details responses, and health check exposure.
 
 Controllers and endpoints should not contain business rules.
+
+## Application Use Cases
+
+The first implemented use cases are:
+
+- `CreateResearchUseCase`: validates and records a research question, creates a linked queued `ResearchRun`, and logs the created run.
+- `GetResearchUseCase`: retrieves a research run projection for API readback.
+
+Application defines the `IResearchStore` persistence port. This is deliberately use-case-oriented rather than a generic repository. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the port through `EfResearchStore`.
+
+## HTTP API
+
+The API currently exposes:
+
+- `POST /api/research`: accepts a question and returns `201 Created` with the queued research run id.
+- `GET /api/research/{researchRunId}`: returns the run state and original question, or `404` when the run does not exist.
+- `GET /health`: runs standard ASP.NET Core health checks, including the PostgreSQL DbContext check.
+
+Validation and unexpected failures are returned as Problem Details. Internal exception details are logged but not exposed in server-error responses.
 
 ## Persistence
 
@@ -43,7 +62,9 @@ Persistence is implemented in `MedResearch.Infrastructure` with EF Core and Npgs
 
 Entity mappings live in separate `IEntityTypeConfiguration<T>` classes under `src/MedResearch.Infrastructure/Persistence/Configurations`.
 
-The first migration is `InitialCreate` under `src/MedResearch.Infrastructure/Persistence/Migrations`.
+The first migration is `20260830063109_InitialCreate` under `src/MedResearch.Infrastructure/Persistence/Migrations`.
+
+`EfResearchStore` persists the initial question/run pair in one EF Core transaction so a failed run insert cannot leave an orphaned question. Readback returns an Application projection rather than EF entities.
 
 ## Database Schema
 
@@ -92,10 +113,10 @@ A non-terminal run may be failed with a required failure reason or cancelled. Co
 
 ## Current Limitations
 
-- No application use case exists yet for submitting research questions.
 - No PubMed, Crossref, or other scientific source integration exists yet.
-- No background worker exists yet.
+- No background worker exists yet, so research runs remain queued after creation.
 - No LLM integration exists yet.
 - No RAG/vector search exists yet.
 - Study quality evaluation and evidence synthesis are not modeled beyond minimal placeholders.
 - Production migration strategy is not decided yet.
+- OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.

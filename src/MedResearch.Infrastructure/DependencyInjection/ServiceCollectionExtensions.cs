@@ -1,4 +1,6 @@
+using MedResearch.Application.Research;
 using MedResearch.Infrastructure.Persistence;
+using MedResearch.Infrastructure.Research;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,8 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(connectionString, npgsqlOptions =>
                 npgsqlOptions.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName)));
 
+        services.AddScoped<IResearchStore, EfResearchStore>();
+
         services.AddHealthChecks()
             .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql"]);
 
@@ -31,5 +35,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
 
 
