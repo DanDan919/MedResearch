@@ -1,9 +1,12 @@
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.Research;
+using MedResearch.Infrastructure.Research.Processing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MedResearch.Infrastructure.DependencyInjection;
 
@@ -23,6 +26,15 @@ public static class ServiceCollectionExtensions
                 npgsqlOptions.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName)));
 
         services.AddScoped<IResearchStore, EfResearchStore>();
+        services.AddScoped<IResearchRunQueue, PostgreSqlResearchRunQueue>();
+
+        var processingOptions = CreateResearchProcessingOptions(configuration);
+        services.AddSingleton(Options.Create(processingOptions));
+
+        if (processingOptions.Enabled)
+        {
+            services.AddHostedService<BackgroundResearchWorker>();
+        }
 
         services.AddHealthChecks()
             .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql"]);
@@ -34,7 +46,27 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    private static ResearchProcessingOptions CreateResearchProcessingOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(ResearchProcessingOptions.SectionName);
+        var enabled = true;
+        var idleDelayMilliseconds = 1_000;
+
+        if (bool.TryParse(section["Enabled"], out var configuredEnabled))
+        {
+            enabled = configuredEnabled;
+        }
+
+        if (int.TryParse(section["IdleDelayMilliseconds"], out var configuredIdleDelayMilliseconds))
+        {
+            idleDelayMilliseconds = configuredIdleDelayMilliseconds;
+        }
+
+        return new ResearchProcessingOptions
+        {
+            Enabled = enabled,
+            IdleDelayMilliseconds = idleDelayMilliseconds
+        };
+    }
 }
-
-
-

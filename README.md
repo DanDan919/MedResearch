@@ -6,20 +6,21 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, and the first end-to-end research API use case. A client can submit a research question, receive a queued research run id, and retrieve the run state.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, and durable background processing for queued research runs.
 
-It does not yet implement research planning, scientific search, PubMed/Crossref integration, LLM extraction, RAG, background processing, or synthesis workflows.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor currently performs deterministic placeholder stages only. It does not yet implement research planning, scientific search, PubMed/Crossref integration, LLM extraction, RAG, or evidence synthesis workflows.
 
 ## Stack Direction
 
 - C# and .NET 10
 - ASP.NET Core Web API
+- ASP.NET Core hosted background service
 - EF Core and PostgreSQL
 - Docker Compose for local development
 - xUnit
 - Testcontainers for PostgreSQL integration tests
 - Structured logging through `ILogger`
-- Background workers later
+- Separate worker executable later only if lifecycle or deployment needs justify it
 - LLM APIs later
 - pgvector later only if needed
 
@@ -57,7 +58,7 @@ The API listens on `http://localhost:8080` by default. The health check is avail
 GET /health
 ```
 
-The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts.
+The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker. Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`.
 
 ## Research API
 
@@ -87,7 +88,7 @@ Retrieve the current run state:
 GET /api/research/{researchRunId}
 ```
 
-Invalid questions and missing runs use ASP.NET Core Problem Details responses.
+The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, and server failures use ASP.NET Core Problem Details responses.
 
 ## EF Core Migrations
 
@@ -118,7 +119,7 @@ dotnet test
 docker compose config
 ```
 
-Application and API tests run without Docker by using the Application persistence abstraction. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application and API tests run without Docker by using Application persistence abstractions. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

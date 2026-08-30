@@ -24,6 +24,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__MedResearch: Host=postgres;Port=5432;Database=${POSTGRES_DB:-medresearch};Username=${POSTGRES_USER:-medresearch};Password=${POSTGRES_PASSWORD:-medresearch_dev_password}
       Database__ApplyMigrationsOnStartup: "true"
+      ResearchProcessing__Enabled: "true"
+      ResearchProcessing__IdleDelayMilliseconds: "1000"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
@@ -32,4 +34,5 @@ services:
 
 volumes:
   medresearch-postgres-data:
+
 
