@@ -1,5 +1,8 @@
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Infrastructure.Literature.Persistence;
+using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Research.Processing;
@@ -27,6 +30,19 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IResearchStore, EfResearchStore>();
         services.AddScoped<IResearchRunQueue, PostgreSqlResearchRunQueue>();
+        services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
+
+        var pubMedOptions = CreatePubMedOptions(configuration);
+        services.AddSingleton(Options.Create(pubMedOptions));
+        services.AddSingleton<PubMedSearchResponseParser>();
+        services.AddSingleton<PubMedArticleMapper>();
+        services.AddHttpClient<PubMedScientificLiteratureSource>(client =>
+        {
+            client.BaseAddress = new Uri(pubMedOptions.BaseUrl, UriKind.Absolute);
+            client.Timeout = pubMedOptions.Timeout;
+        });
+        services.AddScoped<IScientificLiteratureSource>(provider =>
+            provider.GetRequiredService<PubMedScientificLiteratureSource>());
 
         var processingOptions = CreateResearchProcessingOptions(configuration);
         services.AddSingleton(Options.Create(processingOptions));
@@ -68,5 +84,34 @@ public static class ServiceCollectionExtensions
             Enabled = enabled,
             IdleDelayMilliseconds = idleDelayMilliseconds
         };
+    }
+
+    private static PubMedOptions CreatePubMedOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(PubMedOptions.SectionName);
+
+        return new PubMedOptions
+        {
+            BaseUrl = string.IsNullOrWhiteSpace(section["BaseUrl"])
+                ? "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
+                : section["BaseUrl"]!,
+            Tool = string.IsNullOrWhiteSpace(section["Tool"])
+                ? "MedResearch"
+                : section["Tool"]!,
+            Email = string.IsNullOrWhiteSpace(section["Email"])
+                ? null
+                : section["Email"],
+            ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
+                ? null
+                : section["ApiKey"],
+            ResultLimit = TryReadInt(section["ResultLimit"], 10),
+            TimeoutSeconds = TryReadInt(section["TimeoutSeconds"], 15),
+            RequestIntervalMilliseconds = TryReadInt(section["RequestIntervalMilliseconds"], 350)
+        };
+    }
+
+    private static int TryReadInt(string? value, int defaultValue)
+    {
+        return int.TryParse(value, out var parsed) ? parsed : defaultValue;
     }
 }

@@ -26,6 +26,13 @@ services:
       Database__ApplyMigrationsOnStartup: "true"
       ResearchProcessing__Enabled: "true"
       ResearchProcessing__IdleDelayMilliseconds: "1000"
+      PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
+      PubMed__ResultLimit: ${PUBMED_RESULT_LIMIT:-10}
+      PubMed__TimeoutSeconds: "15"
+      PubMed__Tool: MedResearch
+      PubMed__Email: ${PUBMED_EMAIL:-}
+      PubMed__ApiKey: ${PUBMED_API_KEY:-}
+      PubMed__RequestIntervalMilliseconds: "350"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
@@ -34,5 +41,3 @@ services:
 
 volumes:
   medresearch-postgres-data:
-
-

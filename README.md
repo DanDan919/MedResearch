@@ -6,9 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, and durable background processing for queued research runs.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, and the first real scientific literature retrieval implementation through PubMed/NCBI E-utilities.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor currently performs deterministic placeholder stages only. It does not yet implement research planning, scientific search, PubMed/Crossref integration, LLM extraction, RAG, or evidence synthesis workflows.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor uses a deterministic query derived from the question during `Searching`, retrieves bounded PubMed metadata, normalizes it, and persists studies plus search provenance. It does not yet implement AI research planning, LLM extraction, RAG, evidence scoring, diagnosis, treatment recommendations, or synthesis workflows.
 
 ## Stack Direction
 
@@ -16,12 +16,13 @@ A client can submit a research question, receive a queued research run id, and r
 - ASP.NET Core Web API
 - ASP.NET Core hosted background service
 - EF Core and PostgreSQL
+- PubMed retrieval through official NCBI E-utilities
 - Docker Compose for local development
 - xUnit
 - Testcontainers for PostgreSQL integration tests
 - Structured logging through `ILogger`
 - Separate worker executable later only if lifecycle or deployment needs justify it
-- LLM APIs later
+- LLM APIs later behind provider-neutral abstractions
 - pgvector later only if needed
 
 ## Repository Layout
@@ -36,6 +37,7 @@ src/
 tests/
     MedResearch.Domain.Tests
     MedResearch.Application.Tests
+    MedResearch.Infrastructure.Tests
     MedResearch.IntegrationTests
 
 docs/
@@ -58,7 +60,21 @@ The API listens on `http://localhost:8080` by default. The health check is avail
 GET /health
 ```
 
-The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker. Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`.
+The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
+
+Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`.
+
+PubMed can be configured with:
+
+- `PubMed:BaseUrl`
+- `PubMed:ResultLimit` development default: 10
+- `PubMed:TimeoutSeconds` development default: 15
+- `PubMed:Tool`
+- `PubMed:Email`
+- `PubMed:ApiKey`
+- `PubMed:RequestIntervalMilliseconds` development default: 350
+
+Use `.env` for local secrets such as a real NCBI API key. Do not commit `.env`.
 
 ## Research API
 
@@ -90,6 +106,16 @@ GET /api/research/{researchRunId}
 
 The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, and server failures use ASP.NET Core Problem Details responses.
 
+## Scientific Retrieval
+
+`Searching` currently uses PubMed only. The flow is:
+
+```text
+ResearchQuestion -> deterministic PubMed query -> ESearch PMIDs -> EFetch XML -> normalized Study candidates -> PostgreSQL
+```
+
+Stored metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
+
 ## EF Core Migrations
 
 Restore local tools before running EF commands on a fresh machine:
@@ -119,7 +145,7 @@ dotnet test
 docker compose config
 ```
 
-Application and API tests run without Docker by using Application persistence abstractions. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application, Infrastructure, and API tests run without Docker. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

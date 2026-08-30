@@ -18,6 +18,10 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<Evidence> Evidence => Set<Evidence>();
 
+    public DbSet<LiteratureSearch> LiteratureSearches => Set<LiteratureSearch>();
+
+    public DbSet<ResearchStudyDiscovery> ResearchStudyDiscoveries => Set<ResearchStudyDiscovery>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MedResearchDbContext).Assembly);

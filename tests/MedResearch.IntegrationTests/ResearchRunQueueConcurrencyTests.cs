@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Research.Processing;
 using Microsoft.EntityFrameworkCore;
@@ -28,9 +29,9 @@ public sealed class ResearchRunQueueConcurrencyTests
         var claimedRun = await queue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, CancellationToken.None);
 
         Assert.NotNull(claimedRun);
-        Assert.Equal(runId, claimedRun.Id);
-        Assert.Equal(ResearchRunStatus.Planning, claimedRun.Status);
-        Assert.NotNull(claimedRun.StartedAt);
+        Assert.Equal(runId, claimedRun.Run.Id);
+        Assert.Equal(ResearchRunStatus.Planning, claimedRun.Run.Status);
+        Assert.NotNull(claimedRun.Run.StartedAt);
     }
 
     [SkippableFact]
@@ -50,7 +51,7 @@ public sealed class ResearchRunQueueConcurrencyTests
         var secondClaim = await secondQueue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, CancellationToken.None);
 
         Assert.NotNull(firstClaim);
-        Assert.Equal(runId, firstClaim.Id);
+        Assert.Equal(runId, firstClaim.Run.Id);
         Assert.Null(secondClaim);
     }
 
@@ -63,7 +64,7 @@ public sealed class ResearchRunQueueConcurrencyTests
         var runId = await SeedQueuedRunAsync("Can concurrent workers claim the same queued run?");
         using var startGate = new ManualResetEventSlim(false);
 
-        async Task<ResearchRun?> TryClaimAsync()
+        async Task<ClaimedResearchRun?> TryClaimAsync()
         {
             await using var context = _fixture.CreateDbContext();
             var queue = new PostgreSqlResearchRunQueue(context);
@@ -83,7 +84,7 @@ public sealed class ResearchRunQueueConcurrencyTests
 
         var successfulClaims = claims.Where(claim => claim is not null).ToArray();
         Assert.Single(successfulClaims);
-        Assert.Equal(runId, successfulClaims[0]!.Id);
+        Assert.Equal(runId, successfulClaims[0]!.Run.Id);
         Assert.Single(claims, claim => claim is null);
     }
 
@@ -106,8 +107,8 @@ public sealed class ResearchRunQueueConcurrencyTests
 
         Assert.NotNull(firstClaim);
         Assert.NotNull(secondClaim);
-        Assert.Equal([firstRunId, secondRunId], new[] { firstClaim.Id, secondClaim.Id }.Order().ToArray());
-        Assert.All(new[] { firstClaim, secondClaim }, claim => Assert.Equal(ResearchRunStatus.Planning, claim.Status));
+        Assert.Equal([firstRunId, secondRunId], new[] { firstClaim.Run.Id, secondClaim.Run.Id }.Order().ToArray());
+        Assert.All(new[] { firstClaim, secondClaim }, claim => Assert.Equal(ResearchRunStatus.Planning, claim.Run.Status));
     }
 
     [SkippableFact]
@@ -124,7 +125,7 @@ public sealed class ResearchRunQueueConcurrencyTests
             var run = await queue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, CancellationToken.None);
 
             Assert.NotNull(run);
-            run.StartSearching(DateTimeOffset.UtcNow);
+            run.Run.StartSearching(DateTimeOffset.UtcNow);
             await queue.SaveProgressAsync(run, CancellationToken.None);
         }
 
@@ -151,7 +152,7 @@ public sealed class ResearchRunQueueConcurrencyTests
 
             Assert.NotNull(run);
             var markedFailed = await queue.MarkFailedAsync(
-                run.Id,
+                run.Run.Id,
                 "Research processing failed.",
                 DateTimeOffset.UtcNow,
                 CancellationToken.None);
@@ -203,4 +204,3 @@ public sealed class ResearchRunQueueConcurrencyTests
         }
     }
 }
-

@@ -1,0 +1,62 @@
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID Version="1">12345678</PMID>
+      <Article>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <Year>2024</Year>
+              <Month>Feb</Month>
+              <Day>03</Day>
+            </PubDate>
+          </JournalIssue>
+          <Title>Journal of Sleep Research</Title>
+          <ISOAbbreviation>J Sleep Res</ISOAbbreviation>
+        </Journal>
+        <ArticleTitle>Sleep deprivation and working memory in adults.</ArticleTitle>
+        <ELocationID EIdType="doi">10.1000/SLEEP.2024.001</ELocationID>
+        <Abstract>
+          <AbstractText Label="BACKGROUND">Sleep loss may affect cognition.</AbstractText>
+          <AbstractText Label="RESULTS">Working memory performance declined after sleep deprivation.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author><ForeName>Ada</ForeName><LastName>Lovelace</LastName></Author>
+          <Author><CollectiveName>Sleep Research Group</CollectiveName></Author>
+        </AuthorList>
+        <PublicationTypeList>
+          <PublicationType>Journal Article</PublicationType>
+          <PublicationType>Clinical Trial</PublicationType>
+        </PublicationTypeList>
+      </Article>
+    </MedlineCitation>
+    <PubmedData>
+      <ArticleIdList>
+        <ArticleId IdType="pubmed">12345678</ArticleId>
+        <ArticleId IdType="doi">10.1000/SLEEP.2024.001</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID Version="1">87654321</PMID>
+      <Article>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <Year>2023</Year>
+            </PubDate>
+          </JournalIssue>
+          <ISOAbbreviation>Neuro Notes</ISOAbbreviation>
+        </Journal>
+        <ArticleTitle>Incomplete metadata should stay incomplete.</ArticleTitle>
+        <AuthorList>
+          <Author><LastName>Curie</LastName></Author>
+        </AuthorList>
+        <PublicationTypeList>
+          <PublicationType>Review</PublicationType>
+        </PublicationTypeList>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>

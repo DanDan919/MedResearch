@@ -30,12 +30,14 @@ public sealed class ResearchRunProcessor
             workerInstanceId);
 
         var claimedAt = DateTimeOffset.UtcNow;
-        var run = await _researchRunQueue.TryClaimNextQueuedRunAsync(claimedAt, cancellationToken);
+        var claimedRun = await _researchRunQueue.TryClaimNextQueuedRunAsync(claimedAt, cancellationToken);
 
-        if (run is null)
+        if (claimedRun is null)
         {
             return false;
         }
+
+        var run = claimedRun.Run;
 
         _logger.LogInformation(
             "ResearchRunClaimed. ResearchRunId: {ResearchRunId}; Status: {Status}; WorkerInstanceId: {WorkerInstanceId}",
@@ -45,25 +47,25 @@ public sealed class ResearchRunProcessor
 
         try
         {
-            await ExecuteCurrentStageAsync(run, ResearchRunStatus.Planning, workerInstanceId, cancellationToken);
+            await ExecuteCurrentStageAsync(claimedRun, ResearchRunStatus.Planning, workerInstanceId, cancellationToken);
             run.StartSearching(DateTimeOffset.UtcNow);
-            await _researchRunQueue.SaveProgressAsync(run, cancellationToken);
+            await _researchRunQueue.SaveProgressAsync(claimedRun, cancellationToken);
 
-            await ExecuteCurrentStageAsync(run, ResearchRunStatus.Searching, workerInstanceId, cancellationToken);
+            await ExecuteCurrentStageAsync(claimedRun, ResearchRunStatus.Searching, workerInstanceId, cancellationToken);
             run.StartExtraction(DateTimeOffset.UtcNow);
-            await _researchRunQueue.SaveProgressAsync(run, cancellationToken);
+            await _researchRunQueue.SaveProgressAsync(claimedRun, cancellationToken);
 
-            await ExecuteCurrentStageAsync(run, ResearchRunStatus.Extracting, workerInstanceId, cancellationToken);
+            await ExecuteCurrentStageAsync(claimedRun, ResearchRunStatus.Extracting, workerInstanceId, cancellationToken);
             run.StartEvaluation(DateTimeOffset.UtcNow);
-            await _researchRunQueue.SaveProgressAsync(run, cancellationToken);
+            await _researchRunQueue.SaveProgressAsync(claimedRun, cancellationToken);
 
-            await ExecuteCurrentStageAsync(run, ResearchRunStatus.Evaluating, workerInstanceId, cancellationToken);
+            await ExecuteCurrentStageAsync(claimedRun, ResearchRunStatus.Evaluating, workerInstanceId, cancellationToken);
             run.StartSynthesis(DateTimeOffset.UtcNow);
-            await _researchRunQueue.SaveProgressAsync(run, cancellationToken);
+            await _researchRunQueue.SaveProgressAsync(claimedRun, cancellationToken);
 
-            await ExecuteCurrentStageAsync(run, ResearchRunStatus.Synthesizing, workerInstanceId, cancellationToken);
+            await ExecuteCurrentStageAsync(claimedRun, ResearchRunStatus.Synthesizing, workerInstanceId, cancellationToken);
             run.Complete(DateTimeOffset.UtcNow);
-            await _researchRunQueue.SaveProgressAsync(run, cancellationToken);
+            await _researchRunQueue.SaveProgressAsync(claimedRun, cancellationToken);
 
             _logger.LogInformation(
                 "ResearchRunCompleted. ResearchRunId: {ResearchRunId}; Status: {Status}; WorkerInstanceId: {WorkerInstanceId}",
@@ -103,11 +105,13 @@ public sealed class ResearchRunProcessor
     }
 
     private async Task ExecuteCurrentStageAsync(
-        ResearchRun run,
+        ClaimedResearchRun claimedRun,
         ResearchRunStatus stage,
         string workerInstanceId,
         CancellationToken cancellationToken)
     {
+        var run = claimedRun.Run;
+
         _logger.LogInformation(
             "ResearchStageStarted. ResearchRunId: {ResearchRunId}; Stage: {Stage}; Status: {Status}; WorkerInstanceId: {WorkerInstanceId}",
             run.Id,
@@ -115,7 +119,9 @@ public sealed class ResearchRunProcessor
             run.Status,
             workerInstanceId);
 
-        await _stageExecutor.ExecuteAsync(stage, cancellationToken);
+        await _stageExecutor.ExecuteAsync(
+            new ResearchStageExecutionContext(run.Id, stage, claimedRun.ResearchQuestion, workerInstanceId),
+            cancellationToken);
 
         _logger.LogInformation(
             "ResearchStageCompleted. ResearchRunId: {ResearchRunId}; Stage: {Stage}; Status: {Status}; WorkerInstanceId: {WorkerInstanceId}",

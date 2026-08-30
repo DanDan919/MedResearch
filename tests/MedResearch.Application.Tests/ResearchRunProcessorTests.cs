@@ -10,7 +10,7 @@ public sealed class ResearchRunProcessorTests
     public async Task ProcessNextQueuedRunAsync_AdvancesClaimedRunThroughLifecycle()
     {
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(run);
+        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
         var stageExecutor = new RecordingStageExecutor();
         var processor = new ResearchRunProcessor(
             queue,
@@ -24,6 +24,12 @@ public sealed class ResearchRunProcessorTests
         Assert.NotNull(run.StartedAt);
         Assert.NotNull(run.CompletedAt);
         Assert.Null(run.FailureReason);
+        Assert.All(stageExecutor.Contexts, context =>
+        {
+            Assert.Equal(run.Id, context.ResearchRunId);
+            Assert.Equal("Does sleep improve memory?", context.ResearchQuestion);
+            Assert.Equal("worker-1", context.WorkerInstanceId);
+        });
         Assert.Equal(
             [
                 ResearchRunStatus.Planning,
@@ -32,7 +38,7 @@ public sealed class ResearchRunProcessorTests
                 ResearchRunStatus.Evaluating,
                 ResearchRunStatus.Synthesizing
             ],
-            stageExecutor.ExecutedStages);
+            stageExecutor.Contexts.Select(context => context.Stage).ToArray());
         Assert.Equal(
             [
                 ResearchRunStatus.Searching,
@@ -65,7 +71,7 @@ public sealed class ResearchRunProcessorTests
     public async Task ProcessNextQueuedRunAsync_MarksRunFailedWhenStageFails()
     {
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(run);
+        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
         var stageExecutor = new RecordingStageExecutor(ResearchRunStatus.Extracting);
         var processor = new ResearchRunProcessor(
             queue,
@@ -86,7 +92,7 @@ public sealed class ResearchRunProcessorTests
     {
         using var cancellation = new CancellationTokenSource();
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(run);
+        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
         var stageExecutor = new CancellingStageExecutor(cancellation);
         var processor = new ResearchRunProcessor(
             queue,
@@ -110,9 +116,9 @@ public sealed class ResearchRunProcessorTests
 
     private sealed class RecordingResearchRunQueue : IResearchRunQueue
     {
-        private readonly ResearchRun? _claimedRun;
+        private readonly ClaimedResearchRun? _claimedRun;
 
-        public RecordingResearchRunQueue(ResearchRun? claimedRun)
+        public RecordingResearchRunQueue(ClaimedResearchRun? claimedRun)
         {
             _claimedRun = claimedRun;
         }
@@ -121,14 +127,14 @@ public sealed class ResearchRunProcessorTests
 
         public bool MarkFailedWasCalled { get; private set; }
 
-        public Task<ResearchRun?> TryClaimNextQueuedRunAsync(DateTimeOffset claimedAt, CancellationToken cancellationToken)
+        public Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(DateTimeOffset claimedAt, CancellationToken cancellationToken)
         {
             return Task.FromResult(_claimedRun);
         }
 
-        public Task SaveProgressAsync(ResearchRun run, CancellationToken cancellationToken)
+        public Task SaveProgressAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
         {
-            SavedStatuses.Add(run.Status);
+            SavedStatuses.Add(claimedRun.Run.Status);
             return Task.CompletedTask;
         }
 
@@ -139,7 +145,7 @@ public sealed class ResearchRunProcessorTests
             CancellationToken cancellationToken)
         {
             MarkFailedWasCalled = true;
-            _claimedRun?.Fail(safeFailureReason, failedAt);
+            _claimedRun?.Run.Fail(safeFailureReason, failedAt);
             return Task.FromResult(true);
         }
     }
@@ -153,13 +159,13 @@ public sealed class ResearchRunProcessorTests
             _stageToFail = stageToFail;
         }
 
-        public List<ResearchRunStatus> ExecutedStages { get; } = [];
+        public List<ResearchStageExecutionContext> Contexts { get; } = [];
 
-        public Task ExecuteAsync(ResearchRunStatus stage, CancellationToken cancellationToken)
+        public Task ExecuteAsync(ResearchStageExecutionContext context, CancellationToken cancellationToken)
         {
-            ExecutedStages.Add(stage);
+            Contexts.Add(context);
 
-            if (stage == _stageToFail)
+            if (context.Stage == _stageToFail)
             {
                 throw new InvalidOperationException("Synthetic stage failure for processor testing.");
             }
@@ -177,7 +183,7 @@ public sealed class ResearchRunProcessorTests
             _cancellation = cancellation;
         }
 
-        public Task ExecuteAsync(ResearchRunStatus stage, CancellationToken cancellationToken)
+        public Task ExecuteAsync(ResearchStageExecutionContext context, CancellationToken cancellationToken)
         {
             _cancellation.Cancel();
             throw new OperationCanceledException(cancellationToken);

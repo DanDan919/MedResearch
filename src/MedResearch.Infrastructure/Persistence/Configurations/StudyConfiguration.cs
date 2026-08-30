@@ -40,17 +40,38 @@ internal sealed class StudyConfiguration : IEntityTypeConfiguration<Study>
             .HasColumnName("publication_date")
             .HasColumnType("date");
 
+        builder.Property(study => study.PublicationYear)
+            .HasColumnName("publication_year");
+
+        builder.Property(study => study.PublicationMonth)
+            .HasColumnName("publication_month");
+
+        builder.Property(study => study.PublicationDay)
+            .HasColumnName("publication_day");
+
+        builder.Property(study => study.PublicationTypes)
+            .HasColumnName("publication_types")
+            .HasColumnType("text[]")
+            .IsRequired();
+
+        builder.Property(study => study.Authors)
+            .HasColumnName("authors")
+            .HasColumnType("text[]")
+            .IsRequired();
+
         builder.Property(study => study.Source)
             .HasColumnName("source")
             .HasMaxLength(64)
             .IsRequired();
 
         builder.HasIndex(study => study.Doi)
-            .HasDatabaseName("ix_studies_doi")
-            .HasFilter("doi IS NOT NULL");
+            .HasDatabaseName("ux_studies_doi")
+            .HasFilter("doi IS NOT NULL")
+            .IsUnique();
 
         builder.HasIndex(study => study.Pmid)
-            .HasDatabaseName("ix_studies_pmid")
-            .HasFilter("pmid IS NOT NULL");
+            .HasDatabaseName("ux_studies_pmid")
+            .HasFilter("pmid IS NOT NULL")
+            .IsUnique();
     }
 }

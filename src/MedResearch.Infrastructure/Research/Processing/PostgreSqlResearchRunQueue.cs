@@ -17,7 +17,7 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         _dbContext = dbContext;
     }
 
-    public async Task<ResearchRun?> TryClaimNextQueuedRunAsync(
+    public async Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(
         DateTimeOffset claimedAt,
         CancellationToken cancellationToken)
     {
@@ -35,18 +35,27 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         await using var command = connection.CreateCommand();
         command.Transaction = transaction.GetDbTransaction();
         command.CommandText = """
-            UPDATE research_runs
+            UPDATE research_runs AS run
             SET status = @planning_status,
                 started_at = @claimed_at
-            WHERE id = (
-                SELECT id
-                FROM research_runs
-                WHERE status = @queued_status
-                ORDER BY created_at, id
+            FROM research_questions AS question
+            WHERE run.id = (
+                SELECT candidate.id
+                FROM research_runs AS candidate
+                WHERE candidate.status = @queued_status
+                ORDER BY candidate.created_at, candidate.id
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
             )
-            RETURNING id, research_question_id, status, created_at, started_at, completed_at, failure_reason;
+            AND question.id = run.research_question_id
+            RETURNING run.id,
+                run.research_question_id,
+                run.status,
+                run.created_at,
+                run.started_at,
+                run.completed_at,
+                run.failure_reason,
+                question.text;
             """;
 
         AddParameter(command, "planning_status", ResearchRunStatus.Planning.ToString());
@@ -69,16 +78,17 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             reader.IsDBNull(4) ? null : ReadDateTimeOffset(reader, 4),
             reader.IsDBNull(5) ? null : ReadDateTimeOffset(reader, 5),
             reader.IsDBNull(6) ? null : reader.GetString(6));
+        var question = reader.GetString(7);
 
         await reader.DisposeAsync();
         await transaction.CommitAsync(cancellationToken);
 
-        return run;
+        return new ClaimedResearchRun(run, question);
     }
 
-    public async Task SaveProgressAsync(ResearchRun run, CancellationToken cancellationToken)
+    public async Task SaveProgressAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
     {
-        _dbContext.ResearchRuns.Update(run);
+        _dbContext.ResearchRuns.Update(claimedRun.Run);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
