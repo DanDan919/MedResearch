@@ -6,6 +6,8 @@
 - Claimed research runs do not have a lease or automatic recovery path yet. If a process crashes after moving a run from `Queued` to an in-progress status, the run can remain in that state until an operator or future recovery workflow handles it.
 - OpenAI planning has no bounded retry policy yet. Configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures currently move the run through the existing safe failure path.
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.
+- Evidence extraction has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and grounding failures currently move the run through the existing safe failure path.
+- Evidence extraction is abstract-level only; full-text retrieval, section-aware extraction, and publisher/PDF source handling are not implemented.
 - PubMed retrieval has no bounded retry policy yet. Network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures currently move the run through the existing safe failure path.
 - PubMed request pacing is conservative but local to one process. There is no distributed rate limiter across multiple API instances.
 - `ResearchPlannerPrompt` is versioned but still embedded in code. Move prompts to a resource/template mechanism when prompt review, localization, or runtime prompt experiments become real needs.

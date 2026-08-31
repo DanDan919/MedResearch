@@ -37,3 +37,14 @@ Root cause: The repository or credentials were not ready at first, and the local
 Decision / fix: Kept the configured remote URL because it matched the requested owner/repository path. After explicit approval to export repository contents to the exact remote, `git push -u origin main` succeeded.
 Verification: `origin/main` existed at `bf85aa5e30ac81d20b83ea071a010f9cf412c915`, and local `main` tracked `origin/main`.
 Remaining concerns: None for the configured remote at the time of that verification.
+
+## 2026-08-31
+
+Date: 2026-08-31
+Area: Evidence migration
+Problem: EF warned that reshaping the placeholder `evidence` table may result in data loss.
+Observed behavior: `dotnet ef migrations add AddSourceGroundedEvidenceExtraction` scaffolded a migration that drops placeholder `claim` and `confidence` columns and adds required run/extraction/source-grounding fields.
+Root cause: The previous `Evidence` model was a deliberate placeholder without `ResearchRun`, extraction provenance, source scope, or supporting source text, so any rows in that shape cannot be faithfully upgraded into source-grounded evidence.
+Decision / fix: Kept the migration additive in history and documented the incompatibility. Did not rewrite older migrations or silently invent missing provenance for old rows.
+Verification: `dotnet build MedResearch.slnx --no-restore` and `dotnet test MedResearch.slnx --no-build` completed successfully after the model change; Docker-backed PostgreSQL tests remain skipped while Docker Desktop is unavailable.
+Remaining concerns: If a non-development database contains placeholder `evidence` rows, decide an explicit data migration/archive policy before applying this migration.

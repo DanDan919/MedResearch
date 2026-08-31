@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
@@ -79,19 +80,119 @@ public sealed class ScientificResearchStageExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NonPlanningAndNonSearchingStageDoesNotInvokePlannerOrSource()
+    public async Task ExecuteAsync_ExtractingStageExtractsAndPersistsSelectedStudies()
+    {
+        var study = CreateExtractionStudy("Improved recall was reported in 120 adults.");
+        var extractionStore = new RecordingEvidenceExtractionStore([study], 1);
+        var finding = new AcceptedEvidenceFinding(
+            "recall",
+            "Improved recall was reported.",
+            "Improved recall was reported in 120 adults.",
+            EvidenceDirection.Positive,
+            "adults",
+            null,
+            null,
+            null,
+            120,
+            null,
+            null,
+            null,
+            null,
+            null);
+        var extractor = new RecordingEvidenceExtractor(new EvidenceExtractionResult(
+            study.ResearchRunId,
+            study.StudyId,
+            EvidenceExtractionStatus.Completed,
+            null,
+            EvidenceSourceScope.Abstract,
+            "FakeLLM",
+            "fake-model",
+            EvidenceExtractionPrompt.Version,
+            DateTimeOffset.UtcNow,
+            true,
+            [finding]));
+        var executor = CreateExecutor(
+            new RecordingResearchPlanner(CreatePlan(["planned query"])),
+            new RecordingResearchPlanStore(CreatePlan(["planned query"])),
+            new RecordingScientificSource([]),
+            new RecordingSearchResultStore(),
+            extractor,
+            extractionStore);
+
+        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Extracting), CancellationToken.None);
+
+        Assert.Single(extractor.Contexts);
+        Assert.Single(extractionStore.Results);
+        Assert.Equal(EvidenceExtractionStatus.Completed, extractionStore.Results[0].Status);
+        Assert.Single(extractionStore.Results[0].Findings);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExtractingStagePersistsNoAbstractSkip()
+    {
+        var study = CreateExtractionStudy(null);
+        var extractionStore = new RecordingEvidenceExtractionStore([study], 1);
+        var extractor = new RecordingEvidenceExtractor(new EvidenceExtractionResult(
+            study.ResearchRunId,
+            study.StudyId,
+            EvidenceExtractionStatus.Skipped,
+            EvidenceExtractionSkipReason.NoExtractableText,
+            EvidenceSourceScope.Abstract,
+            null,
+            null,
+            EvidenceExtractionPrompt.Version,
+            DateTimeOffset.UtcNow,
+            false,
+            []));
+        var executor = CreateExecutor(
+            new RecordingResearchPlanner(CreatePlan(["planned query"])),
+            new RecordingResearchPlanStore(CreatePlan(["planned query"])),
+            new RecordingScientificSource([]),
+            new RecordingSearchResultStore(),
+            extractor,
+            extractionStore);
+
+        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Extracting), CancellationToken.None);
+
+        Assert.Single(extractionStore.Results);
+        Assert.Equal(EvidenceExtractionStatus.Skipped, extractionStore.Results[0].Status);
+        Assert.Equal(EvidenceExtractionSkipReason.NoExtractableText, extractionStore.Results[0].SkipReason);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExtractingStageProviderFailurePropagates()
+    {
+        var study = CreateExtractionStudy("Reported abstract.");
+        var executor = CreateExecutor(
+            new RecordingResearchPlanner(CreatePlan(["planned query"])),
+            new RecordingResearchPlanStore(CreatePlan(["planned query"])),
+            new RecordingScientificSource([]),
+            new RecordingSearchResultStore(),
+            new RecordingEvidenceExtractor(null, new EvidenceExtractionValidationException("provider failed")),
+            new RecordingEvidenceExtractionStore([study], 1));
+
+        await Assert.ThrowsAsync<EvidenceExtractionValidationException>(() =>
+            executor.ExecuteAsync(CreateContext(ResearchRunStatus.Extracting), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NonImplementedStagesDoNotInvokePlannerSourceOrExtractor()
     {
         var plan = CreatePlan(["planned query"]);
         var planner = new RecordingResearchPlanner(plan);
         var source = new RecordingScientificSource([]);
         var store = new RecordingSearchResultStore();
-        var executor = CreateExecutor(planner, new RecordingResearchPlanStore(plan), source, store);
+        var extractor = new RecordingEvidenceExtractor(null);
+        var extractionStore = new RecordingEvidenceExtractionStore([], 0);
+        var executor = CreateExecutor(planner, new RecordingResearchPlanStore(plan), source, store, extractor, extractionStore);
 
-        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Extracting), CancellationToken.None);
+        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Evaluating), CancellationToken.None);
 
         Assert.Null(planner.ResearchQuestion);
         Assert.Empty(source.Requests);
         Assert.Empty(store.Requests);
+        Assert.Empty(extractor.Contexts);
+        Assert.Empty(extractionStore.Results);
     }
 
     [Fact]
@@ -164,13 +265,18 @@ public sealed class ScientificResearchStageExecutorTests
         IResearchPlanner planner,
         IResearchPlanStore planStore,
         IScientificLiteratureSource source,
-        IScientificSearchResultStore store)
+        IScientificSearchResultStore store,
+        IEvidenceExtractor? evidenceExtractor = null,
+        IEvidenceExtractionStore? evidenceExtractionStore = null)
     {
         return new ScientificResearchStageExecutor(
             planner,
             planStore,
             source,
             store,
+            evidenceExtractor ?? new RecordingEvidenceExtractor(null),
+            evidenceExtractionStore ?? new RecordingEvidenceExtractionStore([], 0),
+            new EvidenceExtractionOptions(),
             NullLogger<ScientificResearchStageExecutor>.Instance);
     }
 
@@ -206,6 +312,25 @@ public sealed class ScientificResearchStageExecutorTests
             2024,
             null,
             null,
+            ["Journal Article"],
+            ["Ada Lovelace"],
+            "PubMed");
+    }
+
+    private static EvidenceExtractionStudyContext CreateExtractionStudy(string? abstractText)
+    {
+        return new EvidenceExtractionStudyContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Does sleep improve recall?",
+            null,
+            Guid.NewGuid(),
+            "Sleep and recall",
+            abstractText,
+            "12345678",
+            "10.1000/example",
+            "Journal",
+            new DateOnly(2026, 1, 1),
             ["Journal Article"],
             ["Ada Lovelace"],
             "PubMed");
@@ -339,6 +464,79 @@ public sealed class ScientificResearchStageExecutorTests
         {
             Requests.Add(request);
             return Task.FromResult(new ScientificSearchPersistenceResult(request.SearchExecutionId, request.Candidates.Count, 0));
+        }
+    }
+
+    private sealed class RecordingEvidenceExtractor : IEvidenceExtractor
+    {
+        private readonly EvidenceExtractionResult? _result;
+        private readonly Exception? _exception;
+
+        public RecordingEvidenceExtractor(EvidenceExtractionResult? result, Exception? exception = null)
+        {
+            _result = result;
+            _exception = exception;
+        }
+
+        public List<EvidenceExtractionStudyContext> Contexts { get; } = [];
+
+        public Task<EvidenceExtractionResult> ExtractAsync(
+            EvidenceExtractionStudyContext context,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Contexts.Add(context);
+
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
+            return Task.FromResult(_result ?? new EvidenceExtractionResult(
+                context.ResearchRunId,
+                context.StudyId,
+                EvidenceExtractionStatus.Skipped,
+                EvidenceExtractionSkipReason.NoExtractableText,
+                EvidenceSourceScope.Abstract,
+                null,
+                null,
+                EvidenceExtractionPrompt.Version,
+                DateTimeOffset.UtcNow,
+                false,
+                []));
+        }
+    }
+
+    private sealed class RecordingEvidenceExtractionStore : IEvidenceExtractionStore
+    {
+        private readonly IReadOnlyCollection<EvidenceExtractionStudyContext> _studies;
+        private readonly int _totalCount;
+
+        public RecordingEvidenceExtractionStore(IReadOnlyCollection<EvidenceExtractionStudyContext> studies, int totalCount)
+        {
+            _studies = studies;
+            _totalCount = totalCount;
+        }
+
+        public List<EvidenceExtractionResult> Results { get; } = [];
+
+        public Task<EvidenceExtractionWorkItemSet> FindStudiesForExtractionAsync(
+            Guid researchRunId,
+            string promptVersion,
+            int maxStudies,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new EvidenceExtractionWorkItemSet(_totalCount, _studies));
+        }
+
+        public Task PersistExtractionResultAsync(
+            EvidenceExtractionResult result,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Results.Add(result);
+            return Task.CompletedTask;
         }
     }
 }

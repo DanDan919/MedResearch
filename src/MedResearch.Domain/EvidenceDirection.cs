@@ -2,8 +2,9 @@ namespace MedResearch.Domain;
 
 public enum EvidenceDirection
 {
-    Supports = 0,
-    Contradicts = 1,
-    Mixed = 2,
-    Inconclusive = 3
+    NotReported = 0,
+    Positive = 1,
+    Negative = 2,
+    NoClearEffect = 3,
+    Mixed = 4
 }

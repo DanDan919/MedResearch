@@ -67,35 +67,76 @@ public sealed class PersistenceMappingTests
     }
 
     [SkippableFact]
-    public async Task Evidence_IsRelatedToStudy()
+    public async Task Evidence_IsRelatedToStudyResearchRunAndExtraction()
     {
         SkipIfPostgreSqlUnavailable();
 
         await using var context = _fixture.CreateDbContext();
+        var question = new ResearchQuestion("Does sleep improve recall?", DateTimeOffset.UtcNow);
+        var run = new ResearchRun(question.Id, question.CreatedAt);
         var study = new Study(
             Guid.NewGuid(),
             "Sleep and memory consolidation in adults",
-            "A controlled study of sleep and memory outcomes.",
+            "Recall improved after sleep in 120 adults.",
             "10.1234/example.doi",
             "12345678",
             "Journal of Neuroscience Examples",
             new DateOnly(2026, 1, 15),
             "PubMed");
+        var extraction = new EvidenceExtraction(
+            Guid.NewGuid(),
+            run.Id,
+            study.Id,
+            EvidenceExtractionStatus.Completed,
+            null,
+            EvidenceSourceScope.Abstract,
+            "FakeLLM",
+            "fake-model",
+            "evidence-extractor-v1",
+            DateTimeOffset.UtcNow,
+            1,
+            true);
         var evidence = new Evidence(
             Guid.NewGuid(),
+            run.Id,
             study.Id,
-            "Sleep was associated with improved recall in the studied cohort.",
-            EvidenceDirection.Supports,
-            0.7500m);
+            extraction.Id,
+            "recall",
+            "Recall improved after sleep.",
+            "Recall improved after sleep in 120 adults.",
+            EvidenceDirection.Positive,
+            EvidenceSourceScope.Abstract,
+            extraction.ExtractedAt,
+            true,
+            "adults",
+            null,
+            null,
+            null,
+            120,
+            null,
+            null,
+            null,
+            null,
+            null);
 
+        context.ResearchQuestions.Add(question);
+        context.ResearchRuns.Add(run);
         context.Studies.Add(study);
+        context.EvidenceExtractions.Add(extraction);
         context.Evidence.Add(evidence);
         await context.SaveChangesAsync();
 
         var savedEvidence = await context.Evidence.SingleAsync(saved => saved.Id == evidence.Id);
+        var savedExtraction = await context.EvidenceExtractions.SingleAsync(saved => saved.Id == savedEvidence.EvidenceExtractionId);
         var savedStudy = await context.Studies.SingleAsync(saved => saved.Id == savedEvidence.StudyId);
 
+        Assert.Equal(run.Id, savedEvidence.ResearchRunId);
         Assert.Equal(study.Id, savedEvidence.StudyId);
+        Assert.Equal(extraction.Id, savedEvidence.EvidenceExtractionId);
+        Assert.Equal("Recall improved after sleep in 120 adults.", savedEvidence.SupportingText);
+        Assert.Equal(120, savedEvidence.SampleSize);
+        Assert.True(savedEvidence.GroundingValidated);
+        Assert.Equal(EvidenceExtractionStatus.Completed, savedExtraction.Status);
         Assert.Equal(study.Title, savedStudy.Title);
     }
 
@@ -107,6 +148,3 @@ public sealed class PersistenceMappingTests
         }
     }
 }
-
-
-

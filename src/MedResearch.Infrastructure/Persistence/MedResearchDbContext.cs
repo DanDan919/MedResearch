@@ -20,6 +20,8 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<Evidence> Evidence => Set<Evidence>();
 
+    public DbSet<EvidenceExtraction> EvidenceExtractions => Set<EvidenceExtraction>();
+
     public DbSet<LiteratureSearch> LiteratureSearches => Set<LiteratureSearch>();
 
     public DbSet<ResearchStudyDiscovery> ResearchStudyDiscoveries => Set<ResearchStudyDiscovery>();

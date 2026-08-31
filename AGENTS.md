@@ -33,6 +33,8 @@ Before significant changes, read:
 18. Missing scientific data must remain missing/null rather than being guessed.
 19. Every scientific claim in the future synthesis layer must be traceable to its source.
 20. Medical output must be framed as evidence synthesis, not diagnosis or treatment advice.
+21. Persisted Evidence must be traceable to a Study and bounded source text.
+22. Abstract-level Evidence must not be represented as full-paper evidence.
 
 ## Development Trail
 

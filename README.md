@@ -6,9 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, and source-grounded abstract evidence extraction.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. It does not yet implement LLM extraction, RAG, evidence scoring, diagnosis, treatment recommendations, or synthesis workflows.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. It does not yet implement RAG, evidence scoring, diagnosis, treatment recommendations, or synthesis workflows.
 
 ## Stack Direction
 
@@ -16,7 +16,7 @@ A client can submit a research question, receive a queued research run id, and r
 - ASP.NET Core Web API
 - ASP.NET Core hosted background service
 - EF Core and PostgreSQL
-- OpenAI Responses API for strict structured planning output
+- OpenAI Responses API for strict structured planning and evidence extraction output
 - PubMed retrieval through official NCBI E-utilities
 - Docker Compose for local development
 - xUnit
@@ -63,7 +63,7 @@ GET /health
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
 
-Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`.
+Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50.
 
 AI planning can be configured with:
 
@@ -136,6 +136,14 @@ Multiple planned queries are executed sequentially. Each query creates its own `
 
 Stored study metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
 
+## Evidence Extraction
+
+`Extracting` currently works at abstract level only. A study with no usable PubMed abstract is recorded as a skipped extraction with `NoExtractableText`; it is not sent to the LLM provider and does not fail the run.
+
+Extracted `Evidence` rows are tied to both the global `Study` and the specific `ResearchRun`. Each completed attempt also creates an `EvidenceExtraction` provenance row with provider, model, prompt version, source scope, extraction timestamp, evidence count, and grounding validation status.
+
+The prompt version is `evidence-extractor-v1`. Supporting excerpts must be present in the supplied abstract after deterministic normalization. Numeric fields are persisted only when the value appears in the supplied source text; otherwise they remain null.
+
 ## EF Core Migrations
 
 Restore local tools before running EF commands on a fresh machine:
@@ -165,7 +173,7 @@ dotnet test
 docker compose config
 ```
 
-Application, Infrastructure, and API tests run without Docker. Planner tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application, Infrastructure, and API tests run without Docker. Planner and evidence extractor tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

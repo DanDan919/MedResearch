@@ -40,7 +40,7 @@ Implemented use cases are:
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
 - `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
-- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, and deterministic no-op behavior for stages that are not implemented yet.
+- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, and deterministic no-op behavior for stages that are not implemented yet.
 
 Application defines ports that reflect current use cases:
 
@@ -50,6 +50,8 @@ Application defines ports that reflect current use cases:
 - `IResearchPlanStore`: persistence boundary for accepted research plans.
 - `IScientificLiteratureSource`: provider-neutral scientific search boundary.
 - `IScientificSearchResultStore`: persistence boundary for normalized scientific candidates, search provenance, and discovery links.
+- `IEvidenceExtractor`: provider-neutral Application service for validating one study extraction request.
+- `IEvidenceExtractionStore`: persistence boundary for discovered-study extraction work items, extraction provenance, and extracted findings.
 
 These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, and PubMed adapters.
 
@@ -75,7 +77,7 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Planning` now produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. Extracting, Evaluating, and Synthesizing remain deterministic placeholders and do not generate fake evidence.
+`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` now performs abstract-level structured evidence extraction from discovered studies. Evaluating and Synthesizing remain deterministic placeholders and do not generate fake evidence.
 
 ## AI Research Planning
 
@@ -155,6 +157,35 @@ The adapter uses HttpClientFactory and does not create a new HttpClient per requ
 
 A valid plan may produce zero PubMed results. Zero-result searches are persisted and the pipeline may continue to later placeholder stages without fabricating studies or evidence.
 
+## Evidence Extraction
+
+Application performs evidence extraction through `EvidenceExtractor`, which reuses the existing provider-neutral `IStructuredLlmClient`. Infrastructure continues to own the concrete OpenAI HTTP adapter; Application does not depend on OpenAI-specific contracts.
+
+Current extraction flow:
+
+```text
+ResearchStudyDiscovery + Study abstract
+  -> EvidenceExtractor
+  -> IStructuredLlmClient
+  -> strict JSON Schema output
+  -> deterministic grounding and numeric validation
+  -> EvidenceExtraction provenance + Evidence findings
+```
+
+The approved LLM input scope is limited to the current research question, bounded `ResearchPlan` context, and the selected `Study` title, abstract, and metadata. No unrelated persisted records, secrets, raw provider payloads, or full-text claims are sent.
+
+The prompt version is `evidence-extractor-v1`. The prompt requires abstract-level extraction only, source-only behavior, null for absent fields, bounded direction labels, and no prose. The LLM is an extraction tool, not a scientific authority.
+
+Validation is deterministic:
+
+- `supportingText` must be a short excerpt present in the supplied abstract after whitespace/case normalization.
+- blank, excessive, or fabricated supporting excerpts fail validation.
+- numeric fields are kept only when the numeric value appears in the supplied abstract; otherwise they remain null.
+- duplicate findings are deduplicated before persistence.
+- unsupported directions or study design labels are rejected.
+
+A missing abstract is recorded as a skipped extraction with `NoExtractableText` and does not call the LLM. Provider, structured-output, validation, and grounding failures use the existing safe run failure path. Extraction runs sequentially and is bounded by `EvidenceExtraction:MaxStudiesPerRun`, default 10.
+
 ## Scientific Data Integrity
 
 External source data is untrusted input. OpenAI and PubMed transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
@@ -226,6 +257,7 @@ Persistence is implemented in `MedResearch.Infrastructure` with EF Core and Npgs
 - `ResearchRun`
 - `ResearchPlan`
 - `Study`
+- `EvidenceExtraction`
 - `Evidence`
 - `LiteratureSearch`
 - `ResearchStudyDiscovery`
@@ -258,6 +290,9 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 - `literature_searches(research_run_id, searched_at)` for run provenance lookup.
 - `literature_searches(research_plan_id)` for plan provenance lookup.
 - unique `research_study_discoveries(research_run_id, study_id)` so one run does not link the same global study twice.
+- unique `evidence_extractions(research_run_id, study_id, prompt_version)` for extraction idempotency.
+- `evidence_extractions(research_run_id, status)` for run extraction status queries.
+- `evidence(research_run_id)`, `evidence(study_id)`, and `evidence(evidence_extraction_id)` for later run and source traceability lookups.
 - EF-created FK indexes for relationships.
 
 ## Health Checks
@@ -282,14 +317,16 @@ The compose API service enables config-gated startup migrations with `Database__
 - `Study`: normalized scientific metadata reported by external sources. Missing source data remains missing.
 - `LiteratureSearch`: minimal reproducibility record for a source query run during a research run.
 - `ResearchStudyDiscovery`: association between one research run/search execution and a global study.
-- `Evidence`: minimal extracted claim linked to a study, with a direction and optional confidence. Evidence is not generated yet.
+- `EvidenceExtraction`
+- `EvidenceExtraction`: one extraction attempt/status/provenance row for one research run, one study, and one prompt version.
+- `Evidence`: one source-grounded abstract-level finding linked to a research run, study, and extraction attempt. Supporting excerpts must be traceable to the supplied study abstract.
 
 ## Current Limitations
 
 - No Crossref, Europe PMC, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
-- No LLM extraction, evidence synthesis output, or RAG/vector search exists yet.
+- No full-text extraction, evidence synthesis output, or RAG/vector search exists yet.
 - No automatic recovery exists yet for runs left in progress after a process crash.
 - Study quality evaluation and evidence synthesis are not modeled beyond minimal placeholders.
 - PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.

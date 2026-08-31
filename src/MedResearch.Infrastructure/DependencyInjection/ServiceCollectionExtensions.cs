@@ -1,9 +1,11 @@
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Ai;
+using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
 using MedResearch.Infrastructure.Ai.OpenAI;
+using MedResearch.Infrastructure.Extraction.Persistence;
 using MedResearch.Infrastructure.Literature.Persistence;
 using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
@@ -36,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearchRunQueue, PostgreSqlResearchRunQueue>();
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
+        services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
 
         var openAIOptions = CreateOpenAIOptions(configuration);
         if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
@@ -64,6 +67,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScientificLiteratureSource>(provider =>
             provider.GetRequiredService<PubMedScientificLiteratureSource>());
 
+        var evidenceExtractionOptions = CreateEvidenceExtractionOptions(configuration);
+        services.AddSingleton(evidenceExtractionOptions);
+
         var processingOptions = CreateResearchProcessingOptions(configuration);
         services.AddSingleton(Options.Create(processingOptions));
 
@@ -81,6 +87,16 @@ public static class ServiceCollectionExtensions
         }
 
         return services;
+    }
+
+    private static EvidenceExtractionOptions CreateEvidenceExtractionOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(EvidenceExtractionOptions.SectionName);
+
+        return new EvidenceExtractionOptions
+        {
+            MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
+        };
     }
 
     private static ResearchProcessingOptions CreateResearchProcessingOptions(IConfiguration configuration)

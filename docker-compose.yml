@@ -32,6 +32,7 @@ services:
       AI__ApiKey: ${OPENAI_API_KEY:-}
       AI__TimeoutSeconds: "30"
       AI__MaxOutputTokens: "2000"
+      EvidenceExtraction__MaxStudiesPerRun: ${EVIDENCE_EXTRACTION_MAX_STUDIES_PER_RUN:-10}
       PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
       PubMed__ResultLimit: ${PUBMED_RESULT_LIMIT:-10}
       PubMed__TimeoutSeconds: "15"

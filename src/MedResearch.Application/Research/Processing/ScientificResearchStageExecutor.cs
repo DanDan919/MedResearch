@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Domain;
@@ -12,6 +13,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     private readonly IResearchPlanStore _researchPlanStore;
     private readonly IScientificLiteratureSource _literatureSource;
     private readonly IScientificSearchResultStore _searchResultStore;
+    private readonly IEvidenceExtractor _evidenceExtractor;
+    private readonly IEvidenceExtractionStore _evidenceExtractionStore;
+    private readonly EvidenceExtractionOptions _evidenceExtractionOptions;
     private readonly ILogger<ScientificResearchStageExecutor> _logger;
 
     public ScientificResearchStageExecutor(
@@ -19,12 +23,18 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         IResearchPlanStore researchPlanStore,
         IScientificLiteratureSource literatureSource,
         IScientificSearchResultStore searchResultStore,
+        IEvidenceExtractor evidenceExtractor,
+        IEvidenceExtractionStore evidenceExtractionStore,
+        EvidenceExtractionOptions evidenceExtractionOptions,
         ILogger<ScientificResearchStageExecutor> logger)
     {
         _researchPlanner = researchPlanner;
         _researchPlanStore = researchPlanStore;
         _literatureSource = literatureSource;
         _searchResultStore = searchResultStore;
+        _evidenceExtractor = evidenceExtractor;
+        _evidenceExtractionStore = evidenceExtractionStore;
+        _evidenceExtractionOptions = evidenceExtractionOptions;
         _logger = logger;
     }
 
@@ -42,11 +52,22 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             return;
         }
 
-        if (context.Stage != ResearchRunStatus.Searching)
+        if (context.Stage == ResearchRunStatus.Searching)
         {
+            await ExecuteSearchingStageAsync(context, cancellationToken);
             return;
         }
 
+        if (context.Stage == ResearchRunStatus.Extracting)
+        {
+            await ExecuteExtractingStageAsync(context, cancellationToken);
+        }
+    }
+
+    private async Task ExecuteSearchingStageAsync(
+        ResearchStageExecutionContext context,
+        CancellationToken cancellationToken)
+    {
         var plan = await _researchPlanStore.FindByResearchRunIdAsync(context.ResearchRunId, cancellationToken);
         if (plan is null)
         {
@@ -57,6 +78,70 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         {
             await ExecuteSearchQueryAsync(context, plan, query, cancellationToken);
         }
+    }
+
+    private async Task ExecuteExtractingStageAsync(
+        ResearchStageExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var maxStudies = _evidenceExtractionOptions.BoundedMaxStudiesPerRun;
+        var stopwatch = Stopwatch.StartNew();
+        var workItems = await _evidenceExtractionStore.FindStudiesForExtractionAsync(
+            context.ResearchRunId,
+            EvidenceExtractionPrompt.Version,
+            maxStudies,
+            cancellationToken);
+
+        var skippedByLimit = Math.Max(0, workItems.TotalDiscoveredStudyCount - workItems.Studies.Count);
+
+        _logger.LogInformation(
+            "EvidenceExtractionStageStarted. ResearchRunId: {ResearchRunId}; PromptVersion: {PromptVersion}; TotalDiscoveredStudyCount: {TotalDiscoveredStudyCount}; SelectedStudyCount: {SelectedStudyCount}; SkippedByLimit: {SkippedByLimit}; MaxStudiesPerRun: {MaxStudiesPerRun}",
+            context.ResearchRunId,
+            EvidenceExtractionPrompt.Version,
+            workItems.TotalDiscoveredStudyCount,
+            workItems.Studies.Count,
+            skippedByLimit,
+            maxStudies);
+
+        var completed = 0;
+        var skipped = 0;
+        var persistedFindings = 0;
+
+        foreach (var study in workItems.Studies)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var result = await _evidenceExtractor.ExtractAsync(study, cancellationToken);
+            await _evidenceExtractionStore.PersistExtractionResultAsync(result, cancellationToken);
+
+            if (result.Status == EvidenceExtractionStatus.Skipped)
+            {
+                skipped++;
+            }
+            else
+            {
+                completed++;
+                persistedFindings += result.Findings.Count;
+            }
+
+            _logger.LogInformation(
+                "EvidencePersisted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; Status: {Status}; PromptVersion: {PromptVersion}; FindingCount: {FindingCount}",
+                result.ResearchRunId,
+                result.StudyId,
+                result.Status,
+                result.PromptVersion,
+                result.Findings.Count);
+        }
+
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "EvidenceExtractionStageCompleted. ResearchRunId: {ResearchRunId}; PromptVersion: {PromptVersion}; CompletedStudyCount: {CompletedStudyCount}; SkippedStudyCount: {SkippedStudyCount}; FindingCount: {FindingCount}; DurationMs: {DurationMs}",
+            context.ResearchRunId,
+            EvidenceExtractionPrompt.Version,
+            completed,
+            skipped,
+            persistedFindings,
+            stopwatch.ElapsedMilliseconds);
     }
 
     private async Task ExecuteSearchQueryAsync(
