@@ -58,7 +58,8 @@ public sealed class ResearchReportStoreTests
         await store.PersistReportAsync(result, CancellationToken.None);
 
         Assert.Equal(1, await context.ResearchReports.CountAsync(report => report.ResearchRunId == seed.RunId));
-        Assert.Equal(1, await context.ResearchReportClaims.CountAsync());
+        var report = await context.ResearchReports.SingleAsync(report => report.ResearchRunId == seed.RunId);
+        Assert.Equal(1, await context.ResearchReportClaims.CountAsync(claim => claim.ResearchReportId == report.Id));
     }
 
     [SkippableFact]

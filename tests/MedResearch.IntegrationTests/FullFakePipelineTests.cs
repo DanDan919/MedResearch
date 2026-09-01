@@ -11,6 +11,7 @@ using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
+using MedResearch.Infrastructure.Research.Processing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -159,6 +160,25 @@ public sealed partial class FullFakePipelineTests
                 services.RemoveAll<IHostedService>();
                 services.RemoveAll<IStructuredLlmClient>();
                 services.RemoveAll<IScientificLiteratureSource>();
+                services.RemoveAll<DbContextOptions<MedResearchDbContext>>();
+                services.RemoveAll<MedResearchDbContext>();
+                services.RemoveAll<IDbContextFactory<MedResearchDbContext>>();
+                services.RemoveAll<IResearchRunQueue>();
+
+                services.AddDbContext<MedResearchDbContext>(options =>
+                    options.UseNpgsql(
+                        _connectionString,
+                        npgsql => npgsql.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName)));
+
+                services.AddDbContextFactory<MedResearchDbContext>(
+                    options => options.UseNpgsql(
+                        _connectionString,
+                        npgsql => npgsql.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName)),
+                    ServiceLifetime.Scoped);
+
+                services.AddScoped<IResearchRunQueue>(provider =>
+                    new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
+
                 services.AddSingleton<IStructuredLlmClient>(_fakeLlm);
                 services.AddSingleton<IScientificLiteratureSource>(_fakeLiterature);
             });

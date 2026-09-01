@@ -233,6 +233,7 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
 
         if (!await reader.ReadAsync(cancellationToken))
         {
+            await reader.DisposeAsync();
             await transaction.CommitAsync(cancellationToken);
             return null;
         }

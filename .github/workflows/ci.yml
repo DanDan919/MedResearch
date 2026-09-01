@@ -52,7 +52,9 @@ jobs:
             $counters = Select-Xml -Path $trxPath -XPath "//*[local-name()='Counters']" | Select-Object -First 1
             if ($counters -ne $null) {
               $node = $counters.Node
-              Write-Host "TRX $($_.Name): total=$($node.total) executed=$($node.executed) passed=$($node.passed) failed=$($node.failed) skipped=$($node.notExecuted)"
+              $counterMessage = "total=$($node.total) executed=$($node.executed) passed=$($node.passed) failed=$($node.failed) skipped=$($node.notExecuted)"
+              Write-Host "TRX $($_.Name): $counterMessage"
+              Write-Host "::notice title=TRX $($_.Name)::$counterMessage"
             }
 
             Select-Xml -Path $trxPath -XPath "//*[local-name()='UnitTestResult' and @outcome='Failed']" | ForEach-Object {
