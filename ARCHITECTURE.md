@@ -40,7 +40,7 @@ Implemented use cases are:
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
 - `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
-- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and deterministic no-op behavior for stages that are not implemented yet.
+- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and traceable report generation during `Synthesizing`.
 
 Application defines ports that reflect current use cases:
 
@@ -54,6 +54,10 @@ Application defines ports that reflect current use cases:
 - `IEvidenceExtractionStore`: persistence boundary for discovered-study extraction work items, extraction provenance, and extracted findings.
 - `IEvidenceEvaluator`: provider-neutral Application service for source-aware methodological assessment.
 - `IEvidenceEvaluationStore`: persistence boundary for evaluation work items, provenance, structured assessment, and idempotency.
+- `ISynthesisCorpusStore`: persistence boundary for loading the current-run synthesis corpus.
+- `ISynthesisContextBuilder`: deterministic Application service for bounding and validating synthesis context.
+- `IResearchSynthesizer`: provider-neutral Application service for validated evidence synthesis.
+- `IResearchReportStore`: persistence/read boundary for synthesized reports, claims, and citations.
 
 These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, and PubMed adapters.
 
@@ -63,6 +67,7 @@ The API currently exposes:
 
 - `POST /api/research`: accepts a question and returns `201 Created` with the queued research run id. It does not wait for background processing.
 - `GET /api/research/{researchRunId}`: returns the run state and original question, including `Failed` state and safe failure reason when present, or `404` when the run does not exist.
+- `GET /api/research/{researchRunId}/report`: returns the persisted synthesis report with coverage, limitations, claims, and authoritative citations; returns `404` for unknown runs and `409` when the run exists but no report is ready.
 - `GET /health`: runs standard ASP.NET Core health checks, including the PostgreSQL DbContext check.
 
 Validation and unexpected failures are returned as Problem Details. Internal exception details are logged but not exposed in server-error responses.
@@ -79,7 +84,7 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. Synthesizing remains a deterministic placeholder and does not generate fake conclusions.
+`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. `Synthesizing` builds a bounded current-run context, creates a validated traceable `ResearchReport`, and persists claims linked to Evidence. Runs move to `Completed` only after the report exists, including explicit insufficient-evidence reports.
 
 ## AI Research Planning
 
@@ -157,7 +162,7 @@ PubMed configuration lives under `PubMed`:
 
 The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. Multiple planned queries are also executed sequentially. No live PubMed tests run by default.
 
-A valid plan may produce zero PubMed results. Zero-result searches are persisted and the pipeline may continue to later placeholder stages without fabricating studies or evidence.
+A valid plan may produce zero PubMed results. Zero-result searches are persisted. Later stages continue without fabricating studies or evidence; synthesis records explicit insufficient evidence when no validated findings exist.
 
 ## Evidence Extraction
 
@@ -216,6 +221,39 @@ A study with no extracted evidence is recorded as skipped with `NoExtractedEvide
 
 This evaluator is MedResearch's internal structured assessment. It is not formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
 
+## Evidence Synthesis
+
+Application performs evidence synthesis through `ResearchSynthesizer`, which reuses `IStructuredLlmClient` for strict structured output and validates model drafts before persistence.
+
+Current synthesis flow:
+
+```text
+ResearchRun corpus
+  -> EfResearchSynthesisStore current-run snapshot
+  -> SynthesisContextBuilder validation, bounding, and deterministic summaries
+  -> ResearchSynthesizer
+  -> IStructuredLlmClient when validated evidence exists
+  -> ResearchReportDraft validation
+  -> ResearchReport + ResearchReportClaim + ResearchReportClaimEvidence persistence
+```
+
+The synthesizer input boundary is limited to the authoritative current question, accepted plan context when present, search provenance, selected current-run studies, validated Evidence findings, EvidenceEvaluation records, outcome-direction summaries, and deterministic limitations. It does not receive unrelated runs, unrelated studies, credentials, logs, raw provider payloads, or full text that MedResearch has not persisted.
+
+The prompt version is `research-synthesizer-v1`. The prompt requires supplied-material-only behavior, traceable EvidenceId citations for every substantive claim, preservation of conflicts, explicit limitations, and no invented PMIDs, DOIs, studies, statistics, diagnoses, treatments, formal GRADE/RoB claims, pooled effects, or meta-analysis.
+
+Validation is deterministic after model output:
+
+- every completed report must contain at least one evidence-supported claim and one conclusion claim;
+- every persisted claim must cite supplied EvidenceIds from the same ResearchRun;
+- model-supplied PMID, DOI, or StudyId values are rejected;
+- claim direction must be compatible with cited evidence direction;
+- conflict or mixed claims require mixed evidence or opposing positive and negative evidence;
+- positive, negative, no-clear-effect, and not-reported claims cannot be supported by incompatible evidence directions;
+- no validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.
+
+The synthesis context is bounded by `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`. Selection uses deterministic ordering. If bounds truncate the corpus, the report stores and exposes that limitation.
+
+Outcome summaries use exact normalized outcome labels only. MedResearch deliberately does not semantically merge outcome names, detect cohort overlap, resolve systematic-review/primary-study citation overlap, vote count, or produce statistical certainty estimates.
 ## Scientific Data Integrity
 
 External source data is untrusted input. OpenAI and PubMed transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
@@ -291,6 +329,9 @@ Persistence is implemented in `MedResearch.Infrastructure` with EF Core and Npgs
 - `Evidence`
 - `LiteratureSearch`
 - `ResearchStudyDiscovery`
+- `ResearchReport`
+- `ResearchReportClaim`
+- `ResearchReportClaimEvidence`
 
 Entity mappings live in separate `IEntityTypeConfiguration<T>` classes under `src/MedResearch.Infrastructure/Persistence/Configurations`.
 
@@ -301,6 +342,7 @@ Migrations:
 - `20260830160612_AddStructuredResearchPlans`
 - `20260831142411_AddSourceGroundedEvidenceExtraction`
 - `20260831171340_AddStructuredEvidenceEvaluations`
+- `20260901021148_AddTraceableResearchReports`
 
 ## Database Schema
 
@@ -313,6 +355,9 @@ Migrations:
 - `evidence_extractions`: GUID primary key, required `research_run_id` and `study_id` FKs, status, optional skip reason, source scope, optional provider/model, prompt version, extraction timestamp, evidence count, and grounding validation flag.
 - `evidence`: GUID primary key, required FKs to research run, study, and evidence extraction, outcome, result summary, supporting source excerpt, direction, source scope, extraction timestamp, grounding validation flag, and nullable reported scientific fields for population, intervention/exposure, comparator, study design, sample size, effect measure/value, confidence interval bounds, and p-value.
 - `evidence_evaluations`: GUID primary key, required `research_run_id` and `study_id` FKs, evaluated evidence id array, status, optional skip reason, source scope, provider/model/prompt provenance, evaluated timestamp, structured methodological categories, limitation arrays, deterministic signal booleans, and unknown/insufficient-source counts.
+- `research_reports`: GUID primary key, required `research_run_id` FK, report status, optional insufficient-evidence reason, bounded report sections, synthesis confidence, optional provider/model, prompt version, generated timestamp, corpus counts, source coverage flags, searched-source array, and deterministic limitation array.
+- `research_report_claims`: GUID primary key, required `research_report_id` FK, claim type, direction, bounded claim text, and ordinal.
+- `research_report_claim_evidence`: composite primary key over `research_report_claim_id` and `evidence_id`, required FK to Evidence, and citation ordinal.
 
 Indexes and constraints are intentionally limited to current lookup/query needs:
 
@@ -330,6 +375,11 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 - unique `evidence_evaluations(research_run_id, study_id, prompt_version)` for evaluation idempotency.
 - `evidence_evaluations(research_run_id, status)` for run evaluation status queries.
 - `evidence_evaluations(study_id)` for study-to-evaluation traceability.
+- unique `research_reports(research_run_id, prompt_version)` for report idempotency.
+- `research_reports(research_run_id, status)` for run report status lookup.
+- unique `research_report_claims(research_report_id, ordinal)` for stable claim ordering.
+- `research_report_claim_evidence(evidence_id)` for evidence-to-report traceability.
+- unique `research_report_claim_evidence(research_report_claim_id, ordinal)` for stable citation ordering.
 - EF-created FK indexes for relationships.
 
 ## Health Checks
@@ -357,15 +407,18 @@ The compose API service enables config-gated startup migrations with `Database__
 - `EvidenceExtraction`: one extraction attempt/status/provenance row for one research run, one study, and one prompt version.
 - `Evidence`: one source-grounded abstract-level finding linked to a research run, study, and extraction attempt. Supporting excerpts must be traceable to the supplied study abstract.
 - `EvidenceEvaluation`: one internal structured methodological assessment for one research run, one study, and one evaluator prompt version. It is source-aware and categorical, not a numeric quality score or formal GRADE/RoB result.
+- `ResearchReport`: one persisted synthesis artifact for a research run and synthesizer prompt version, including report status, confidence category, source coverage, deterministic limitations, and provenance.
+- `ResearchReportClaim`: one accepted report claim with type, direction, text, and stable ordering.
+- `ResearchReportClaimEvidence`: join row linking a report claim to authoritative Evidence citations with stable citation ordering.
 
 ## Current Limitations
 
 - No Crossref, Europe PMC, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
-- No full-text extraction, evidence synthesis output, or RAG/vector search exists yet.
+- No full-text extraction or RAG/vector search exists yet.
 - No automatic recovery exists yet for runs left in progress after a process crash.
-- Formal study quality frameworks and evidence synthesis are not implemented.
+- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
 - PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - Rate limiting is conservative and local to the process; no distributed rate limiter exists.

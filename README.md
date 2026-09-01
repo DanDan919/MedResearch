@@ -6,9 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, source-grounded abstract evidence extraction, and structured source-aware evidence evaluation.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. It does not yet implement RAG, final synthesis, diagnosis, treatment recommendations, formal GRADE, or formal risk-of-bias frameworks.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
 
 ## Stack Direction
 
@@ -16,7 +16,7 @@ A client can submit a research question, receive a queued research run id, and r
 - ASP.NET Core Web API
 - ASP.NET Core hosted background service
 - EF Core and PostgreSQL
-- OpenAI Responses API for strict structured planning, evidence extraction, and evidence evaluation output
+- OpenAI Responses API for strict structured planning, evidence extraction, evidence evaluation, and evidence synthesis output
 - PubMed retrieval through official NCBI E-utilities
 - Docker Compose for local development
 - xUnit
@@ -63,7 +63,7 @@ GET /health
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
 
-Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50. Evidence evaluation volume can be configured with `EvidenceEvaluation:MaxStudiesPerRun` with the same default and bounds.
+Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50. Evidence evaluation volume can be configured with `EvidenceEvaluation:MaxStudiesPerRun` with the same default and bounds. Synthesis context size can be configured with `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`; defaults are 10, 40, and 12.
 
 AI planning can be configured with:
 
@@ -114,7 +114,15 @@ Retrieve the current run state:
 GET /api/research/{researchRunId}
 ```
 
-The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, and server failures use ASP.NET Core Problem Details responses.
+The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
+
+Retrieve the persisted synthesis report:
+
+```text
+GET /api/research/{researchRunId}/report
+```
+
+The report endpoint returns `200 OK` with coverage, deterministic limitations, claims, and authoritative Evidence/Study citations when a report exists. It returns `404 Not Found` for an unknown run and `409 Conflict` for a known run whose report is not ready.
 
 ## Research Planning
 
@@ -152,6 +160,14 @@ Evaluation uses categorical states rather than arbitrary numeric quality scores.
 
 The prompt version is `evidence-evaluator-v1`. The evaluator reuses `IStructuredLlmClient`; OpenAI remains an Infrastructure adapter. Normal tests use fake LLM providers. This is not GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
 
+## Evidence Synthesis
+
+`Synthesizing` creates a persisted `ResearchReport` for the current research run. It uses only validated current-run Evidence, current-run Study metadata, search provenance, extraction provenance, and study-level EvidenceEvaluation records.
+
+The prompt version is `research-synthesizer-v1`. The synthesis model returns strict structured output, but Application still validates every draft claim. Persisted claims must cite supplied EvidenceIds, cannot provide their own PMID/DOI/study identifiers, and must preserve direction semantics. Citation metadata returned by the API is reconstructed from persisted Evidence and Study rows.
+
+When no validated evidence exists, MedResearch creates an explicit `InsufficientEvidence` report without calling the LLM. Synthesis is qualitative only: no meta-analysis, vote counting, formal GRADE, formal risk-of-bias result, diagnosis, or treatment recommendation is produced.
+
 ## EF Core Migrations
 
 Restore local tools before running EF commands on a fresh machine:
@@ -181,7 +197,7 @@ dotnet test
 docker compose config
 ```
 
-Application, Infrastructure, and API tests run without Docker. Planner, evidence extractor, and evidence evaluator tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application, Infrastructure, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
 
 ## Development Notes
 

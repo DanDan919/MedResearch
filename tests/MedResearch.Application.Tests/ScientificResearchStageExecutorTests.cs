@@ -3,6 +3,7 @@ using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -177,7 +178,7 @@ public sealed class ScientificResearchStageExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NonImplementedStagesDoNotInvokePlannerSourceExtractorOrEvaluator()
+    public async Task ExecuteAsync_TerminalStagesDoNotInvokePlannerSourceExtractorEvaluatorOrSynthesizer()
     {
         var plan = CreatePlan(["planned query"]);
         var planner = new RecordingResearchPlanner(plan);
@@ -187,7 +188,7 @@ public sealed class ScientificResearchStageExecutorTests
         var extractionStore = new RecordingEvidenceExtractionStore([], 0);
         var executor = CreateExecutor(planner, new RecordingResearchPlanStore(plan), source, store, extractor, extractionStore);
 
-        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Synthesizing), CancellationToken.None);
+        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Completed), CancellationToken.None);
 
         Assert.Null(planner.ResearchQuestion);
         Assert.Empty(source.Requests);
@@ -270,7 +271,10 @@ public sealed class ScientificResearchStageExecutorTests
         IEvidenceExtractor? evidenceExtractor = null,
         IEvidenceExtractionStore? evidenceExtractionStore = null,
         IEvidenceEvaluator? evidenceEvaluator = null,
-        IEvidenceEvaluationStore? evidenceEvaluationStore = null)
+        IEvidenceEvaluationStore? evidenceEvaluationStore = null,
+        ISynthesisContextBuilder? synthesisContextBuilder = null,
+        IResearchSynthesizer? researchSynthesizer = null,
+        IResearchReportStore? researchReportStore = null)
     {
         return new ScientificResearchStageExecutor(
             planner,
@@ -283,6 +287,9 @@ public sealed class ScientificResearchStageExecutorTests
             evidenceEvaluator ?? new RecordingEvidenceEvaluator(null),
             evidenceEvaluationStore ?? new RecordingEvidenceEvaluationStore([], 0),
             new EvidenceEvaluationOptions(),
+            synthesisContextBuilder ?? new RecordingSynthesisContextBuilder(CreateSynthesisContext()),
+            researchSynthesizer ?? new RecordingResearchSynthesizer(CreateSynthesisResult(CreateSynthesisContext())),
+            researchReportStore ?? new RecordingResearchReportStore(),
             NullLogger<ScientificResearchStageExecutor>.Instance);
     }
 
@@ -450,6 +457,88 @@ public sealed class ScientificResearchStageExecutorTests
             new EvidenceEvaluationSignalSet(EvidenceSourceScope.Abstract, 0, false, false, false, false, false, StudyDesignClassification.Unknown, []),
             4,
             5);
+    }
+
+    private static SynthesisContext CreateSynthesisContext(Guid? runId = null, IReadOnlyCollection<SynthesisEvidenceContext>? evidence = null)
+    {
+        var researchRunId = runId ?? Guid.NewGuid();
+        var studyId = Guid.NewGuid();
+        evidence ??= [CreateSynthesisEvidence(researchRunId, studyId, Guid.NewGuid(), EvidenceDirection.Positive)];
+        var studies = evidence
+            .GroupBy(item => item.StudyId)
+            .Select(group => new SynthesisStudyContext(
+                group.Key,
+                "Sleep and recall",
+                "12345678",
+                "10.1000/example",
+                "Journal",
+                new DateOnly(2026, 1, 1),
+                ["Journal Article"],
+                ["Ada Lovelace"],
+                "PubMed",
+                null,
+                group.ToArray()))
+            .ToArray();
+        var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0);
+        var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
+
+        return new SynthesisContext(
+            researchRunId,
+            Guid.NewGuid(),
+            "Does sleep improve recall?",
+            new SynthesisPlanContext(Guid.NewGuid(), "adults", "sleep", "wakefulness", ["recall"], ["controlled trial"], ["sleep recall"], []),
+            statistics,
+            coverage,
+            studies,
+            [new SynthesisOutcomeDirectionSummary("recall", 1, 0, 0, 0, 0, SynthesisConflictStatus.Unknown)],
+            ["Current evidence is abstract-level."]);
+    }
+
+    private static SynthesisEvidenceContext CreateSynthesisEvidence(Guid runId, Guid studyId, Guid evidenceId, EvidenceDirection direction)
+    {
+        return new SynthesisEvidenceContext(
+            evidenceId,
+            runId,
+            studyId,
+            "recall",
+            "Recall improved after sleep.",
+            "reported improved recall in 120 adults",
+            direction,
+            EvidenceSourceScope.Abstract,
+            DateTimeOffset.UtcNow,
+            "adults",
+            "sleep",
+            "wakefulness",
+            "controlled trial",
+            120,
+            null,
+            null,
+            null,
+            null,
+            null);
+    }
+
+    private static ResearchSynthesisResult CreateSynthesisResult(SynthesisContext context)
+    {
+        var evidenceId = context.Studies.SelectMany(study => study.Evidence).FirstOrDefault()?.EvidenceId ?? Guid.NewGuid();
+        return new ResearchSynthesisResult(
+            context.ResearchRunId,
+            ResearchReportStatus.Completed,
+            null,
+            "Executive summary.",
+            "Evidence summary.",
+            "Conflict summary.",
+            "Limitations summary.",
+            "Conclusion.",
+            SynthesisConfidence.Limited,
+            "FakeLLM",
+            "fake-model",
+            ResearchSynthesisPrompt.Version,
+            DateTimeOffset.UtcNow,
+            context.Statistics,
+            context.SourceCoverage,
+            context.DeterministicLimitations,
+            [new AcceptedResearchReportClaim(ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Conclusion claim.", [evidenceId], 0)]);
     }
     private sealed class RecordingResearchPlanner : IResearchPlanner
     {
@@ -656,6 +745,83 @@ public sealed class ScientificResearchStageExecutorTests
 
         }
 
+
+    private sealed class RecordingSynthesisContextBuilder : ISynthesisContextBuilder
+    {
+        private readonly SynthesisContext _context;
+        private readonly Exception? _exception;
+
+        public RecordingSynthesisContextBuilder(SynthesisContext context, Exception? exception = null)
+        {
+            _context = context;
+            _exception = exception;
+        }
+
+        public List<Guid> Requests { get; } = [];
+
+        public Task<SynthesisContext> BuildAsync(Guid researchRunId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(researchRunId);
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
+            return Task.FromResult(_context with { ResearchRunId = researchRunId });
+        }
+    }
+
+    private sealed class RecordingResearchSynthesizer : IResearchSynthesizer
+    {
+        private readonly ResearchSynthesisResult _result;
+        private readonly Exception? _exception;
+
+        public RecordingResearchSynthesizer(ResearchSynthesisResult result, Exception? exception = null)
+        {
+            _result = result;
+            _exception = exception;
+        }
+
+        public List<SynthesisContext> Contexts { get; } = [];
+
+        public Task<ResearchSynthesisResult> SynthesizeAsync(SynthesisContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Contexts.Add(context);
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
+            return Task.FromResult(_result with { ResearchRunId = context.ResearchRunId });
+        }
+    }
+
+    private sealed class RecordingResearchReportStore : IResearchReportStore
+    {
+        public bool ExistingReport { get; init; }
+
+        public List<ResearchSynthesisResult> Results { get; } = [];
+
+        public Task<bool> HasReportAsync(Guid researchRunId, string promptVersion, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(ExistingReport);
+        }
+
+        public Task PersistReportAsync(ResearchSynthesisResult result, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Results.Add(result);
+            return Task.CompletedTask;
+        }
+
+        public Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<ResearchReportReadModel?>(null);
+        }
+    }
     private sealed class RecordingEvidenceEvaluator : IEvidenceEvaluator
     {
         private readonly EvidenceEvaluationResult? _result;

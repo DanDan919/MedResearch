@@ -5,6 +5,7 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
 using MedResearch.Infrastructure.Evaluation.Persistence;
@@ -14,6 +15,7 @@ using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.Planning.Persistence;
 using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Research.Processing;
+using MedResearch.Infrastructure.Synthesis.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +44,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
         services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
         services.AddScoped<IEvidenceEvaluationStore, EfEvidenceEvaluationStore>();
+        services.AddScoped<EfResearchSynthesisStore>();
+        services.AddScoped<ISynthesisCorpusStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
+        services.AddScoped<IResearchReportStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
 
         var openAIOptions = CreateOpenAIOptions(configuration);
         if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
@@ -72,6 +77,12 @@ public static class ServiceCollectionExtensions
 
         var evidenceExtractionOptions = CreateEvidenceExtractionOptions(configuration);
         services.AddSingleton(evidenceExtractionOptions);
+
+        var evidenceEvaluationOptions = CreateEvidenceEvaluationOptions(configuration);
+        services.AddSingleton(evidenceEvaluationOptions);
+
+        var synthesisOptions = CreateSynthesisOptions(configuration);
+        services.AddSingleton(synthesisOptions);
 
         var processingOptions = CreateResearchProcessingOptions(configuration);
         services.AddSingleton(Options.Create(processingOptions));
@@ -109,6 +120,18 @@ public static class ServiceCollectionExtensions
         return new EvidenceEvaluationOptions
         {
             MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
+        };
+    }
+
+    private static SynthesisOptions CreateSynthesisOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(SynthesisOptions.SectionName);
+
+        return new SynthesisOptions
+        {
+            MaxStudies = TryReadInt(section["MaxStudies"], 10),
+            MaxEvidenceFindings = TryReadInt(section["MaxEvidenceFindings"], 40),
+            MaxClaims = TryReadInt(section["MaxClaims"], 12)
         };
     }
 

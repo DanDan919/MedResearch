@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-08-31
+Date: 2026-09-01
 
 ## Exists Now
 
@@ -23,6 +23,7 @@ Date: 2026-08-31
 - First end-to-end research API use case:
   - `POST /api/research` creates a `ResearchQuestion` and queued `ResearchRun`.
   - `GET /api/research/{researchRunId}` retrieves the run state and original question.
+  - `GET /api/research/{researchRunId}/report` retrieves the persisted synthesis report when ready.
   - API endpoints call Application use cases and do not query EF directly.
   - Invalid input, missing runs, and unexpected failures are returned as Problem Details.
 - Durable background research processing:
@@ -32,7 +33,8 @@ Date: 2026-08-31
   - `Searching` consumes persisted `ResearchPlan.SearchQueries` and performs real PubMed retrieval through provider-neutral Application contracts.
   - `Extracting` performs source-grounded abstract-level evidence extraction for discovered studies.
   - `Evaluating` performs structured source-aware methodological evidence evaluation from study metadata, extraction provenance, and grounded evidence.
-  - Synthesizing remains a deterministic placeholder and does not generate fake conclusions.
+  - `Synthesizing` builds bounded current-run synthesis context and persists a traceable `ResearchReport` with claims linked to Evidence.
+  - Runs move to Completed only after report persistence succeeds or an explicit insufficient-evidence report is created.
 - Structured AI research planning:
   - `IStructuredLlmClient` provider-neutral Application boundary.
   - `ResearchPlanner` Application service.
@@ -68,6 +70,15 @@ Date: 2026-08-31
   - Studies with no extracted evidence are recorded as skipped with `NoExtractedEvidence` and are not sent to the LLM.
   - Provider, malformed output, validation, and unsupported methodological claims use the existing safe run failure path.
   - `EvidenceEvaluation:MaxStudiesPerRun` defaults to 10 and is bounded between 1 and 50.
+- Traceable evidence synthesis:
+  - `ISynthesisCorpusStore`, `ISynthesisContextBuilder`, `IResearchSynthesizer`, and `IResearchReportStore` in Application.
+  - `SynthesisContextBuilder` validates current-run corpus identity, discovered-study membership, evidence/evaluation/extraction/search run scope, and evaluation EvidenceIds.
+  - Context selection is deterministic and bounded by `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`.
+  - Prompt version `research-synthesizer-v1` with strict structured output.
+  - Every persisted completed-report claim must cite supplied EvidenceIds from the same ResearchRun.
+  - Citation authority comes from persisted Evidence and Study rows; model-supplied PMID, DOI, and StudyId are rejected.
+  - No validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.
+  - Synthesis is qualitative only: no meta-analysis, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation.
 - Application persistence boundaries:
   - `IResearchStore` for HTTP create/read use cases.
   - `IResearchRunQueue` for worker claim/progress/failure operations.
@@ -75,15 +86,18 @@ Date: 2026-08-31
   - `IScientificSearchResultStore` for normalized scientific candidates, search provenance, and discovery links.
   - `IEvidenceExtractionStore` for extraction work items, provenance, idempotency, and evidence persistence.
   - `IEvidenceEvaluationStore` for evaluation work items, provenance, idempotency, and structured assessment persistence.
+  - `ISynthesisCorpusStore` for loading current-run synthesis corpus snapshots.
+  - `IResearchReportStore` for idempotent report persistence and report read models.
 - EF Core PostgreSQL persistence in Infrastructure:
   - `MedResearchDbContext`
-  - explicit entity configurations for ResearchQuestion, ResearchRun, ResearchPlan, Study, Evidence, EvidenceExtraction, EvidenceEvaluation, LiteratureSearch, and ResearchStudyDiscovery
+  - explicit entity configurations for ResearchQuestion, ResearchRun, ResearchPlan, Study, Evidence, EvidenceExtraction, EvidenceEvaluation, LiteratureSearch, ResearchStudyDiscovery, ResearchReport, ResearchReportClaim, and ResearchReportClaimEvidence
   - migrations:
     - `20260830063109_InitialCreate`
     - `20260830114130_AddLiteratureSearchProvenance`
     - `20260830160612_AddStructuredResearchPlans`
     - `20260831142411_AddSourceGroundedEvidenceExtraction`
     - `20260831171340_AddStructuredEvidenceEvaluations`
+    - `20260901021148_AddTraceableResearchReports`
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
@@ -91,6 +105,7 @@ Date: 2026-08-31
   - OpenAI and PubMed environment placeholders in `.env.example`
   - `EvidenceExtraction__MaxStudiesPerRun` wired from `.env.example`
   - `EvidenceEvaluation__MaxStudiesPerRun` wired from `.env.example`
+  - `Synthesis__MaxStudies`, `Synthesis__MaxEvidenceFindings`, and `Synthesis__MaxClaims` wired from `.env.example`
 - Domain concepts:
   - `ResearchQuestion`
   - `ResearchRun`
@@ -113,12 +128,20 @@ Date: 2026-08-31
   - `ComparatorPresence`
   - `DirectnessRating`
   - `MethodologicalConfidence`
+  - `ResearchReport`
+  - `ResearchReportStatus`
+  - `ResearchReportInsufficientEvidenceReason`
+  - `ResearchReportClaim`
+  - `ResearchReportClaimType`
+  - `ResearchReportClaimDirection`
+  - `ResearchReportClaimEvidence`
+  - `SynthesisConfidence`
 - Tests:
   - Domain unit tests for question validation and research run lifecycle behavior.
-  - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, cancellation, and provider failure propagation.
+  - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, and provider failure propagation.
   - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior.
-  - API integration tests using `WebApplicationFactory` and a fake `IResearchStore`, so endpoint behavior runs without Docker and does not start hosted services.
-  - PostgreSQL integration tests using Testcontainers for research persistence, queue semantics, plan/search persistence, and evidence extraction persistence, and evidence evaluation persistence. They run against real PostgreSQL when Docker is reachable and are currently skipped because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
+  - PostgreSQL integration tests using Testcontainers for research persistence, queue semantics, plan/search persistence, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, and current-run corpus loading. They run against real PostgreSQL when Docker is reachable and are currently skipped because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
 
 ## Environment Status
 
@@ -130,7 +153,7 @@ Date: 2026-08-31
 
 ## Next Logical Milestone
 
-Add source-grounded synthesis planning after reviewing evaluation traceability. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
+Add stale in-progress run recovery and operational hardening before expanding more external scientific or LLM providers. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
 
 ## Not Yet Implemented
 
@@ -139,7 +162,10 @@ Add source-grounded synthesis planning after reviewing evaluation traceability. 
 - Additional LLM providers beyond OpenAI.
 - Full-text extraction.
 - Formal study quality frameworks such as GRADE, RoB 2, ROBINS-I, AMSTAR-2, or NOS.
-- Evidence synthesis output.
+- Full-text evidence synthesis.
+- Formal meta-analysis or pooled effect estimation.
+- Semantic outcome harmonization.
+- Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
 - PubMed retry policy or distributed rate limiting.
 - OpenAI retry policy.

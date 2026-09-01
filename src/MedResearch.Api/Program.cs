@@ -1,6 +1,7 @@
 using MedResearch.Api.Research;
 using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -99,8 +100,94 @@ research.MapGet("/{researchRunId:guid}", async (
     .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
+
+research.MapGet("/{researchRunId:guid}/report", async (
+        Guid researchRunId,
+        GetResearchUseCase getResearchUseCase,
+        GetResearchReportUseCase getReportUseCase,
+        CancellationToken cancellationToken) =>
+    {
+        var run = await getResearchUseCase.ExecuteAsync(researchRunId, cancellationToken);
+        if (run is null)
+        {
+            return Results.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Research run not found"
+            });
+        }
+
+        var report = await getReportUseCase.ExecuteAsync(researchRunId, cancellationToken);
+        if (report is null)
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Research report is not ready",
+                Extensions =
+                {
+                    ["researchRunId"] = researchRunId,
+                    ["researchRunStatus"] = run.Status
+                }
+            });
+        }
+
+        return Results.Ok(ToReportResponse(report));
+    })
+    .WithName("GetResearchReport")
+    .Produces<ResearchReportResponse>(StatusCodes.Status200OK)
+    .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+    .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+    .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 app.Run();
 
+static ResearchReportResponse ToReportResponse(ResearchReportReadModel report)
+{
+    return new ResearchReportResponse(
+        report.ResearchRunId,
+        report.ResearchReportId,
+        report.Status.ToString(),
+        report.InsufficientEvidenceReason?.ToString(),
+        report.Question,
+        report.ExecutiveSummary,
+        report.EvidenceSummary,
+        report.ConflictSummary,
+        report.LimitationsSummary,
+        report.Conclusion,
+        report.SynthesisConfidence.ToString(),
+        report.PromptVersion,
+        report.GeneratedAt,
+        new ResearchReportCoverageResponse(
+            report.Coverage.DiscoveredStudyCount,
+            report.Coverage.ExtractedStudyCount,
+            report.Coverage.EvaluatedStudyCount,
+            report.Coverage.EvidenceFindingCount,
+            report.Coverage.IncludedStudyCount,
+            report.Coverage.IncludedEvidenceFindingCount,
+            report.Coverage.SearchQueryCount,
+            report.Coverage.StudiesWithNoExtractableEvidence,
+            report.Coverage.StudiesWithInsufficientEvaluationSource,
+            report.Coverage.PotentialConflictDetected,
+            report.Coverage.EvidenceTruncated,
+            report.Coverage.UsesAbstractLevelEvidenceOnly,
+            report.Coverage.SearchedSources),
+        report.DeterministicLimitations,
+        report.Claims.Select(claim => new ResearchReportClaimResponse(
+            claim.ClaimId,
+            claim.ClaimType.ToString(),
+            claim.Direction.ToString(),
+            claim.Text,
+            claim.Ordinal,
+            claim.Citations.Select(citation => new ResearchReportCitationResponse(
+                citation.EvidenceId,
+                citation.StudyId,
+                citation.Pmid,
+                citation.Doi,
+                citation.Title,
+                citation.SupportingText,
+                citation.EvidenceDirection.ToString(),
+                citation.Ordinal)).ToArray())).ToArray());
+}
 public partial class Program
 {
 }

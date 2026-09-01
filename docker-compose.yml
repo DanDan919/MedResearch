@@ -34,6 +34,9 @@ services:
       AI__MaxOutputTokens: "2000"
       EvidenceExtraction__MaxStudiesPerRun: ${EVIDENCE_EXTRACTION_MAX_STUDIES_PER_RUN:-10}
       EvidenceEvaluation__MaxStudiesPerRun: ${EVIDENCE_EVALUATION_MAX_STUDIES_PER_RUN:-10}
+      Synthesis__MaxStudies: ${SYNTHESIS_MAX_STUDIES:-10}
+      Synthesis__MaxEvidenceFindings: ${SYNTHESIS_MAX_EVIDENCE_FINDINGS:-40}
+      Synthesis__MaxClaims: ${SYNTHESIS_MAX_CLAIMS:-12}
       PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
       PubMed__ResultLimit: ${PUBMED_RESULT_LIMIT:-10}
       PubMed__TimeoutSeconds: "15"

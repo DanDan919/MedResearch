@@ -57,3 +57,14 @@ Root cause: Application orchestration services depended on an options object who
 Decision / fix: Registered safe default `EvidenceExtractionOptions` and `EvidenceEvaluationOptions` in Application DI, while Infrastructure still replaces them with configured singleton values when normal persistence registration is used.
 Verification: `dotnet test MedResearch.slnx --no-build` completed successfully after the DI change, with Docker-backed PostgreSQL tests skipped while Docker Desktop is unavailable.
 Remaining concerns: Keep future Application-level orchestration options independently constructible for test hosts that intentionally replace Infrastructure.
+
+## 2026-09-01
+
+Date: 2026-09-01
+Area: Synthesis report persistence
+Problem: The first implementation of report persistence accidentally mapped `potential_conflict_detected` from the `EvidenceTruncated` source-coverage flag.
+Observed behavior: Code review of `EfResearchSynthesisStore` showed both constructor arguments using `result.SourceCoverage.EvidenceTruncated`, which would have lost persisted conflict provenance.
+Root cause: Adjacent boolean constructor arguments had the same type and were easy to transpose.
+Decision / fix: Changed persistence to pass `result.SourceCoverage.PotentialConflictDetected` explicitly and kept coverage reconstruction tests around persisted reports.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx` passed after the fix; Docker-backed PostgreSQL tests were skipped because the Docker engine is unavailable.
+Remaining concerns: Consider using a named options/object mapping pattern if future report coverage fields grow further.

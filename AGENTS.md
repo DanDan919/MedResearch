@@ -37,6 +37,9 @@ Before significant changes, read:
 22. Abstract-level Evidence must not be represented as full-paper evidence.
 23. Absence of methodological detail from available source material must never be converted into a negative quality judgment.
 24. MedResearch internal evidence evaluation must not be presented as formal GRADE, RoB 2, ROBINS-I, AMSTAR-2, or another validated framework unless that framework is explicitly implemented.
+25. Every substantive persisted ResearchReport claim must reference validated Evidence from the same ResearchRun.
+26. Scientific insufficiency must be represented explicitly rather than replaced with model prior knowledge.
+27. Study/evidence direction counts are descriptive corpus context only, not certainty weights, vote counts, or statistical estimators.
 
 ## Development Trail
 

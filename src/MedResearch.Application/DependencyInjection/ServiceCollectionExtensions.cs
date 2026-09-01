@@ -3,6 +3,7 @@ using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Synthesis;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MedResearch.Application.DependencyInjection;
@@ -20,9 +21,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEvidenceExtractor, EvidenceExtractor>();
         services.AddSingleton<EvidenceExtractionOptions>();
         services.AddSingleton<EvidenceEvaluationOptions>();
+        services.AddSingleton<SynthesisOptions>();
         services.AddScoped<EvidenceEvaluationSignalBuilder>();
         services.AddScoped<EvidenceEvaluationDraftValidator>();
         services.AddScoped<IEvidenceEvaluator, EvidenceEvaluator>();
+        services.AddScoped<ISynthesisContextBuilder, SynthesisContextBuilder>();
+        services.AddScoped<ResearchReportDraftValidator>();
+        services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
+        services.AddScoped<GetResearchReportUseCase>();
         services.AddScoped<ResearchRunProcessor>();
         services.AddScoped<IResearchStageExecutor, ScientificResearchStageExecutor>();
 

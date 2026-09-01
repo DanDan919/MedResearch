@@ -3,6 +3,7 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     private readonly IEvidenceEvaluator _evidenceEvaluator;
     private readonly IEvidenceEvaluationStore _evidenceEvaluationStore;
     private readonly EvidenceEvaluationOptions _evidenceEvaluationOptions;
+    private readonly ISynthesisContextBuilder _synthesisContextBuilder;
+    private readonly IResearchSynthesizer _researchSynthesizer;
+    private readonly IResearchReportStore _researchReportStore;
     private readonly ILogger<ScientificResearchStageExecutor> _logger;
 
     public ScientificResearchStageExecutor(
@@ -33,6 +37,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         IEvidenceEvaluator evidenceEvaluator,
         IEvidenceEvaluationStore evidenceEvaluationStore,
         EvidenceEvaluationOptions evidenceEvaluationOptions,
+        ISynthesisContextBuilder synthesisContextBuilder,
+        IResearchSynthesizer researchSynthesizer,
+        IResearchReportStore researchReportStore,
         ILogger<ScientificResearchStageExecutor> logger)
     {
         _researchPlanner = researchPlanner;
@@ -45,6 +52,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         _evidenceEvaluator = evidenceEvaluator;
         _evidenceEvaluationStore = evidenceEvaluationStore;
         _evidenceEvaluationOptions = evidenceEvaluationOptions;
+        _synthesisContextBuilder = synthesisContextBuilder;
+        _researchSynthesizer = researchSynthesizer;
+        _researchReportStore = researchReportStore;
         _logger = logger;
     }
 
@@ -77,6 +87,12 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         if (context.Stage == ResearchRunStatus.Evaluating)
         {
             await ExecuteEvaluatingStageAsync(context, cancellationToken);
+            return;
+        }
+
+        if (context.Stage == ResearchRunStatus.Synthesizing)
+        {
+            await ExecuteSynthesizingStageAsync(context, cancellationToken);
         }
     }
 
@@ -220,6 +236,37 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             EvidenceEvaluationPrompt.Version,
             completed,
             skipped,
+            stopwatch.ElapsedMilliseconds);
+    }
+
+    private async Task ExecuteSynthesizingStageAsync(
+        ResearchStageExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        if (await _researchReportStore.HasReportAsync(context.ResearchRunId, ResearchSynthesisPrompt.Version, cancellationToken))
+        {
+            _logger.LogInformation(
+                "ResearchReportAlreadyPersisted. ResearchRunId: {ResearchRunId}; PromptVersion: {PromptVersion}",
+                context.ResearchRunId,
+                ResearchSynthesisPrompt.Version);
+            return;
+        }
+
+        var synthesisContext = await _synthesisContextBuilder.BuildAsync(context.ResearchRunId, cancellationToken);
+        var result = await _researchSynthesizer.SynthesizeAsync(synthesisContext, cancellationToken);
+        await _researchReportStore.PersistReportAsync(result, cancellationToken);
+
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "ResearchReportPersisted. ResearchRunId: {ResearchRunId}; ReportStatus: {ReportStatus}; PromptVersion: {PromptVersion}; ClaimCount: {ClaimCount}; StudyCount: {StudyCount}; EvidenceCount: {EvidenceCount}; ConflictCount: {ConflictCount}; DurationMs: {DurationMs}",
+            result.ResearchRunId,
+            result.Status,
+            result.PromptVersion,
+            result.Claims.Count,
+            result.Statistics.IncludedStudyCount,
+            result.Statistics.IncludedEvidenceFindingCount,
+            synthesisContext.OutcomeDirectionSummaries.Count(summary => summary.ConflictStatus == SynthesisConflictStatus.Present),
             stopwatch.ElapsedMilliseconds);
     }
 
