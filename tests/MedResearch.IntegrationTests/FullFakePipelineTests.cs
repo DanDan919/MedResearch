@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
@@ -19,6 +20,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace MedResearch.IntegrationTests;
 
@@ -81,7 +83,7 @@ public sealed partial class FullFakePipelineTests
         await using (var db = _fixture.CreateDbContext())
         {
             var run = await db.ResearchRuns.SingleAsync(run => run.Id == created.ResearchRunId, CancellationToken.None);
-            Assert.Equal(ResearchRunStatus.Completed, run.Status);
+            Assert.True(run.Status == ResearchRunStatus.Completed, $"Expected research run to complete, but status was {run.Status}. FailureReason: {run.FailureReason}. Logs: {factory.LogProvider.Messages}");
             Assert.Null(run.ProcessingLeaseOwner);
             Assert.Null(run.ProcessingLeaseExpiresAt);
 
@@ -145,6 +147,8 @@ public sealed partial class FullFakePipelineTests
         private readonly FakeStructuredLlmClient _fakeLlm;
         private readonly FakeScientificLiteratureSource _fakeLiterature;
 
+        public CapturingLoggerProvider LogProvider { get; } = new();
+
         public FakePipelineApiFactory(
             string connectionString,
             FakeStructuredLlmClient fakeLlm,
@@ -158,6 +162,7 @@ public sealed partial class FullFakePipelineTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            builder.ConfigureLogging(logging => logging.AddProvider(LogProvider));
             builder.ConfigureAppConfiguration(configuration =>
             {
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -198,6 +203,69 @@ public sealed partial class FullFakePipelineTests
                 services.AddSingleton<IStructuredLlmClient>(_fakeLlm);
                 services.AddSingleton<IScientificLiteratureSource>(_fakeLiterature);
             });
+        }
+    }
+
+    public sealed class CapturingLoggerProvider : ILoggerProvider
+    {
+        private readonly ConcurrentQueue<string> _messages = new();
+
+        public string Messages => string.Join(Environment.NewLine, _messages);
+
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new CapturingLogger(categoryName, _messages);
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class CapturingLogger : ILogger
+        {
+            private readonly string _categoryName;
+            private readonly ConcurrentQueue<string> _messages;
+
+            public CapturingLogger(string categoryName, ConcurrentQueue<string> messages)
+            {
+                _categoryName = categoryName;
+                _messages = messages;
+            }
+
+            public IDisposable BeginScope<TState>(TState state)
+                where TState : notnull
+            {
+                return NullScope.Instance;
+            }
+
+            public bool IsEnabled(LogLevel logLevel)
+            {
+                return logLevel >= LogLevel.Warning;
+            }
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                if (!IsEnabled(logLevel))
+                {
+                    return;
+                }
+
+                _messages.Enqueue($"{logLevel} {_categoryName}: {formatter(state, exception)} {exception}");
+            }
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
         }
     }
 

@@ -115,7 +115,7 @@ public sealed class ResearchRunQueueConcurrencyTests
 
         Assert.NotNull(firstClaim);
         Assert.NotNull(secondClaim);
-        Assert.Equal([firstRunId, secondRunId], new[] { firstClaim.Run.Id, secondClaim.Run.Id }.Order().ToArray());
+        Assert.Equal(new[] { firstRunId, secondRunId }.Order().ToArray(), new[] { firstClaim.Run.Id, secondClaim.Run.Id }.Order().ToArray());
         Assert.All(new[] { firstClaim, secondClaim }, claim => Assert.Equal(ResearchRunStatus.Planning, claim.Run.Status));
     }
 
