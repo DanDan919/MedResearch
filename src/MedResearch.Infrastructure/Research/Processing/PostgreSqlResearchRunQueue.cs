@@ -275,9 +275,9 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             command =>
             {
                 AddParameter(command, "status", run.Status.ToString());
-                AddParameter(command, "started_at", run.StartedAt);
-                AddParameter(command, "completed_at", run.CompletedAt);
-                AddParameter(command, "failure_reason", run.FailureReason);
+                AddParameter(command, "started_at", run.StartedAt, DbType.DateTimeOffset);
+                AddParameter(command, "completed_at", run.CompletedAt, DbType.DateTimeOffset);
+                AddParameter(command, "failure_reason", run.FailureReason, DbType.String);
                 AddParameter(command, "is_terminal", isTerminal);
                 AddParameter(command, "saved_at", savedAt);
                 AddParameter(command, "lease_expires_at", savedAt.Add(leaseDuration));
@@ -356,10 +356,15 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         AddParameter(command, "lease_version", claimedRun.LeaseVersion);
     }
 
-    private static void AddParameter(DbCommand command, string name, object? value)
+    private static void AddParameter(DbCommand command, string name, object? value, DbType? dbType = null)
     {
         var parameter = command.CreateParameter();
         parameter.ParameterName = name;
+        if (dbType.HasValue)
+        {
+            parameter.DbType = dbType.Value;
+        }
+
         parameter.Value = value ?? DBNull.Value;
         command.Parameters.Add(parameter);
     }
