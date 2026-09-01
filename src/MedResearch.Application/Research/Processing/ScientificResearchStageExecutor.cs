@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
@@ -16,6 +17,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     private readonly IEvidenceExtractor _evidenceExtractor;
     private readonly IEvidenceExtractionStore _evidenceExtractionStore;
     private readonly EvidenceExtractionOptions _evidenceExtractionOptions;
+    private readonly IEvidenceEvaluator _evidenceEvaluator;
+    private readonly IEvidenceEvaluationStore _evidenceEvaluationStore;
+    private readonly EvidenceEvaluationOptions _evidenceEvaluationOptions;
     private readonly ILogger<ScientificResearchStageExecutor> _logger;
 
     public ScientificResearchStageExecutor(
@@ -26,6 +30,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         IEvidenceExtractor evidenceExtractor,
         IEvidenceExtractionStore evidenceExtractionStore,
         EvidenceExtractionOptions evidenceExtractionOptions,
+        IEvidenceEvaluator evidenceEvaluator,
+        IEvidenceEvaluationStore evidenceEvaluationStore,
+        EvidenceEvaluationOptions evidenceEvaluationOptions,
         ILogger<ScientificResearchStageExecutor> logger)
     {
         _researchPlanner = researchPlanner;
@@ -35,6 +42,9 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         _evidenceExtractor = evidenceExtractor;
         _evidenceExtractionStore = evidenceExtractionStore;
         _evidenceExtractionOptions = evidenceExtractionOptions;
+        _evidenceEvaluator = evidenceEvaluator;
+        _evidenceEvaluationStore = evidenceEvaluationStore;
+        _evidenceEvaluationOptions = evidenceEvaluationOptions;
         _logger = logger;
     }
 
@@ -61,6 +71,12 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         if (context.Stage == ResearchRunStatus.Extracting)
         {
             await ExecuteExtractingStageAsync(context, cancellationToken);
+            return;
+        }
+
+        if (context.Stage == ResearchRunStatus.Evaluating)
+        {
+            await ExecuteEvaluatingStageAsync(context, cancellationToken);
         }
     }
 
@@ -141,6 +157,69 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             completed,
             skipped,
             persistedFindings,
+            stopwatch.ElapsedMilliseconds);
+    }
+
+    private async Task ExecuteEvaluatingStageAsync(
+        ResearchStageExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var maxStudies = _evidenceEvaluationOptions.BoundedMaxStudiesPerRun;
+        var stopwatch = Stopwatch.StartNew();
+        var workItems = await _evidenceEvaluationStore.FindStudiesForEvaluationAsync(
+            context.ResearchRunId,
+            EvidenceEvaluationPrompt.Version,
+            maxStudies,
+            cancellationToken);
+        var skippedByLimit = Math.Max(0, workItems.TotalExtractionCount - workItems.Studies.Count);
+
+        _logger.LogInformation(
+            "EvidenceEvaluationStageStarted. ResearchRunId: {ResearchRunId}; PromptVersion: {PromptVersion}; TotalExtractionCount: {TotalExtractionCount}; SelectedStudyCount: {SelectedStudyCount}; SkippedByLimit: {SkippedByLimit}; MaxStudiesPerRun: {MaxStudiesPerRun}",
+            context.ResearchRunId,
+            EvidenceEvaluationPrompt.Version,
+            workItems.TotalExtractionCount,
+            workItems.Studies.Count,
+            skippedByLimit,
+            maxStudies);
+
+        var completed = 0;
+        var skipped = 0;
+
+        foreach (var study in workItems.Studies)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var result = await _evidenceEvaluator.EvaluateAsync(study, cancellationToken);
+            await _evidenceEvaluationStore.PersistEvaluationResultAsync(result, cancellationToken);
+
+            if (result.Status == EvidenceEvaluationStatus.Skipped)
+            {
+                skipped++;
+            }
+            else
+            {
+                completed++;
+            }
+
+            _logger.LogInformation(
+                "EvidenceEvaluationPersisted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; Status: {Status}; PromptVersion: {PromptVersion}; SourceScope: {SourceScope}; OverallCategory: {OverallCategory}; UnknownDomainCount: {UnknownDomainCount}; InsufficientSourceDomainCount: {InsufficientSourceDomainCount}",
+                result.ResearchRunId,
+                result.StudyId,
+                result.Status,
+                result.PromptVersion,
+                result.SourceScope,
+                result.OverallConfidence,
+                result.UnknownDomainCount,
+                result.InsufficientSourceDomainCount);
+        }
+
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "EvidenceEvaluationStageCompleted. ResearchRunId: {ResearchRunId}; PromptVersion: {PromptVersion}; CompletedStudyCount: {CompletedStudyCount}; SkippedStudyCount: {SkippedStudyCount}; DurationMs: {DurationMs}",
+            context.ResearchRunId,
+            EvidenceEvaluationPrompt.Version,
+            completed,
+            skipped,
             stopwatch.ElapsedMilliseconds);
     }
 

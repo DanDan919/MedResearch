@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
@@ -176,7 +177,7 @@ public sealed class ScientificResearchStageExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NonImplementedStagesDoNotInvokePlannerSourceOrExtractor()
+    public async Task ExecuteAsync_NonImplementedStagesDoNotInvokePlannerSourceExtractorOrEvaluator()
     {
         var plan = CreatePlan(["planned query"]);
         var planner = new RecordingResearchPlanner(plan);
@@ -186,7 +187,7 @@ public sealed class ScientificResearchStageExecutorTests
         var extractionStore = new RecordingEvidenceExtractionStore([], 0);
         var executor = CreateExecutor(planner, new RecordingResearchPlanStore(plan), source, store, extractor, extractionStore);
 
-        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Evaluating), CancellationToken.None);
+        await executor.ExecuteAsync(CreateContext(ResearchRunStatus.Synthesizing), CancellationToken.None);
 
         Assert.Null(planner.ResearchQuestion);
         Assert.Empty(source.Requests);
@@ -267,7 +268,9 @@ public sealed class ScientificResearchStageExecutorTests
         IScientificLiteratureSource source,
         IScientificSearchResultStore store,
         IEvidenceExtractor? evidenceExtractor = null,
-        IEvidenceExtractionStore? evidenceExtractionStore = null)
+        IEvidenceExtractionStore? evidenceExtractionStore = null,
+        IEvidenceEvaluator? evidenceEvaluator = null,
+        IEvidenceEvaluationStore? evidenceEvaluationStore = null)
     {
         return new ScientificResearchStageExecutor(
             planner,
@@ -277,6 +280,9 @@ public sealed class ScientificResearchStageExecutorTests
             evidenceExtractor ?? new RecordingEvidenceExtractor(null),
             evidenceExtractionStore ?? new RecordingEvidenceExtractionStore([], 0),
             new EvidenceExtractionOptions(),
+            evidenceEvaluator ?? new RecordingEvidenceEvaluator(null),
+            evidenceEvaluationStore ?? new RecordingEvidenceEvaluationStore([], 0),
+            new EvidenceEvaluationOptions(),
             NullLogger<ScientificResearchStageExecutor>.Instance);
     }
 
@@ -336,6 +342,115 @@ public sealed class ScientificResearchStageExecutorTests
             "PubMed");
     }
 
+
+    private static EvaluationStudyContext CreateEvaluationStudy(IReadOnlyCollection<EvaluationEvidenceContext> evidence)
+    {
+        return new EvaluationStudyContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Does sleep improve recall?",
+            new EvaluationPlanContext("adults", "sleep", "wakefulness", ["recall"], ["controlled trial"], []),
+            Guid.NewGuid(),
+            "Sleep and recall",
+            "A randomized trial reported improved recall in 120 adults.",
+            "12345678",
+            "10.1000/example",
+            "Journal",
+            new DateOnly(2026, 1, 1),
+            ["Randomized Controlled Trial"],
+            ["Ada Lovelace"],
+            "PubMed",
+            EvidenceExtractionStatus.Completed,
+            null,
+            EvidenceSourceScope.Abstract,
+            EvidenceExtractionPrompt.Version,
+            evidence);
+    }
+
+    private static EvaluationEvidenceContext CreateEvaluationEvidence(Guid evidenceId)
+    {
+        return new EvaluationEvidenceContext(
+            evidenceId,
+            "recall",
+            "Recall improved after sleep.",
+            "reported improved recall in 120 adults",
+            EvidenceDirection.Positive,
+            "adults",
+            "sleep",
+            "wakefulness",
+            "randomized controlled trial",
+            120,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true);
+    }
+
+    private static EvidenceEvaluationResult CreateCompletedEvaluation(EvaluationStudyContext study)
+    {
+        return new EvidenceEvaluationResult(
+            study.ResearchRunId,
+            study.StudyId,
+            study.Evidence.Select(evidence => evidence.EvidenceId).ToArray(),
+            EvidenceEvaluationStatus.Completed,
+            null,
+            EvidenceSourceScope.Abstract,
+            "FakeLLM",
+            "fake-model",
+            EvidenceEvaluationPrompt.Version,
+            DateTimeOffset.UtcNow,
+            StudyDesignClassification.RandomizedControlledTrial,
+            MethodologicalAssessmentState.Favorable,
+            ComparatorPresence.Present,
+            "wakefulness",
+            MethodologicalAssessmentState.Favorable,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.Unknown,
+            DirectnessRating.Direct,
+            MethodologicalConfidence.InsufficientInformation,
+            "The abstract supports directness but not detailed bias assessment.",
+            ["Current source scope is abstract-level only."],
+            [],
+            new EvidenceEvaluationSignalSet(EvidenceSourceScope.Abstract, study.Evidence.Count, true, false, false, false, true, StudyDesignClassification.RandomizedControlledTrial, []),
+            1,
+            3);
+    }
+
+    private static EvidenceEvaluationResult CreateSkippedEvaluation(EvaluationStudyContext study)
+    {
+        return new EvidenceEvaluationResult(
+            study.ResearchRunId,
+            study.StudyId,
+            [],
+            EvidenceEvaluationStatus.Skipped,
+            EvidenceEvaluationSkipReason.NoExtractedEvidence,
+            EvidenceSourceScope.Abstract,
+            null,
+            null,
+            EvidenceEvaluationPrompt.Version,
+            DateTimeOffset.UtcNow,
+            StudyDesignClassification.Unknown,
+            MethodologicalAssessmentState.Unknown,
+            ComparatorPresence.Unclear,
+            null,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.InsufficientSource,
+            MethodologicalAssessmentState.Unknown,
+            DirectnessRating.Unclear,
+            MethodologicalConfidence.InsufficientInformation,
+            "No source-grounded evidence findings are available.",
+            [],
+            [],
+            new EvidenceEvaluationSignalSet(EvidenceSourceScope.Abstract, 0, false, false, false, false, false, StudyDesignClassification.Unknown, []),
+            4,
+            5);
+    }
     private sealed class RecordingResearchPlanner : IResearchPlanner
     {
         private readonly ResearchPlan _plan;
@@ -532,6 +647,69 @@ public sealed class ScientificResearchStageExecutorTests
 
         public Task PersistExtractionResultAsync(
             EvidenceExtractionResult result,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Results.Add(result);
+            return Task.CompletedTask;
+        }
+
+        }
+
+    private sealed class RecordingEvidenceEvaluator : IEvidenceEvaluator
+    {
+        private readonly EvidenceEvaluationResult? _result;
+        private readonly Exception? _exception;
+
+        public RecordingEvidenceEvaluator(EvidenceEvaluationResult? result, Exception? exception = null)
+        {
+            _result = result;
+            _exception = exception;
+        }
+
+        public List<EvaluationStudyContext> Contexts { get; } = [];
+
+        public Task<EvidenceEvaluationResult> EvaluateAsync(
+            EvaluationStudyContext context,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Contexts.Add(context);
+
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
+            return Task.FromResult(_result ?? CreateSkippedEvaluation(context));
+        }
+    }
+
+    private sealed class RecordingEvidenceEvaluationStore : IEvidenceEvaluationStore
+    {
+        private readonly IReadOnlyCollection<EvaluationStudyContext> _studies;
+        private readonly int _totalCount;
+
+        public RecordingEvidenceEvaluationStore(IReadOnlyCollection<EvaluationStudyContext> studies, int totalCount)
+        {
+            _studies = studies;
+            _totalCount = totalCount;
+        }
+
+        public List<EvidenceEvaluationResult> Results { get; } = [];
+
+        public Task<EvidenceEvaluationWorkItemSet> FindStudiesForEvaluationAsync(
+            Guid researchRunId,
+            string promptVersion,
+            int maxStudies,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new EvidenceEvaluationWorkItemSet(_totalCount, _studies));
+        }
+
+        public Task PersistEvaluationResultAsync(
+            EvidenceEvaluationResult result,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

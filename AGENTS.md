@@ -35,6 +35,8 @@ Before significant changes, read:
 20. Medical output must be framed as evidence synthesis, not diagnosis or treatment advice.
 21. Persisted Evidence must be traceable to a Study and bounded source text.
 22. Abstract-level Evidence must not be represented as full-paper evidence.
+23. Absence of methodological detail from available source material must never be converted into a negative quality judgment.
+24. MedResearch internal evidence evaluation must not be presented as formal GRADE, RoB 2, ROBINS-I, AMSTAR-2, or another validated framework unless that framework is explicitly implemented.
 
 ## Development Trail
 

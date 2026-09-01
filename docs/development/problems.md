@@ -48,3 +48,12 @@ Root cause: The previous `Evidence` model was a deliberate placeholder without `
 Decision / fix: Kept the migration additive in history and documented the incompatibility. Did not rewrite older migrations or silently invent missing provenance for old rows.
 Verification: `dotnet build MedResearch.slnx --no-restore` and `dotnet test MedResearch.slnx --no-build` completed successfully after the model change; Docker-backed PostgreSQL tests remain skipped while Docker Desktop is unavailable.
 Remaining concerns: If a non-development database contains placeholder `evidence` rows, decide an explicit data migration/archive policy before applying this migration.
+
+Date: 2026-08-31
+Area: API integration dependency injection
+Problem: API integration tests failed service-provider validation after adding evidence evaluation options.
+Observed behavior: `WebApplicationFactory` tests replace Infrastructure persistence with fakes, so the configured Infrastructure registration that normally supplies `EvidenceEvaluationOptions` was not present while `ScientificResearchStageExecutor` required it.
+Root cause: Application orchestration services depended on an options object whose safe default was registered only by Infrastructure configuration binding.
+Decision / fix: Registered safe default `EvidenceExtractionOptions` and `EvidenceEvaluationOptions` in Application DI, while Infrastructure still replaces them with configured singleton values when normal persistence registration is used.
+Verification: `dotnet test MedResearch.slnx --no-build` completed successfully after the DI change, with Docker-backed PostgreSQL tests skipped while Docker Desktop is unavailable.
+Remaining concerns: Keep future Application-level orchestration options independently constructible for test hosts that intentionally replace Infrastructure.

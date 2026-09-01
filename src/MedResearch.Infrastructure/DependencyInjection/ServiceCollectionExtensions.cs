@@ -1,11 +1,13 @@
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
 using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
+using MedResearch.Infrastructure.Evaluation.Persistence;
 using MedResearch.Infrastructure.Literature.Persistence;
 using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
@@ -39,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
         services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
+        services.AddScoped<IEvidenceEvaluationStore, EfEvidenceEvaluationStore>();
 
         var openAIOptions = CreateOpenAIOptions(configuration);
         if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
@@ -94,6 +97,16 @@ public static class ServiceCollectionExtensions
         var section = configuration.GetSection(EvidenceExtractionOptions.SectionName);
 
         return new EvidenceExtractionOptions
+        {
+            MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
+        };
+    }
+
+    private static EvidenceEvaluationOptions CreateEvidenceEvaluationOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(EvidenceEvaluationOptions.SectionName);
+
+        return new EvidenceEvaluationOptions
         {
             MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
         };

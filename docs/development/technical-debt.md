@@ -8,9 +8,11 @@
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.
 - Evidence extraction has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and grounding failures currently move the run through the existing safe failure path.
 - Evidence extraction is abstract-level only; full-text retrieval, section-aware extraction, and publisher/PDF source handling are not implemented.
+- Evidence evaluation has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported methodological claims currently move the run through the existing safe failure path.
+- Evidence evaluation is an internal categorical assessment only. It is not a validated GRADE, RoB 2, ROBINS-I, AMSTAR-2, NOS, or other formal study-quality framework.
 - PubMed retrieval has no bounded retry policy yet. Network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures currently move the run through the existing safe failure path.
 - PubMed request pacing is conservative but local to one process. There is no distributed rate limiter across multiple API instances.
-- `ResearchPlannerPrompt` is versioned but still embedded in code. Move prompts to a resource/template mechanism when prompt review, localization, or runtime prompt experiments become real needs.
+- `ResearchPlannerPrompt`, `EvidenceExtractorPrompt`, and `EvidenceEvaluationPrompt` are versioned but still embedded in code. Move prompts to a resource/template mechanism when prompt review, localization, or runtime prompt experiments become real needs.
 
 ## Watch List
 
@@ -21,3 +23,4 @@
 - Decide whether `/health` should become a richer operational health check when more external dependencies exist.
 - Run PostgreSQL Testcontainers integration tests in an environment where Docker Desktop is running.
 - Consider an explicit opt-in live OpenAI smoke test only if the development workflow needs it.
+- Review whether evidence evaluation should persist provider-attempt diagnostics separately from terminal run failures before adding retries or batch reprocessing.

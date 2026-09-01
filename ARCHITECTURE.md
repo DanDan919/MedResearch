@@ -40,7 +40,7 @@ Implemented use cases are:
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
 - `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
-- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, and deterministic no-op behavior for stages that are not implemented yet.
+- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and deterministic no-op behavior for stages that are not implemented yet.
 
 Application defines ports that reflect current use cases:
 
@@ -52,6 +52,8 @@ Application defines ports that reflect current use cases:
 - `IScientificSearchResultStore`: persistence boundary for normalized scientific candidates, search provenance, and discovery links.
 - `IEvidenceExtractor`: provider-neutral Application service for validating one study extraction request.
 - `IEvidenceExtractionStore`: persistence boundary for discovered-study extraction work items, extraction provenance, and extracted findings.
+- `IEvidenceEvaluator`: provider-neutral Application service for source-aware methodological assessment.
+- `IEvidenceEvaluationStore`: persistence boundary for evaluation work items, provenance, structured assessment, and idempotency.
 
 These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, and PubMed adapters.
 
@@ -77,7 +79,7 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` now performs abstract-level structured evidence extraction from discovered studies. Evaluating and Synthesizing remain deterministic placeholders and do not generate fake evidence.
+`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. Synthesizing remains a deterministic placeholder and does not generate fake conclusions.
 
 ## AI Research Planning
 
@@ -186,6 +188,34 @@ Validation is deterministic:
 
 A missing abstract is recorded as a skipped extraction with `NoExtractableText` and does not call the LLM. Provider, structured-output, validation, and grounding failures use the existing safe run failure path. Extraction runs sequentially and is bounded by `EvidenceExtraction:MaxStudiesPerRun`, default 10.
 
+## Evidence Evaluation
+
+Application performs evidence evaluation through `EvidenceEvaluator`, which reuses `IStructuredLlmClient`. Infrastructure continues to own OpenAI HTTP behavior and EF persistence.
+
+Current evaluation flow:
+
+```text
+EvidenceExtraction + grounded Evidence + Study metadata
+  -> deterministic signal builder
+  -> EvidenceEvaluator
+  -> IStructuredLlmClient when evidence exists
+  -> strict JSON Schema output
+  -> source-scope/category validation and deterministic finalization
+  -> EvidenceEvaluation persistence
+```
+
+The evaluator input boundary is limited to the current research question, bounded plan context, relevant study metadata/source text, grounded evidence findings/supporting excerpts, and extraction provenance. It does not receive unrelated studies, unrelated runs, credentials, logs, or raw provider payloads.
+
+The prompt version is `evidence-evaluator-v1`. The prompt requires use of supplied material only, preservation of `Unknown`, `InsufficientSource`, and `NotApplicable`, no numeric quality score, no statistical-significance-as-quality shortcut, no invented limitations, and no formal GRADE/RoB claims.
+
+Evaluation uses one study-level `EvidenceEvaluation` per research run, study, and prompt version. The row stores the evaluated `EvidenceIds`, so future synthesis can combine study-level methodology with the exact grounded findings without duplicating the same study assessment across every evidence row.
+
+Deterministic validation checks authoritative run/study identity, supported categories, bounded text, grounded author-reported limitations, source-scope semantics, and rejection of source absence as a concern. For abstract-only inputs, domains such as allocation concealment, detailed attrition assessment, and often blinding are finalized as `InsufficientSource` or `NotApplicable` unless source text supports a more specific judgment.
+
+A study with no extracted evidence is recorded as skipped with `NoExtractedEvidence` and does not call the LLM. Provider failures, malformed output, validation failures, and unsupported methodological claims use the existing safe run failure path. Expected scientific insufficiency is persisted as structured state and does not fail the run.
+
+This evaluator is MedResearch's internal structured assessment. It is not formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
+
 ## Scientific Data Integrity
 
 External source data is untrusted input. OpenAI and PubMed transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
@@ -269,6 +299,8 @@ Migrations:
 - `20260830063109_InitialCreate`
 - `20260830114130_AddLiteratureSearchProvenance`
 - `20260830160612_AddStructuredResearchPlans`
+- `20260831142411_AddSourceGroundedEvidenceExtraction`
+- `20260831171340_AddStructuredEvidenceEvaluations`
 
 ## Database Schema
 
@@ -278,7 +310,9 @@ Migrations:
 - `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, journal, publication date/date parts, publication types, and authors.
 - `literature_searches`: GUID primary key, required `research_run_id` FK, optional `research_plan_id` FK, source, query, searched timestamp, result count, persisted count, duplicate count.
 - `research_study_discoveries`: GUID primary key, required FKs to research run, literature search, and study, plus source identifier and discovery timestamp.
-- `evidence`: GUID primary key, required `study_id` FK, required claim and direction, optional confidence.
+- `evidence_extractions`: GUID primary key, required `research_run_id` and `study_id` FKs, status, optional skip reason, source scope, optional provider/model, prompt version, extraction timestamp, evidence count, and grounding validation flag.
+- `evidence`: GUID primary key, required FKs to research run, study, and evidence extraction, outcome, result summary, supporting source excerpt, direction, source scope, extraction timestamp, grounding validation flag, and nullable reported scientific fields for population, intervention/exposure, comparator, study design, sample size, effect measure/value, confidence interval bounds, and p-value.
+- `evidence_evaluations`: GUID primary key, required `research_run_id` and `study_id` FKs, evaluated evidence id array, status, optional skip reason, source scope, provider/model/prompt provenance, evaluated timestamp, structured methodological categories, limitation arrays, deterministic signal booleans, and unknown/insufficient-source counts.
 
 Indexes and constraints are intentionally limited to current lookup/query needs:
 
@@ -293,6 +327,9 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 - unique `evidence_extractions(research_run_id, study_id, prompt_version)` for extraction idempotency.
 - `evidence_extractions(research_run_id, status)` for run extraction status queries.
 - `evidence(research_run_id)`, `evidence(study_id)`, and `evidence(evidence_extraction_id)` for later run and source traceability lookups.
+- unique `evidence_evaluations(research_run_id, study_id, prompt_version)` for evaluation idempotency.
+- `evidence_evaluations(research_run_id, status)` for run evaluation status queries.
+- `evidence_evaluations(study_id)` for study-to-evaluation traceability.
 - EF-created FK indexes for relationships.
 
 ## Health Checks
@@ -317,9 +354,9 @@ The compose API service enables config-gated startup migrations with `Database__
 - `Study`: normalized scientific metadata reported by external sources. Missing source data remains missing.
 - `LiteratureSearch`: minimal reproducibility record for a source query run during a research run.
 - `ResearchStudyDiscovery`: association between one research run/search execution and a global study.
-- `EvidenceExtraction`
 - `EvidenceExtraction`: one extraction attempt/status/provenance row for one research run, one study, and one prompt version.
 - `Evidence`: one source-grounded abstract-level finding linked to a research run, study, and extraction attempt. Supporting excerpts must be traceable to the supplied study abstract.
+- `EvidenceEvaluation`: one internal structured methodological assessment for one research run, one study, and one evaluator prompt version. It is source-aware and categorical, not a numeric quality score or formal GRADE/RoB result.
 
 ## Current Limitations
 
@@ -328,7 +365,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - No live OpenAI smoke test is configured or run by default.
 - No full-text extraction, evidence synthesis output, or RAG/vector search exists yet.
 - No automatic recovery exists yet for runs left in progress after a process crash.
-- Study quality evaluation and evidence synthesis are not modeled beyond minimal placeholders.
+- Formal study quality frameworks and evidence synthesis are not implemented.
 - PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - Rate limiting is conservative and local to the process; no distributed rate limiter exists.
