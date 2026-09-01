@@ -6,7 +6,7 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable background processing for queued research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
 A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
 
@@ -59,11 +59,13 @@ The API listens on `http://localhost:8080` by default. The health check is avail
 
 ```text
 GET /health
+GET /health/live
+GET /health/ready
 ```
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
 
-Background processing can be configured with `ResearchProcessing:Enabled` and `ResearchProcessing:IdleDelayMilliseconds`. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50. Evidence evaluation volume can be configured with `EvidenceEvaluation:MaxStudiesPerRun` with the same default and bounds. Synthesis context size can be configured with `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`; defaults are 10, 40, and 12.
+Background processing can be configured with `ResearchProcessing:Enabled`, `ResearchProcessing:IdleDelayMilliseconds`, `ResearchProcessing:LeaseDurationSeconds`, and `ResearchProcessing:HeartbeatIntervalSeconds`. The heartbeat interval must be positive and shorter than the lease duration. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50. Evidence evaluation volume can be configured with `EvidenceEvaluation:MaxStudiesPerRun` with the same default and bounds. Synthesis context size can be configured with `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`; defaults are 10, 40, and 12.
 
 AI planning can be configured with:
 
@@ -84,7 +86,7 @@ PubMed can be configured with:
 - `PubMed:ApiKey`
 - `PubMed:RequestIntervalMilliseconds` development default: 350
 
-Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`.
+Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`. The API can start and expose health endpoints without an OpenAI API key; a real processing run that reaches an OpenAI-backed stage fails through the normal safe failure path if required provider configuration is absent.
 
 ## Research API
 
@@ -114,7 +116,7 @@ Retrieve the current run state:
 GET /api/research/{researchRunId}
 ```
 
-The background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
+The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
 
 Retrieve the persisted synthesis report:
 
@@ -168,6 +170,10 @@ The prompt version is `research-synthesizer-v1`. The synthesis model returns str
 
 When no validated evidence exists, MedResearch creates an explicit `InsufficientEvidence` report without calling the LLM. Synthesis is qualitative only: no meta-analysis, vote counting, formal GRADE, formal risk-of-bias result, diagnosis, or treatment recommendation is produced.
 
+## CI
+
+GitHub Actions runs on Ubuntu with Docker available. The workflow restores, builds, runs the full test suite with Testcontainers required, checks for pending EF model changes, validates Docker Compose, and uploads TRX test results for diagnostics. The Testcontainers fixture applies EF migrations to a fresh PostgreSQL database before PostgreSQL integration tests execute.
+
 ## EF Core Migrations
 
 Restore local tools before running EF commands on a fresh machine:
@@ -197,7 +203,7 @@ dotnet test
 docker compose config
 ```
 
-Application, Infrastructure, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory.
+Application, Infrastructure, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped locally when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory. CI sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, so Docker/Testcontainers unavailability fails the run instead of silently skipping PostgreSQL coverage. Normal CI does not require `OPENAI_API_KEY`, NCBI credentials, or live internet calls to OpenAI/PubMed.
 
 ## Development Notes
 

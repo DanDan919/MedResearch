@@ -243,7 +243,7 @@ public sealed class ScientificResearchStageExecutorTests
     {
         var run = new ResearchRun(Guid.NewGuid(), DateTimeOffset.UtcNow);
         run.StartPlanning(DateTimeOffset.UtcNow);
-        var queue = new ProcessorSearchQueue(new ClaimedResearchRun(run, "Does planning failure mark the run failed?"));
+        var queue = new ProcessorSearchQueue(new ClaimedResearchRun(run, "Does planning failure mark the run failed?", "worker-1", 1, DateTimeOffset.UtcNow.AddMinutes(15), false));
         var planner = new RecordingResearchPlanner(CreatePlan(["planned query"]), new ResearchPlanValidationException("invalid plan"));
         var executor = CreateExecutor(planner, new RecordingResearchPlanStore(null), new RecordingScientificSource([]), new RecordingSearchResultStore());
         var processor = new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance);
@@ -611,24 +611,49 @@ public sealed class ScientificResearchStageExecutorTests
 
         public bool MarkFailedWasCalled { get; private set; }
 
-        public Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(DateTimeOffset claimedAt, CancellationToken cancellationToken)
+        public Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(
+            DateTimeOffset claimedAt,
+            string workerInstanceId,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult<ClaimedResearchRun?>(_claimedRun);
         }
 
-        public Task SaveProgressAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
+        public Task<bool> RenewLeaseAsync(
+            ClaimedResearchRun claimedRun,
+            DateTimeOffset heartbeatAt,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
-        public Task<bool> MarkFailedAsync(Guid researchRunId, string safeFailureReason, DateTimeOffset failedAt, CancellationToken cancellationToken)
+        public Task<bool> SaveProgressAsync(
+            ClaimedResearchRun claimedRun,
+            DateTimeOffset savedAt,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> MarkFailedAsync(
+            ClaimedResearchRun claimedRun,
+            string safeFailureReason,
+            DateTimeOffset failedAt,
+            CancellationToken cancellationToken)
         {
             MarkFailedWasCalled = true;
-            _claimedRun.Run.Fail(safeFailureReason, failedAt);
+            claimedRun.Run.Fail(safeFailureReason, failedAt);
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> ReleaseLeaseAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
+        {
             return Task.FromResult(true);
         }
     }
-
     private sealed class RecordingScientificSource : IScientificLiteratureSource
     {
         private readonly IReadOnlyCollection<ScientificStudyCandidate> _candidates;

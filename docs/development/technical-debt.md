@@ -3,7 +3,6 @@
 ## Current
 
 - Production migration strategy is not decided. Docker Compose uses config-gated startup migrations for local development only.
-- Claimed research runs do not have a lease or automatic recovery path yet. If a process crashes after moving a run from `Queued` to an in-progress status, the run can remain in that state until an operator or future recovery workflow handles it.
 - OpenAI planning has no bounded retry policy yet. Configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures currently move the run through the existing safe failure path.
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.
 - Evidence extraction has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and grounding failures currently move the run through the existing safe failure path.
@@ -19,11 +18,11 @@
 
 ## Watch List
 
-- Design a PostgreSQL-backed recovery strategy for stale in-progress `ResearchRun` rows before adding more long-running LLM calls.
+- Monitor lease duration and heartbeat defaults under real CI/runtime load; tune them before adding longer-running providers or full-text stages.
 - Decide whether the hosted background worker should become a separate `MedResearch.Worker` executable once independent deployment, scaling, or operational lifecycle needs are demonstrated.
 - Add additional literature source adapters only when they actually work and are covered by fixtures/tests.
 - Add additional LLM providers only when a real provider is selected and can be tested behind `IStructuredLlmClient`.
-- Decide whether `/health` should become a richer operational health check when more external dependencies exist.
-- Run PostgreSQL Testcontainers integration tests in an environment where Docker Desktop is running.
+- Decide whether health output should expose richer machine-readable readiness details when more external dependencies exist.
+- Keep CI as the authoritative PostgreSQL/Testcontainers runtime check while local Docker Desktop remains unavailable.
 - Consider an explicit opt-in live OpenAI smoke test only if the development workflow needs it.
 - Review whether evidence evaluation and synthesis should persist provider-attempt diagnostics separately from terminal run failures before adding retries or batch reprocessing.

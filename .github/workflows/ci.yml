@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      MEDRESEARCH_REQUIRE_DOCKER_TESTS: true
+      TESTCONTAINERS_RYUK_DISABLED: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Docker info
+        run: docker info
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore MedResearch.slnx
+
+      - name: Build
+        run: dotnet build MedResearch.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test MedResearch.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Verify EF model has no pending migration
+        run: dotnet ef migrations has-pending-model-changes --configuration Release --project src/MedResearch.Infrastructure/MedResearch.Infrastructure.csproj --startup-project src/MedResearch.Api/MedResearch.Api.csproj
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore

@@ -2,13 +2,31 @@ namespace MedResearch.Application.Research.Processing;
 
 public interface IResearchRunQueue
 {
-    Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(DateTimeOffset claimedAt, CancellationToken cancellationToken);
+    Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(
+        DateTimeOffset claimedAt,
+        string workerInstanceId,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken);
 
-    Task SaveProgressAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken);
+    Task<bool> RenewLeaseAsync(
+        ClaimedResearchRun claimedRun,
+        DateTimeOffset heartbeatAt,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken);
+
+    Task<bool> SaveProgressAsync(
+        ClaimedResearchRun claimedRun,
+        DateTimeOffset savedAt,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken);
 
     Task<bool> MarkFailedAsync(
-        Guid researchRunId,
+        ClaimedResearchRun claimedRun,
         string safeFailureReason,
         DateTimeOffset failedAt,
+        CancellationToken cancellationToken);
+
+    Task<bool> ReleaseLeaseAsync(
+        ClaimedResearchRun claimedRun,
         CancellationToken cancellationToken);
 }

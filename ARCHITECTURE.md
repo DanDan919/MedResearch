@@ -69,6 +69,8 @@ The API currently exposes:
 - `GET /api/research/{researchRunId}`: returns the run state and original question, including `Failed` state and safe failure reason when present, or `404` when the run does not exist.
 - `GET /api/research/{researchRunId}/report`: returns the persisted synthesis report with coverage, limitations, claims, and authoritative citations; returns `404` for unknown runs and `409` when the run exists but no report is ready.
 - `GET /health`: runs standard ASP.NET Core health checks, including the PostgreSQL DbContext check.
+- `GET /health/live`: liveness check that does not depend on PostgreSQL, OpenAI, PubMed, or other external providers.
+- `GET /health/ready`: readiness check that includes PostgreSQL connectivity.
 
 Validation and unexpected failures are returned as Problem Details. Internal exception details are logged but not exposed in server-error responses.
 
@@ -76,7 +78,7 @@ Validation and unexpected failures are returned as Problem Details. Internal exc
 
 The first background processor runs as an ASP.NET Core hosted `BackgroundService` in the API host. This keeps deployment simple for the current monolith while allowing multiple API process instances to compete safely for queued work through PostgreSQL.
 
-The worker loop creates a scoped `ResearchRunProcessor`, attempts to claim one queued run, processes it if one is available, and waits for a configurable idle delay only when no queued work was found. The configured section is `ResearchProcessing` with `Enabled` and `IdleDelayMilliseconds` values.
+The worker loop creates a scoped `ResearchRunProcessor`, attempts to claim one queued or expired in-progress run, processes it if one is available, and waits for a configurable idle delay only when no work was found. The configured section is `ResearchProcessing` with `Enabled`, `IdleDelayMilliseconds`, `LeaseDurationSeconds`, and `HeartbeatIntervalSeconds` values. Heartbeat interval must be positive and shorter than the lease duration.
 
 The current pipeline advances runs through:
 
@@ -289,12 +291,12 @@ Missing values stay missing. The system does not infer missing DOI, PMID, author
 
 ## PostgreSQL Claiming Strategy
 
-`PostgreSqlResearchRunQueue` claims queued work with a short PostgreSQL transaction and an atomic `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED ...) RETURNING ...` statement. The claim moves a run from `Queued` to `Planning`, sets `started_at`, and returns the associated research question text before committing.
+`PostgreSqlResearchRunQueue` claims queued or expired in-progress work with a short PostgreSQL transaction and an atomic `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED ...) RETURNING ...` statement. A queued claim moves a run from `Queued` to `Planning`; a reclaim keeps the existing in-progress status. Both paths set lease owner, acquisition time, expiry, heartbeat time, increment `processing_lease_version`, set `started_at` when needed, and return the associated research question text before committing.
 
 Required invariant:
 
 ```text
-One queued ResearchRun -> at most one worker can successfully claim it
+One queued or expired ResearchRun -> at most one worker can successfully claim/reclaim it
 ```
 
 The transaction boundary is intentionally short:
@@ -307,7 +309,7 @@ execute external stage work outside the transaction
 persist each lifecycle transition separately
 ```
 
-The worker does not hold a database lock for the full pipeline, which keeps the design compatible with external LLM and scientific API operations.
+The worker does not hold a database lock for the full pipeline, which keeps the design compatible with external LLM and scientific API operations. Reclaimable statuses are `Planning`, `Searching`, `Extracting`, `Evaluating`, and `Synthesizing`; `Completed`, `Failed`, and `Cancelled` are never reclaimed. Terminal states clear active lease metadata.
 
 ## Failure And Cancellation
 
@@ -315,7 +317,7 @@ If processing fails, Application logs the full exception internally and asks Inf
 
 OpenAI configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures follow the existing safe run failure path. PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures follow the same path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
 
-If the process crashes after claiming a run and before completing or failing it, the run can remain in an in-progress state. Automatic lease/recovery is not implemented yet and is tracked as technical debt.
+If the process crashes after claiming a run and before completing or failing it, another worker can reclaim the run after `processing_lease_expires_at`. Reclaim resumes from the persisted current stage. Lease-sensitive writes require the current `processing_lease_owner` and monotonically increasing `processing_lease_version`, which prevents stale workers from overwriting progress after ownership has transferred.
 
 ## Persistence
 
@@ -343,11 +345,12 @@ Migrations:
 - `20260831142411_AddSourceGroundedEvidenceExtraction`
 - `20260831171340_AddStructuredEvidenceEvaluations`
 - `20260901021148_AddTraceableResearchReports`
+- `20260901063528_AddResearchRunProcessingLeases`
 
 ## Database Schema
 
 - `research_questions`: GUID primary key, required question text, creation timestamp.
-- `research_runs`: GUID primary key, required `research_question_id` FK, string-backed status, created/started/completed timestamps, optional failure reason.
+- `research_runs`: GUID primary key, required `research_question_id` FK, string-backed status, created/started/completed timestamps, optional failure reason, processing lease owner/acquired/expires/heartbeat timestamps, and processing lease version.
 - `research_plans`: GUID primary key, required `research_run_id` and `research_question_id` FKs, authoritative original question, optional PICO-like text fields, array fields for outcomes, preferred study types, search queries, and exclusion hints, plus provider, model, prompt version, and generated timestamp.
 - `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, journal, publication date/date parts, publication types, and authors.
 - `literature_searches`: GUID primary key, required `research_run_id` FK, optional `research_plan_id` FK, source, query, searched timestamp, result count, persisted count, duplicate count.
@@ -362,6 +365,7 @@ Migrations:
 Indexes and constraints are intentionally limited to current lookup/query needs:
 
 - `research_runs(status, created_at)` for run status/queue-style queries.
+- `research_runs(status, processing_lease_expires_at, created_at)` for queued/recoverable worker claim scans.
 - unique `research_plans(research_run_id)` because one accepted plan belongs to one run.
 - `research_plans(research_question_id)` for question-to-plan lookup.
 - filtered unique `studies(doi)` for DOI deduplication when DOI is present.
@@ -393,7 +397,7 @@ Docker Compose defines:
 - `postgres`: PostgreSQL 17 Alpine with development-only defaults.
 - `api`: MedResearch API image built from `src/MedResearch.Api/Dockerfile`; it hosts both HTTP endpoints and the background research worker.
 
-The compose API service enables config-gated startup migrations with `Database__ApplyMigrationsOnStartup=true`. This is a local development convenience, not a production migration strategy. OpenAI model and API key values are supplied through environment variables or `.env`; committed configuration contains placeholders only.
+The compose API service enables config-gated startup migrations with `Database__ApplyMigrationsOnStartup=true`. This is a local development convenience, not a production migration strategy. OpenAI model and API key values are supplied through environment variables or `.env`; committed configuration contains placeholders only. The container can start and answer liveness/readiness without an OpenAI API key, but real OpenAI-backed research processing still requires provider configuration when invoked.
 
 ## Initial Domain Concepts
 

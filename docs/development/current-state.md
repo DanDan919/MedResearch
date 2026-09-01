@@ -17,7 +17,7 @@ Date: 2026-09-01
   - `tests/MedResearch.Application.Tests`
   - `tests/MedResearch.Infrastructure.Tests`
   - `tests/MedResearch.IntegrationTests`
-- Standard ASP.NET Core health check endpoint at `/health`.
+- Standard ASP.NET Core health check endpoints at `/health`, `/health/live`, and `/health/ready`.
 - Infrastructure registration through `services.AddInfrastructure(configuration)`.
 - Application registration through `services.AddApplication()`.
 - First end-to-end research API use case:
@@ -26,15 +26,18 @@ Date: 2026-09-01
   - `GET /api/research/{researchRunId}/report` retrieves the persisted synthesis report when ready.
   - API endpoints call Application use cases and do not query EF directly.
   - Invalid input, missing runs, and unexpected failures are returned as Problem Details.
-- Durable background research processing:
-  - `BackgroundResearchWorker` runs as an ASP.NET Core hosted service in `MedResearch.Api`.
-  - `ResearchRunProcessor` advances claimed runs through Planning, Searching, Extracting, Evaluating, Synthesizing, and Completed.
+- Durable lease-backed background research processing:
+  - `BackgroundResearchWorker` runs as an ASP.NET Core hosted service in `MedResearch.Api` and uses an operational worker instance id.
+  - `ResearchRunProcessor` advances claimed runs through Planning, Searching, Extracting, Evaluating, Synthesizing, and Completed while renewing processing leases.
   - `Planning` calls the structured Research Planner and persists a validated `ResearchPlan`.
   - `Searching` consumes persisted `ResearchPlan.SearchQueries` and performs real PubMed retrieval through provider-neutral Application contracts.
   - `Extracting` performs source-grounded abstract-level evidence extraction for discovered studies.
   - `Evaluating` performs structured source-aware methodological evidence evaluation from study metadata, extraction provenance, and grounded evidence.
   - `Synthesizing` builds bounded current-run synthesis context and persists a traceable `ResearchReport` with claims linked to Evidence.
   - Runs move to Completed only after report persistence succeeds or an explicit insufficient-evidence report is created.
+  - Expired in-progress leases in Planning, Searching, Extracting, Evaluating, or Synthesizing can be reclaimed at the current stage.
+  - Progress/failure/heartbeat writes require lease owner and monotonically increasing lease version to prevent stale-worker overwrites.
+  - Terminal states clear active lease metadata.
 - Structured AI research planning:
   - `IStructuredLlmClient` provider-neutral Application boundary.
   - `ResearchPlanner` Application service.
@@ -98,6 +101,7 @@ Date: 2026-09-01
     - `20260831142411_AddSourceGroundedEvidenceExtraction`
     - `20260831171340_AddStructuredEvidenceEvaluations`
     - `20260901021148_AddTraceableResearchReports`
+    - `20260901063528_AddResearchRunProcessingLeases`
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
@@ -106,6 +110,7 @@ Date: 2026-09-01
   - `EvidenceExtraction__MaxStudiesPerRun` wired from `.env.example`
   - `EvidenceEvaluation__MaxStudiesPerRun` wired from `.env.example`
   - `Synthesis__MaxStudies`, `Synthesis__MaxEvidenceFindings`, and `Synthesis__MaxClaims` wired from `.env.example`
+  - `ResearchProcessing__LeaseDurationSeconds` and `ResearchProcessing__HeartbeatIntervalSeconds` wired from `.env.example`
 - Domain concepts:
   - `ResearchQuestion`
   - `ResearchRun`
@@ -141,23 +146,23 @@ Date: 2026-09-01
   - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, and provider failure propagation.
   - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior.
   - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
-  - PostgreSQL integration tests using Testcontainers for research persistence, queue semantics, plan/search persistence, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, and current-run corpus loading. They run against real PostgreSQL when Docker is reachable and are currently skipped because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - PostgreSQL integration tests using Testcontainers for research persistence, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - GitHub Actions CI requires Docker-backed Testcontainers tests with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`.
 
 ## Environment Status
 
 - GitHub remote is configured as `https://github.com/DanDan919/MedResearch.git`.
 - Docker CLI and Docker Compose are installed, but Docker Desktop engine is not reachable at `//./pipe/dockerDesktopLinuxEngine` in this environment.
-- Application/database health check runtime verification has not passed because the Docker Compose stack cannot start while the engine is unavailable.
+- Local Docker Compose health-check runtime verification has not passed because the Docker Compose stack cannot start while the engine is unavailable. `/health/ready` is covered by the PostgreSQL-backed fake-provider integration test when Docker is available.
 - No live PubMed smoke test is configured or run by default. Normal tests use fixtures and fake HTTP.
 - No live OpenAI smoke test is configured or run by default. Normal tests use fake LLM providers and fake HTTP.
 
 ## Next Logical Milestone
 
-Add stale in-progress run recovery and operational hardening before expanding more external scientific or LLM providers. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
+Let CI execute the Docker-backed PostgreSQL suite successfully and fix any CI-only failures before expanding more external scientific or LLM providers. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
 
 ## Not Yet Implemented
 
-- Automatic recovery for in-progress runs after a worker crash.
 - Crossref, Europe PMC, OpenAlex, Semantic Scholar, publisher API, or other non-PubMed source integrations.
 - Additional LLM providers beyond OpenAI.
 - Full-text extraction.

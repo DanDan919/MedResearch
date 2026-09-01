@@ -14,7 +14,12 @@ public sealed class ResearchRun
         DateTimeOffset createdAt,
         DateTimeOffset? startedAt,
         DateTimeOffset? completedAt,
-        string? failureReason)
+        string? failureReason,
+        string? processingLeaseOwner = null,
+        DateTimeOffset? processingLeaseAcquiredAt = null,
+        DateTimeOffset? processingLeaseExpiresAt = null,
+        DateTimeOffset? lastHeartbeatAt = null,
+        long processingLeaseVersion = 0)
     {
         if (id == Guid.Empty)
         {
@@ -26,6 +31,11 @@ public sealed class ResearchRun
             throw new ArgumentException("Research question id cannot be empty.", nameof(researchQuestionId));
         }
 
+        if (processingLeaseVersion < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(processingLeaseVersion), "Processing lease version cannot be negative.");
+        }
+
         Id = id;
         ResearchQuestionId = researchQuestionId;
         Status = status;
@@ -33,6 +43,11 @@ public sealed class ResearchRun
         StartedAt = startedAt;
         CompletedAt = completedAt;
         FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim();
+        ProcessingLeaseOwner = string.IsNullOrWhiteSpace(processingLeaseOwner) ? null : processingLeaseOwner.Trim();
+        ProcessingLeaseAcquiredAt = processingLeaseAcquiredAt;
+        ProcessingLeaseExpiresAt = processingLeaseExpiresAt;
+        LastHeartbeatAt = lastHeartbeatAt;
+        ProcessingLeaseVersion = processingLeaseVersion;
     }
 
     public Guid Id { get; }
@@ -49,6 +64,16 @@ public sealed class ResearchRun
 
     public string? FailureReason { get; private set; }
 
+    public string? ProcessingLeaseOwner { get; private set; }
+
+    public DateTimeOffset? ProcessingLeaseAcquiredAt { get; private set; }
+
+    public DateTimeOffset? ProcessingLeaseExpiresAt { get; private set; }
+
+    public DateTimeOffset? LastHeartbeatAt { get; private set; }
+
+    public long ProcessingLeaseVersion { get; private set; }
+
     public void StartPlanning(DateTimeOffset startedAt) => MoveTo(ResearchRunStatus.Planning, ResearchRunStatus.Queued, startedAt);
 
     public void StartSearching(DateTimeOffset startedAt) => MoveTo(ResearchRunStatus.Searching, ResearchRunStatus.Planning, startedAt);
@@ -64,6 +89,7 @@ public sealed class ResearchRun
         EnsureCurrentStatus(ResearchRunStatus.Synthesizing, ResearchRunStatus.Completed);
         Status = ResearchRunStatus.Completed;
         CompletedAt = completedAt;
+        ClearLease();
     }
 
     public void Fail(string failureReason, DateTimeOffset failedAt)
@@ -77,6 +103,7 @@ public sealed class ResearchRun
         Status = ResearchRunStatus.Failed;
         FailureReason = failureReason.Trim();
         CompletedAt = failedAt;
+        ClearLease();
     }
 
     public void Cancel(DateTimeOffset cancelledAt)
@@ -84,6 +111,51 @@ public sealed class ResearchRun
         EnsureNotTerminal(ResearchRunStatus.Cancelled);
         Status = ResearchRunStatus.Cancelled;
         CompletedAt = cancelledAt;
+        ClearLease();
+    }
+
+    public void AssignLease(string owner, DateTimeOffset acquiredAt, DateTimeOffset expiresAt, long version)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        if (expiresAt <= acquiredAt)
+        {
+            throw new ArgumentException("Lease expiry must be after acquisition time.", nameof(expiresAt));
+        }
+
+        if (version <= ProcessingLeaseVersion)
+        {
+            throw new ArgumentOutOfRangeException(nameof(version), "Lease version must increase.");
+        }
+
+        ProcessingLeaseOwner = owner.Trim();
+        ProcessingLeaseAcquiredAt = acquiredAt;
+        ProcessingLeaseExpiresAt = expiresAt;
+        LastHeartbeatAt = acquiredAt;
+        ProcessingLeaseVersion = version;
+    }
+
+    public void RenewLease(DateTimeOffset heartbeatAt, DateTimeOffset expiresAt)
+    {
+        if (string.IsNullOrWhiteSpace(ProcessingLeaseOwner))
+        {
+            throw new InvalidOperationException("Cannot renew a research run without an active lease owner.");
+        }
+
+        if (expiresAt <= heartbeatAt)
+        {
+            throw new ArgumentException("Lease expiry must be after heartbeat time.", nameof(expiresAt));
+        }
+
+        LastHeartbeatAt = heartbeatAt;
+        ProcessingLeaseExpiresAt = expiresAt;
+    }
+
+    public void ClearLease()
+    {
+        ProcessingLeaseOwner = null;
+        ProcessingLeaseAcquiredAt = null;
+        ProcessingLeaseExpiresAt = null;
+        LastHeartbeatAt = null;
     }
 
     private void MoveTo(ResearchRunStatus nextStatus, ResearchRunStatus requiredCurrentStatus, DateTimeOffset startedAt)

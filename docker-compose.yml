@@ -26,6 +26,8 @@ services:
       Database__ApplyMigrationsOnStartup: "true"
       ResearchProcessing__Enabled: "true"
       ResearchProcessing__IdleDelayMilliseconds: "1000"
+      ResearchProcessing__LeaseDurationSeconds: ${RESEARCH_PROCESSING_LEASE_DURATION_SECONDS:-900}
+      ResearchProcessing__HeartbeatIntervalSeconds: ${RESEARCH_PROCESSING_HEARTBEAT_INTERVAL_SECONDS:-60}
       AI__Provider: OpenAI
       AI__BaseUrl: https://api.openai.com/v1/
       AI__Model: ${OPENAI_MODEL:-}

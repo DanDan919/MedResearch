@@ -27,8 +27,10 @@ public sealed class BackgroundResearchWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "Background research worker started. WorkerInstanceId: {WorkerInstanceId}",
-            _workerInstanceId);
+            "Background research worker started. WorkerId: {WorkerId}; LeaseDurationSeconds: {LeaseDurationSeconds}; HeartbeatIntervalSeconds: {HeartbeatIntervalSeconds}",
+            _workerInstanceId,
+            _options.LeaseDurationSeconds,
+            _options.HeartbeatIntervalSeconds);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -36,7 +38,7 @@ public sealed class BackgroundResearchWorker : BackgroundService
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var processor = scope.ServiceProvider.GetRequiredService<ResearchRunProcessor>();
-                var processedRun = await processor.ProcessNextQueuedRunAsync(_workerInstanceId, stoppingToken);
+                var processedRun = await processor.ProcessNextQueuedRunAsync(_workerInstanceId, _options.LeaseDuration, _options.HeartbeatInterval, stoppingToken);
 
                 if (!processedRun)
                 {
@@ -51,7 +53,7 @@ public sealed class BackgroundResearchWorker : BackgroundService
             {
                 _logger.LogError(
                     exception,
-                    "Background research worker iteration failed. WorkerInstanceId: {WorkerInstanceId}",
+                    "Background research worker iteration failed. WorkerId: {WorkerId}",
                     _workerInstanceId);
 
                 await DelayUntilNextAttemptAsync(stoppingToken);
@@ -59,7 +61,7 @@ public sealed class BackgroundResearchWorker : BackgroundService
         }
 
         _logger.LogInformation(
-            "Background research worker stopped. WorkerInstanceId: {WorkerInstanceId}",
+            "Background research worker stopped. WorkerId: {WorkerId}",
             _workerInstanceId);
     }
 

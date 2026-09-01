@@ -40,6 +40,8 @@ Before significant changes, read:
 25. Every substantive persisted ResearchReport claim must reference validated Evidence from the same ResearchRun.
 26. Scientific insufficiency must be represented explicitly rather than replaced with model prior knowledge.
 27. Study/evidence direction counts are descriptive corpus context only, not certainty weights, vote counts, or statistical estimators.
+28. PostgreSQL integration behavior must be verified against real PostgreSQL; do not replace database-specific tests with EF Core InMemory.
+29. ResearchRun processing leases must not permit stale workers to overwrite a run after ownership has transferred.
 
 ## Development Trail
 

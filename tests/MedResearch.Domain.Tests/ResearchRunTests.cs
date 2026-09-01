@@ -106,6 +106,37 @@ public sealed class ResearchRunTests
         Assert.Equal(ResearchRunStatus.Completed, run.Status);
     }
 
+
+    [Fact]
+    public void AssignLease_RequiresIncreasingVersion()
+    {
+        var run = CreateRun();
+        run.StartPlanning(DateTimeOffset.UtcNow);
+        var acquiredAt = DateTimeOffset.UtcNow;
+
+        run.AssignLease("worker-a", acquiredAt, acquiredAt.AddMinutes(5), 1);
+
+        Assert.Equal("worker-a", run.ProcessingLeaseOwner);
+        Assert.Equal(1, run.ProcessingLeaseVersion);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            run.AssignLease("worker-b", acquiredAt.AddMinutes(1), acquiredAt.AddMinutes(6), 1));
+    }
+
+    [Fact]
+    public void Complete_ClearsProcessingLease()
+    {
+        var run = CreateRunInSynthesis();
+        var acquiredAt = DateTimeOffset.UtcNow;
+        run.AssignLease("worker-a", acquiredAt, acquiredAt.AddMinutes(5), 1);
+
+        run.Complete(acquiredAt.AddMinutes(1));
+
+        Assert.Null(run.ProcessingLeaseOwner);
+        Assert.Null(run.ProcessingLeaseAcquiredAt);
+        Assert.Null(run.ProcessingLeaseExpiresAt);
+        Assert.Null(run.LastHeartbeatAt);
+        Assert.Equal(1, run.ProcessingLeaseVersion);
+    }
     private static ResearchRun CreateRun()
     {
         return new ResearchRun(Guid.NewGuid(), DateTimeOffset.UtcNow);

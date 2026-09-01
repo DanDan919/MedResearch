@@ -68,3 +68,11 @@ Root cause: Adjacent boolean constructor arguments had the same type and were ea
 Decision / fix: Changed persistence to pass `result.SourceCoverage.PotentialConflictDetected` explicitly and kept coverage reconstruction tests around persisted reports.
 Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx` passed after the fix; Docker-backed PostgreSQL tests were skipped because the Docker engine is unavailable.
 Remaining concerns: Consider using a named options/object mapping pattern if future report coverage fields grow further.
+Date: 2026-09-01
+Area: EF Core DbContextFactory dependency injection
+Problem: API integration tests failed service-provider validation after adding a DbContext factory for worker heartbeat/recovery.
+Observed behavior: `dotnet test` reported that singleton `IDbContextFactory<MedResearchDbContext>` could not consume scoped `DbContextOptions<MedResearchDbContext>`.
+Root cause: `AddDbContext` registered scoped context options, while `AddDbContextFactory` defaulted to singleton lifetime.
+Decision / fix: Registered the DbContext factory with scoped lifetime so heartbeat/recovery queue operations can create independent DbContext instances without violating service-provider validation.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally after the fix, with Docker-backed PostgreSQL tests skipped because Docker Desktop is unavailable.
+Remaining concerns: CI must run the Docker-backed PostgreSQL suite with Docker available to verify runtime SQL behavior.

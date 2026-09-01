@@ -4,6 +4,7 @@ using MedResearch.Application.Research;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,6 +51,14 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready") || check.Tags.Contains("database")
+});
 
 var research = app.MapGroup("/api/research")
     .WithTags("Research");

@@ -34,12 +34,12 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("Connection string 'MedResearch' is required.");
         }
 
-        services.AddDbContext<MedResearchDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsqlOptions =>
-                npgsqlOptions.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName)));
+        services.AddDbContext<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString));
+        services.AddDbContextFactory<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString), ServiceLifetime.Scoped);
 
         services.AddScoped<IResearchStore, EfResearchStore>();
-        services.AddScoped<IResearchRunQueue, PostgreSqlResearchRunQueue>();
+        services.AddScoped<IResearchRunQueue>(provider =>
+            new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
         services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
@@ -93,7 +93,7 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddHealthChecks()
-            .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql"]);
+            .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql", "ready"]);
 
         if (bool.TryParse(configuration["Database:ApplyMigrationsOnStartup"], out var applyMigrationsOnStartup) && applyMigrationsOnStartup)
         {
@@ -109,7 +109,7 @@ public static class ServiceCollectionExtensions
 
         return new EvidenceExtractionOptions
         {
-            MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
+            MaxStudiesPerRun = ReadPositiveInt(section["MaxStudiesPerRun"], 10, "EvidenceExtraction:MaxStudiesPerRun")
         };
     }
 
@@ -119,7 +119,7 @@ public static class ServiceCollectionExtensions
 
         return new EvidenceEvaluationOptions
         {
-            MaxStudiesPerRun = TryReadInt(section["MaxStudiesPerRun"], 10)
+            MaxStudiesPerRun = ReadPositiveInt(section["MaxStudiesPerRun"], 10, "EvidenceEvaluation:MaxStudiesPerRun")
         };
     }
 
@@ -129,9 +129,9 @@ public static class ServiceCollectionExtensions
 
         return new SynthesisOptions
         {
-            MaxStudies = TryReadInt(section["MaxStudies"], 10),
-            MaxEvidenceFindings = TryReadInt(section["MaxEvidenceFindings"], 40),
-            MaxClaims = TryReadInt(section["MaxClaims"], 12)
+            MaxStudies = ReadPositiveInt(section["MaxStudies"], 10, "Synthesis:MaxStudies"),
+            MaxEvidenceFindings = ReadPositiveInt(section["MaxEvidenceFindings"], 40, "Synthesis:MaxEvidenceFindings"),
+            MaxClaims = ReadPositiveInt(section["MaxClaims"], 12, "Synthesis:MaxClaims")
         };
     }
 
@@ -139,22 +139,26 @@ public static class ServiceCollectionExtensions
     {
         var section = configuration.GetSection(ResearchProcessingOptions.SectionName);
         var enabled = true;
-        var idleDelayMilliseconds = 1_000;
+        var idleDelayMilliseconds = ReadPositiveInt(section["IdleDelayMilliseconds"], 1_000, "ResearchProcessing:IdleDelayMilliseconds");
+        var leaseDurationSeconds = ReadPositiveInt(section["LeaseDurationSeconds"], 900, "ResearchProcessing:LeaseDurationSeconds");
+        var heartbeatIntervalSeconds = ReadPositiveInt(section["HeartbeatIntervalSeconds"], 60, "ResearchProcessing:HeartbeatIntervalSeconds");
 
         if (bool.TryParse(section["Enabled"], out var configuredEnabled))
         {
             enabled = configuredEnabled;
         }
 
-        if (int.TryParse(section["IdleDelayMilliseconds"], out var configuredIdleDelayMilliseconds))
+        if (heartbeatIntervalSeconds >= leaseDurationSeconds)
         {
-            idleDelayMilliseconds = configuredIdleDelayMilliseconds;
+            throw new InvalidOperationException("ResearchProcessing:HeartbeatIntervalSeconds must be shorter than ResearchProcessing:LeaseDurationSeconds.");
         }
 
         return new ResearchProcessingOptions
         {
             Enabled = enabled,
-            IdleDelayMilliseconds = idleDelayMilliseconds
+            IdleDelayMilliseconds = idleDelayMilliseconds,
+            LeaseDurationSeconds = leaseDurationSeconds,
+            HeartbeatIntervalSeconds = heartbeatIntervalSeconds
         };
     }
 
@@ -176,8 +180,8 @@ public static class ServiceCollectionExtensions
             ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
                 ? null
                 : section["ApiKey"],
-            TimeoutSeconds = TryReadInt(section["TimeoutSeconds"], 30),
-            MaxOutputTokens = TryReadInt(section["MaxOutputTokens"], 2_000)
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 30, "AI:TimeoutSeconds"),
+            MaxOutputTokens = ReadPositiveInt(section["MaxOutputTokens"], 2_000, "AI:MaxOutputTokens")
         };
     }
 
@@ -199,14 +203,35 @@ public static class ServiceCollectionExtensions
             ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
                 ? null
                 : section["ApiKey"],
-            ResultLimit = TryReadInt(section["ResultLimit"], 10),
-            TimeoutSeconds = TryReadInt(section["TimeoutSeconds"], 15),
-            RequestIntervalMilliseconds = TryReadInt(section["RequestIntervalMilliseconds"], 350)
+            ResultLimit = ReadPositiveInt(section["ResultLimit"], 10, "PubMed:ResultLimit"),
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "PubMed:TimeoutSeconds"),
+            RequestIntervalMilliseconds = ReadPositiveInt(section["RequestIntervalMilliseconds"], 350, "PubMed:RequestIntervalMilliseconds")
         };
     }
 
-    private static int TryReadInt(string? value, int defaultValue)
+    private static void ConfigurePostgreSql(DbContextOptionsBuilder options, string connectionString)
     {
-        return int.TryParse(value, out var parsed) ? parsed : defaultValue;
+        options.UseNpgsql(connectionString, npgsqlOptions =>
+            npgsqlOptions.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName));
+    }
+
+    private static int ReadPositiveInt(string? value, int defaultValue, string configurationKey)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        if (!int.TryParse(value, out var parsed))
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be an integer.");
+        }
+
+        if (parsed <= 0)
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be positive.");
+        }
+
+        return parsed;
     }
 }

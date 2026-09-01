@@ -10,7 +10,7 @@ public sealed class ResearchRunProcessorTests
     public async Task ProcessNextQueuedRunAsync_AdvancesClaimedRunThroughLifecycle()
     {
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
         var stageExecutor = new RecordingStageExecutor();
         var processor = new ResearchRunProcessor(
             queue,
@@ -71,7 +71,7 @@ public sealed class ResearchRunProcessorTests
     public async Task ProcessNextQueuedRunAsync_MarksRunFailedWhenStageFails()
     {
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
         var stageExecutor = new RecordingStageExecutor(ResearchRunStatus.Extracting);
         var processor = new ResearchRunProcessor(
             queue,
@@ -92,7 +92,7 @@ public sealed class ResearchRunProcessorTests
     {
         using var cancellation = new CancellationTokenSource();
         var run = CreateClaimedRun();
-        var queue = new RecordingResearchRunQueue(new ClaimedResearchRun(run, "Does sleep improve memory?"));
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
         var stageExecutor = new CancellingStageExecutor(cancellation);
         var processor = new ResearchRunProcessor(
             queue,
@@ -105,6 +105,7 @@ public sealed class ResearchRunProcessorTests
         Assert.Equal(ResearchRunStatus.Planning, run.Status);
         Assert.Null(run.FailureReason);
         Assert.False(queue.MarkFailedWasCalled);
+        Assert.True(queue.ReleaseLeaseWasCalled);
     }
 
     private static ResearchRun CreateClaimedRun()
@@ -112,6 +113,11 @@ public sealed class ResearchRunProcessorTests
         var run = new ResearchRun(Guid.NewGuid(), DateTimeOffset.UtcNow);
         run.StartPlanning(DateTimeOffset.UtcNow);
         return run;
+    }
+
+    private static ClaimedResearchRun CreateClaim(ResearchRun run, string question)
+    {
+        return new ClaimedResearchRun(run, question, "worker-1", 1, DateTimeOffset.UtcNow.AddMinutes(15), false);
     }
 
     private sealed class RecordingResearchRunQueue : IResearchRunQueue
@@ -127,25 +133,50 @@ public sealed class ResearchRunProcessorTests
 
         public bool MarkFailedWasCalled { get; private set; }
 
-        public Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(DateTimeOffset claimedAt, CancellationToken cancellationToken)
+        public bool ReleaseLeaseWasCalled { get; private set; }
+
+        public Task<ClaimedResearchRun?> TryClaimNextQueuedRunAsync(
+            DateTimeOffset claimedAt,
+            string workerInstanceId,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(_claimedRun);
         }
 
-        public Task SaveProgressAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
+        public Task<bool> RenewLeaseAsync(
+            ClaimedResearchRun claimedRun,
+            DateTimeOffset heartbeatAt,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> SaveProgressAsync(
+            ClaimedResearchRun claimedRun,
+            DateTimeOffset savedAt,
+            TimeSpan leaseDuration,
+            CancellationToken cancellationToken)
         {
             SavedStatuses.Add(claimedRun.Run.Status);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task<bool> MarkFailedAsync(
-            Guid researchRunId,
+            ClaimedResearchRun claimedRun,
             string safeFailureReason,
             DateTimeOffset failedAt,
             CancellationToken cancellationToken)
         {
             MarkFailedWasCalled = true;
-            _claimedRun?.Run.Fail(safeFailureReason, failedAt);
+            claimedRun.Run.Fail(safeFailureReason, failedAt);
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> ReleaseLeaseAsync(ClaimedResearchRun claimedRun, CancellationToken cancellationToken)
+        {
+            ReleaseLeaseWasCalled = true;
             return Task.FromResult(true);
         }
     }

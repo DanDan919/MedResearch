@@ -11,9 +11,13 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
     public DbContextOptions<MedResearchDbContext> DbContextOptions { get; private set; } = null!;
 
+    public string? ConnectionString { get; private set; }
+
     public string? UnavailableReason { get; private set; }
 
     public bool IsAvailable => UnavailableReason is null;
+
+    public static bool RequireDockerTests => IsTruthy(Environment.GetEnvironmentVariable("MEDRESEARCH_REQUIRE_DOCKER_TESTS"));
 
     public async Task InitializeAsync()
     {
@@ -26,17 +30,24 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
                 .Build();
 
             await _postgres.StartAsync();
+            ConnectionString = _postgres.GetConnectionString();
 
             DbContextOptions = new DbContextOptionsBuilder<MedResearchDbContext>()
-                .UseNpgsql(_postgres.GetConnectionString())
+                .UseNpgsql(ConnectionString)
                 .Options;
 
             await using var context = CreateDbContext();
             await context.Database.MigrateAsync();
         }
-        catch (DockerUnavailableException exception)
+        catch (DockerUnavailableException exception) when (!RequireDockerTests)
         {
             UnavailableReason = exception.Message;
+        }
+        catch (DockerUnavailableException exception) when (RequireDockerTests)
+        {
+            throw new InvalidOperationException(
+                "Docker-backed PostgreSQL integration tests are required, but Docker/Testcontainers is unavailable.",
+                exception);
         }
     }
 
@@ -56,6 +67,13 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         }
 
         return new MedResearchDbContext(DbContextOptions);
+    }
+
+    private static bool IsTruthy(string? value)
+    {
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
     }
 }
 
