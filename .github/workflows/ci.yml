@@ -38,7 +38,37 @@ jobs:
         run: dotnet build MedResearch.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test MedResearch.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+        shell: pwsh
+        run: |
+          dotnet test MedResearch.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+          $testExitCode = $LASTEXITCODE
+
+          function Escape-Annotation([string] $value) {
+            return $value.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+          }
+
+          Get-ChildItem -Path TestResults -Recurse -Filter *.trx | ForEach-Object {
+            $trxPath = $_.FullName
+            $counters = Select-Xml -Path $trxPath -XPath "//*[local-name()='Counters']" | Select-Object -First 1
+            if ($counters -ne $null) {
+              $node = $counters.Node
+              Write-Host "TRX $($_.Name): total=$($node.total) executed=$($node.executed) passed=$($node.passed) failed=$($node.failed) skipped=$($node.notExecuted)"
+            }
+
+            Select-Xml -Path $trxPath -XPath "//*[local-name()='UnitTestResult' and @outcome='Failed']" | ForEach-Object {
+              $node = $_.Node
+              $message = $node.Output.ErrorInfo.Message
+              if ([string]::IsNullOrWhiteSpace($message)) {
+                $message = $node.Output.ErrorInfo.StackTrace
+              }
+
+              $title = Escape-Annotation $node.testName
+              $body = Escape-Annotation $message
+              Write-Host "::error title=$title::$body"
+            }
+          }
+
+          exit $testExitCode
 
       - name: Verify EF model has no pending migration
         run: dotnet ef migrations has-pending-model-changes --configuration Release --project src/MedResearch.Infrastructure/MedResearch.Infrastructure.csproj --startup-project src/MedResearch.Api/MedResearch.Api.csproj
