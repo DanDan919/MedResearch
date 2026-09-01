@@ -37,6 +37,22 @@ public sealed partial class FullFakePipelineTests
     {
         SkipIfPostgreSqlUnavailable();
 
+        await using (var db = _fixture.CreateDbContext())
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE research_runs
+                SET status = 'Cancelled',
+                    completed_at = NOW(),
+                    processing_lease_owner = NULL,
+                    processing_lease_acquired_at = NULL,
+                    processing_lease_expires_at = NULL,
+                    last_heartbeat_at = NULL
+                WHERE status NOT IN ('Completed', 'Failed', 'Cancelled');
+                """,
+                CancellationToken.None);
+        }
+
         var fakeLlm = new FakeStructuredLlmClient();
         var fakeLiterature = new FakeScientificLiteratureSource();
         using var factory = new FakePipelineApiFactory(_fixture.ConnectionString!, fakeLlm, fakeLiterature);
