@@ -89,7 +89,7 @@ public sealed partial class FullFakePipelineTests
 
             Assert.True(await db.ResearchPlans.AnyAsync(plan => plan.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.LiteratureSearches.AnyAsync(search => search.ResearchRunId == created.ResearchRunId, CancellationToken.None));
-            Assert.True(await db.Studies.AnyAsync(study => study.Pmid == "12345678" && study.Doi == "10.1000/fake-sleep-recall", CancellationToken.None));
+            Assert.True(await db.Studies.AnyAsync(study => study.Pmid == "99123456" && study.Doi == "10.1000/medresearch-e2e-sleep-recall", CancellationToken.None));
             Assert.True(await db.ResearchStudyDiscoveries.AnyAsync(discovery => discovery.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.EvidenceExtractions.AnyAsync(extraction => extraction.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.Evidence.AnyAsync(evidence => evidence.ResearchRunId == created.ResearchRunId && evidence.GroundingValidated, CancellationToken.None));
@@ -108,8 +108,8 @@ public sealed partial class FullFakePipelineTests
 
             Assert.Equal(ResearchReportClaimType.Conclusion, claimEvidence.claim.ClaimType);
             Assert.Equal(claimEvidence.evidence.Id, claimEvidence.link.EvidenceId);
-            Assert.Equal("12345678", claimEvidence.study.Pmid);
-            Assert.Equal("10.1000/fake-sleep-recall", claimEvidence.study.Doi);
+            Assert.Equal("99123456", claimEvidence.study.Pmid);
+            Assert.Equal("10.1000/medresearch-e2e-sleep-recall", claimEvidence.study.Doi);
         }
 
         var reportResponse = await client.GetAsync($"/api/research/{created.ResearchRunId}/report");
@@ -122,8 +122,8 @@ public sealed partial class FullFakePipelineTests
         Assert.Contains("PubMed", report.Coverage.SearchedSources);
         var returnedClaim = Assert.Single(report.Claims);
         var returnedCitation = Assert.Single(returnedClaim.Citations);
-        Assert.Equal("12345678", returnedCitation.Pmid);
-        Assert.Equal("10.1000/fake-sleep-recall", returnedCitation.Doi);
+        Assert.Equal("99123456", returnedCitation.Pmid);
+        Assert.Equal("10.1000/medresearch-e2e-sleep-recall", returnedCitation.Doi);
         Assert.Equal("Fake randomized sleep recall trial", returnedCitation.Title);
         Assert.Contains("sleep improved recall", returnedCitation.SupportingText, StringComparison.OrdinalIgnoreCase);
 
@@ -284,8 +284,8 @@ public sealed partial class FullFakePipelineTests
             Assert.Contains("sleep", request.Query, StringComparison.OrdinalIgnoreCase);
 
             var candidate = new ScientificStudyCandidate(
-                "12345678",
-                "10.1000/fake-sleep-recall",
+                "99123456",
+                "10.1000/medresearch-e2e-sleep-recall",
                 "Fake randomized sleep recall trial",
                 AbstractText,
                 "Journal of Deterministic Tests",
@@ -326,7 +326,7 @@ public sealed partial class FullFakePipelineTests
                     new EvidenceFindingDraft(
                         "recall",
                         "Sleep improved recall in adults compared with wakefulness.",
-                        "sleep improved recall in 120 adults compared with wakefulness.",
+                        "In this randomized controlled trial, sleep improved recall in 120 adults compared with wakefulness.",
                         "Positive",
                         "adults",
                         "sleep",
