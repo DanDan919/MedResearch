@@ -8,3 +8,8 @@
 - Docker CLI and Docker Compose are installed, but the Docker Desktop engine was not reachable during persistence setup.
 - Testcontainers requires the Docker engine and should not be treated as a pure unit-test dependency.
 - EF Core migrations can be created from Infrastructure with API as startup when both projects have private design-time tooling as needed.
+
+
+## 2026-09-02
+
+- Current NCBI E-utilities documentation confirms base URL `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/`, PubMed database name `pubmed`, optional `api_key`, default request limits of 3 requests/second without an API key and 10 requests/second with an API key, encouraged `tool`/`email` identification, and batching/History Server guidance for larger retrieval jobs.

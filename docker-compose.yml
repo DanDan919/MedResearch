@@ -39,13 +39,17 @@ services:
       Synthesis__MaxStudies: ${SYNTHESIS_MAX_STUDIES:-10}
       Synthesis__MaxEvidenceFindings: ${SYNTHESIS_MAX_EVIDENCE_FINDINGS:-40}
       Synthesis__MaxClaims: ${SYNTHESIS_MAX_CLAIMS:-12}
+      PubMed__Enabled: ${PUBMED_ENABLED:-true}
       PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
-      PubMed__ResultLimit: ${PUBMED_RESULT_LIMIT:-10}
+      PubMed__MaxResultsPerQuery: ${PUBMED_MAX_RESULTS_PER_QUERY:-10}
       PubMed__TimeoutSeconds: "15"
       PubMed__Tool: MedResearch
       PubMed__Email: ${PUBMED_EMAIL:-}
       PubMed__ApiKey: ${PUBMED_API_KEY:-}
-      PubMed__RequestIntervalMilliseconds: "350"
+      PubMed__MaxRequestsPerSecond: ${PUBMED_MAX_REQUESTS_PER_SECOND:-2}
+      PubMed__FetchBatchSize: ${PUBMED_FETCH_BATCH_SIZE:-25}
+      PubMed__MaxRetryAttempts: ${PUBMED_MAX_RETRY_ATTEMPTS:-2}
+      PubMed__RetryBaseDelayMilliseconds: ${PUBMED_RETRY_BASE_DELAY_MILLISECONDS:-250}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

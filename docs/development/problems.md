@@ -113,3 +113,22 @@ Root cause: The schema mixed two different invariants: Study work should be dedu
 Decision / fix: Changed discovery uniqueness to `(literature_search_id, study_id)`, kept a non-unique `(research_run_id, study_id)` lookup index, and deduplicated extraction/synthesis study work by StudyId while preserving multiple LiteratureSearch/discovery rows.
 Verification: `dotnet restore E:\MedResearch\MedResearch.slnx`, `dotnet build E:\MedResearch\MedResearch.slnx --no-restore`, `dotnet test E:\MedResearch\MedResearch.slnx --no-build`, and `dotnet ef migrations has-pending-model-changes` passed locally after the forward migration. Docker-backed PostgreSQL execution is pending the next CI run because local Docker Desktop is unavailable.
 Remaining concerns: If future reports need to expose per-query discovery paths directly, add a read model for discovery provenance instead of overloading synthesis Study snapshots.
+
+
+Date: 2026-09-02
+Area: PubMed E-utilities production hardening
+Problem: The PubMed adapter used conservative manual request spacing, but it did not enforce documented NCBI rate ceilings through explicit configuration validation and had no bounded transient retry policy.
+Observed behavior: 429, 5xx, network failures, and timeouts immediately failed the search path; configured request pacing was expressed as an interval rather than an official-policy-bounded request rate.
+Root cause: The first PubMed milestone intentionally kept provider behavior simple and deferred production-grade retry/rate semantics.
+Decision / fix: Added validated PubMed options, optional API-key-aware rate ceilings, a centralized token-bucket request gate, bounded transient retry with Retry-After support, and deterministic fake-HTTP tests.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally; CI verification is pending after push.
+Remaining concerns: Rate limiting remains local to one process and is not a distributed NCBI quota coordinator.
+
+Date: 2026-09-02
+Area: PubMed EFetch batching
+Problem: The adapter sent one EFetch request containing the full returned PMID list, without an explicit fetch batch size.
+Observed behavior: Current small defaults kept this bounded, but the code did not prove or document 3/3/1-style batching behavior for larger configured result windows.
+Root cause: The initial retrieval implementation optimized for the smallest working PubMed flow rather than production retrieval shape.
+Decision / fix: Added `PubMed:FetchBatchSize`, chunked EFetch requests, deduplicated duplicate ESearch PMIDs before fetch, and deduplicated duplicate EFetch article records before returning provider-neutral candidates.
+Verification: Deterministic fake-HTTP tests cover 7 PMID with batch size 3, zero-PMID no-fetch behavior, and duplicate ESearch/EFetch records.
+Remaining concerns: History Server retrieval is deferred until result windows grow beyond small bounded direct PMID batches.

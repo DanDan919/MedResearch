@@ -51,6 +51,71 @@ public sealed class InfrastructureConfigurationTests
         Assert.NotNull(provider);
     }
 
+
+    [Fact]
+    public void AddInfrastructure_RejectsPubMedRateAboveOfficialLimitWithoutApiKey()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["PubMed:MaxRequestsPerSecond"] = "4"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+
+        Assert.Contains("PubMed:MaxRequestsPerSecond", exception.Message);
+        Assert.Contains("without an API key", exception.Message);
+    }
+
+    [Fact]
+    public void AddInfrastructure_AllowsPubMedKeyedRateUpToOfficialDefaultLimit()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["PubMed:ApiKey"] = "test-api-key",
+            ["PubMed:MaxRequestsPerSecond"] = "10"
+        });
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+
+        Assert.NotNull(provider);
+    }
+
+    [Fact]
+    public void AddInfrastructure_RejectsPubMedRateAboveOfficialDefaultLimitWithApiKey()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["PubMed:ApiKey"] = "test-api-key",
+            ["PubMed:MaxRequestsPerSecond"] = "11"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+
+        Assert.Contains("PubMed:MaxRequestsPerSecond", exception.Message);
+        Assert.Contains("with an API key", exception.Message);
+    }
+
+    [Fact]
+    public void AddInfrastructure_RejectsInvalidPubMedBatchAndRetryConfiguration()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["PubMed:FetchBatchSize"] = "0"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+
+        Assert.Contains("PubMed:FetchBatchSize", exception.Message);
+    }
     private static IConfiguration CreateConfiguration(Dictionary<string, string?> overrides)
     {
         var values = new Dictionary<string, string?>
@@ -65,9 +130,12 @@ public sealed class InfrastructureConfigurationTests
             ["AI:TimeoutSeconds"] = "30",
             ["AI:MaxOutputTokens"] = "2000",
             ["PubMed:BaseUrl"] = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/",
-            ["PubMed:ResultLimit"] = "10",
+            ["PubMed:MaxResultsPerQuery"] = "10",
             ["PubMed:TimeoutSeconds"] = "15",
-            ["PubMed:RequestIntervalMilliseconds"] = "350"
+            ["PubMed:MaxRequestsPerSecond"] = "2",
+            ["PubMed:FetchBatchSize"] = "25",
+            ["PubMed:MaxRetryAttempts"] = "2",
+            ["PubMed:RetryBaseDelayMilliseconds"] = "250"
         };
 
         foreach (var (key, value) in overrides)

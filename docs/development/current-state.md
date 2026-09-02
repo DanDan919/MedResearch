@@ -48,8 +48,11 @@ Date: 2026-09-02
   - `IScientificLiteratureSource`
   - `IScientificSearchResultStore`
   - PubMed implementation using official NCBI E-utilities `esearch.fcgi` and `efetch.fcgi`
-  - PubMed result limit default: 10
-  - optional PubMed/NCBI email and API key configuration
+  - PubMed `tool`/`email` identification support and optional `api_key`
+  - PubMed result limit default: 10, fetch batch size default: 25, max request rate default: 2 requests/second
+  - central local token-bucket rate limiting across ESearch and EFetch
+  - bounded retry for transient 429, 5xx, network, and timeout failures
+  - batched EFetch retrieval instead of one request per PMID
   - multiple planned queries execute sequentially
   - zero-result searches are persisted and do not fabricate studies or evidence
 - Source-grounded evidence extraction:
@@ -107,7 +110,7 @@ Date: 2026-09-02
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
   - development-only defaults in `.env.example`
-  - OpenAI and PubMed environment placeholders in `.env.example`
+  - OpenAI and PubMed environment placeholders in `.env.example`, including PubMed rate/batch/retry knobs
   - `EvidenceExtraction__MaxStudiesPerRun` wired from `.env.example`
   - `EvidenceEvaluation__MaxStudiesPerRun` wired from `.env.example`
   - `Synthesis__MaxStudies`, `Synthesis__MaxEvidenceFindings`, and `Synthesis__MaxClaims` wired from `.env.example`
@@ -145,7 +148,7 @@ Date: 2026-09-02
 - Tests:
   - Domain unit tests for question validation, research run lifecycle behavior, and representative invalid transition matrix checks.
   - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, provider failure propagation, and source-level architecture boundaries for Domain/Application.
-  - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior.
+  - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior, including request parameters, optional API key handling, batching, retry, cancellation, XML edge cases, and DOI/PMID normalization.
   - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
   - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, extraction deduplication after repeated discovery, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
   - GitHub Actions CI requires Docker-backed Testcontainers tests with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` and fails on unexpected skipped tests in required-Docker mode.
@@ -155,7 +158,7 @@ Date: 2026-09-02
 - GitHub remote is configured as `https://github.com/DanDan919/MedResearch.git`.
 - Docker CLI and Docker Compose are installed, but Docker Desktop engine is not reachable at `//./pipe/dockerDesktopLinuxEngine` in this environment.
 - Local Docker Compose health-check runtime verification has not passed because the Docker Compose stack cannot start while the engine is unavailable. `/health/ready` is covered by the PostgreSQL-backed fake-provider integration test when Docker is available.
-- No live PubMed smoke test is configured or run by default. Normal tests use fixtures and fake HTTP.
+- An optional live PubMed smoke test project exists outside `MedResearch.slnx`; it is not run by default or by normal CI. Normal tests use fixtures and fake HTTP.
 - No live OpenAI smoke test is configured or run by default. Normal tests use fake LLM providers and fake HTTP.
 
 ## Next Logical Milestone
@@ -173,6 +176,7 @@ Keep hardening trust boundaries, retry behavior, and operational diagnostics bef
 - Semantic outcome harmonization.
 - Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
-- PubMed retry policy or distributed rate limiting.
+- Distributed PubMed rate limiting across multiple API instances.
+- PubMed History Server retrieval for larger result windows.
 - OpenAI retry policy.
 - Production migration strategy.

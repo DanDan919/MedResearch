@@ -79,12 +79,17 @@ AI planning can be configured with:
 PubMed can be configured with:
 
 - `PubMed:BaseUrl`
-- `PubMed:ResultLimit` development default: 10
-- `PubMed:TimeoutSeconds` development default: 15
-- `PubMed:Tool`
-- `PubMed:Email`
-- `PubMed:ApiKey`
-- `PubMed:RequestIntervalMilliseconds` development default: 350
+- `PubMed:Enabled`, default `true`
+- `PubMed:BaseUrl`, default `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/`
+- `PubMed:MaxResultsPerQuery`, development default `10`, bounded to 1-200
+- `PubMed:FetchBatchSize`, development default `25`, bounded to 1-200
+- `PubMed:MaxRequestsPerSecond`, development default `2`; cannot exceed 3 without `ApiKey` or 10 with `ApiKey`
+- `PubMed:TimeoutSeconds`, development default `15`, bounded to 1-120
+- `PubMed:Tool`, default `MedResearch`, sent on E-utilities requests
+- `PubMed:Email`, optional contact, sent when configured
+- `PubMed:ApiKey`, optional secret, sent as `api_key` only when configured
+- `PubMed:MaxRetryAttempts`, development default `2`, bounded to 0-5
+- `PubMed:RetryBaseDelayMilliseconds`, development default `250`
 
 Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`. The API can start and expose health endpoints without an OpenAI API key; a real processing run that reaches an OpenAI-backed stage fails through the normal safe failure path if required provider configuration is absent.
 
@@ -139,12 +144,12 @@ The prompt version is `research-planner-v1`. The planner is allowed to produce q
 `Searching` currently uses PubMed only. The flow is:
 
 ```text
-ResearchQuestion -> ResearchPlan -> SearchQueries -> ESearch PMIDs -> EFetch XML -> normalized Study candidates -> PostgreSQL
+ResearchQuestion -> ResearchPlan -> SearchQueries -> ESearch PMIDs -> batched EFetch XML -> normalized Study candidates -> PostgreSQL
 ```
 
-Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. If more than one query discovers the same Study, MedResearch preserves multiple discovery paths while downstream extraction and synthesis process the Study once per ResearchRun. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
+Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. PubMed requests include configured `tool`/`email` identification and optional `api_key`; all ESearch and EFetch calls share one local rate limiter. ESearch uses `db=pubmed`, `retmode=json`, and bounded `retmax`; EFetch uses `db=pubmed`, `retmode=xml`, and bounded batches rather than one request per PMID. Transient 429/5xx/network/timeout failures are retried with bounded backoff, while bad requests and malformed successful payloads fail fast. If more than one query discovers the same Study, MedResearch preserves multiple discovery paths while downstream extraction and synthesis process the Study once per ResearchRun. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
 
-Stored study metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
+Stored study metadata is limited to values reported by PubMed: PMID, normalized DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts. PubMed records without a valid PMID or title are skipped rather than title-merged or assigned synthetic identity.
 
 ## Evidence Extraction
 
@@ -203,8 +208,19 @@ dotnet test
 docker compose config
 ```
 
-Domain, Application, Infrastructure, architecture-boundary, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped locally when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory. CI sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, so Docker/Testcontainers unavailability fails the run instead of silently skipping PostgreSQL coverage. Normal CI does not require `OPENAI_API_KEY`, NCBI credentials, or live internet calls to OpenAI/PubMed.
+Domain, Application, Infrastructure, architecture-boundary, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP for ESearch, EFetch, request parameter, batching, retry, cancellation, XML parsing, and normalization behavior; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped locally when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory. CI sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, so Docker/Testcontainers unavailability fails the run instead of silently skipping PostgreSQL coverage. Normal CI does not require `OPENAI_API_KEY`, NCBI credentials, or live internet calls to OpenAI/PubMed.
 
 ## Development Notes
 
 Read `AGENTS.md`, `ARCHITECTURE.md`, and `docs/development/current-state.md` before significant changes.
+
+
+### Optional Live PubMed Smoke Test
+
+The optional live PubMed smoke test is intentionally outside `MedResearch.slnx`, so normal `dotnet test` and CI do not call NCBI. To run it explicitly, set `MEDRESEARCH_RUN_LIVE_PUBMED_TESTS=true` and a contact email such as `PubMed__Email` or `PUBMED_EMAIL`, then run:
+
+```bash
+dotnet test tests/MedResearch.LivePubMedSmokeTests/MedResearch.LivePubMedSmokeTests.csproj
+```
+
+`PubMed__ApiKey` or `PUBMED_API_KEY` is optional. The live smoke test requests one result and is not a load test.

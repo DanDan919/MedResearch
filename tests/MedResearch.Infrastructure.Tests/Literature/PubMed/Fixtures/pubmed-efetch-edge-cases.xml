@@ -1,0 +1,55 @@
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID Version="1">11111111</PMID>
+      <Article>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <Year>2026</Year>
+            </PubDate>
+          </JournalIssue>
+          <Title>Edge Journal</Title>
+        </Journal>
+        <ArticleTitle>Unicode &#946; cognition &amp; encoded entities.</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND">&#946; cognition improves.</AbstractText>
+          <AbstractText Label="METHODS">Participants completed <i>nested</i> recall tasks.</AbstractText>
+        </Abstract>
+        <ELocationID EIdType="doi">doi:10.1234/ABC.X</ELocationID>
+        <AuthorList>
+          <Author><ForeName>Jane</ForeName><LastName>Doe</LastName></Author>
+          <Author><CollectiveName>Consortium Group</CollectiveName></Author>
+        </AuthorList>
+      </Article>
+    </MedlineCitation>
+    <PubmedData>
+      <ArticleIdList>
+        <ArticleId IdType="doi">https://doi.org/10.1234/ABC.X</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID Version="1">22222222</PMID>
+      <Article>
+        <Journal><JournalIssue><PubDate /></JournalIssue></Journal>
+        <ArticleTitle>Electronic publication date fallback.</ArticleTitle>
+        <ArticleDate DateType="Electronic"><Year>2025</Year><Month>05</Month><Day>09</Day></ArticleDate>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID Version="1">33333333</PMID>
+      <Article>
+        <Journal>
+          <JournalIssue>
+            <PubDate><MedlineDate>2024 Jan-Feb</MedlineDate></PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Medline date fallback.</ArticleTitle>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>

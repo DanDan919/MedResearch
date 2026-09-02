@@ -65,6 +65,8 @@ public static class ServiceCollectionExtensions
 
         var pubMedOptions = CreatePubMedOptions(configuration);
         services.AddSingleton(Options.Create(pubMedOptions));
+        services.AddSingleton<IPubMedRequestGate, TokenBucketPubMedRequestGate>();
+        services.AddSingleton<IPubMedRetryDelay, PubMedRetryDelay>();
         services.AddSingleton<PubMedSearchResponseParser>();
         services.AddSingleton<PubMedArticleMapper>();
         services.AddHttpClient<PubMedScientificLiteratureSource>(client =>
@@ -188,9 +190,15 @@ public static class ServiceCollectionExtensions
     private static PubMedOptions CreatePubMedOptions(IConfiguration configuration)
     {
         var section = configuration.GetSection(PubMedOptions.SectionName);
-
-        return new PubMedOptions
+        var enabled = true;
+        if (bool.TryParse(section["Enabled"], out var configuredEnabled))
         {
+            enabled = configuredEnabled;
+        }
+
+        var options = new PubMedOptions
+        {
+            Enabled = enabled,
             BaseUrl = string.IsNullOrWhiteSpace(section["BaseUrl"])
                 ? "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
                 : section["BaseUrl"]!,
@@ -203,10 +211,32 @@ public static class ServiceCollectionExtensions
             ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
                 ? null
                 : section["ApiKey"],
-            ResultLimit = ReadPositiveInt(section["ResultLimit"], 10, "PubMed:ResultLimit"),
+            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"] ?? section["ResultLimit"], 10, "PubMed:MaxResultsPerQuery"),
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "PubMed:TimeoutSeconds"),
-            RequestIntervalMilliseconds = ReadPositiveInt(section["RequestIntervalMilliseconds"], 350, "PubMed:RequestIntervalMilliseconds")
+            MaxRequestsPerSecond = ReadMaxRequestsPerSecond(section),
+            FetchBatchSize = ReadPositiveInt(section["FetchBatchSize"], 25, "PubMed:FetchBatchSize"),
+            MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "PubMed:MaxRetryAttempts"),
+            RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "PubMed:RetryBaseDelayMilliseconds")
         };
+
+        options.Validate();
+        return options;
+    }
+
+    private static int ReadMaxRequestsPerSecond(IConfigurationSection section)
+    {
+        if (!string.IsNullOrWhiteSpace(section["MaxRequestsPerSecond"]))
+        {
+            return ReadPositiveInt(section["MaxRequestsPerSecond"], 2, "PubMed:MaxRequestsPerSecond");
+        }
+
+        if (!string.IsNullOrWhiteSpace(section["RequestIntervalMilliseconds"]))
+        {
+            var interval = ReadPositiveInt(section["RequestIntervalMilliseconds"], 350, "PubMed:RequestIntervalMilliseconds");
+            return Math.Max(1, 1_000 / interval);
+        }
+
+        return 2;
     }
 
     private static void ConfigurePostgreSql(DbContextOptionsBuilder options, string connectionString)
@@ -230,6 +260,26 @@ public static class ServiceCollectionExtensions
         if (parsed <= 0)
         {
             throw new InvalidOperationException($"Configuration value {configurationKey} must be positive.");
+        }
+
+        return parsed;
+    }
+
+    private static int ReadNonNegativeInt(string? value, int defaultValue, string configurationKey)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        if (!int.TryParse(value, out var parsed))
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be an integer.");
+        }
+
+        if (parsed < 0)
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be zero or positive.");
         }
 
         return parsed;

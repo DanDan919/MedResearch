@@ -143,8 +143,8 @@ Current PubMed flow:
 ```text
 ResearchPlan.SearchQueries
   -> sequential source search requests
-  -> ESearch db=pubmed returns PMIDs
-  -> EFetch db=pubmed retmode=xml returns article metadata
+  -> ESearch db=pubmed retmode=json returns distinct PMIDs
+  -> batched EFetch db=pubmed retmode=xml returns article metadata
   -> PubMed transport parsing in Infrastructure
   -> ScientificStudyCandidate records
   -> PostgreSQL persistence
@@ -155,14 +155,18 @@ The previous deterministic question-to-query builder has been removed. Searching
 PubMed configuration lives under `PubMed`:
 
 - `BaseUrl`
-- `ResultLimit`, default 10 and bounded in code
-- `TimeoutSeconds`, default 15
-- `Tool`, default `MedResearch`
-- optional `Email`
-- optional `ApiKey`
-- `RequestIntervalMilliseconds`, default 350
+- `Enabled`, default `true`
+- `MaxResultsPerQuery`, default 10 and bounded to 1-200
+- `FetchBatchSize`, default 25 and bounded to 1-200
+- `MaxRequestsPerSecond`, default 2; validated against documented NCBI limits of 3 without `ApiKey` and 10 with `ApiKey`
+- `TimeoutSeconds`, default 15 and bounded to 1-120
+- `Tool`, default `MedResearch`, sent on E-utilities requests
+- optional `Email`, sent when configured
+- optional `ApiKey`, sent as `api_key` when configured
+- `MaxRetryAttempts`, default 2 and bounded to 0-5
+- `RetryBaseDelayMilliseconds`, default 250
 
-The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. Multiple planned queries are also executed sequentially. No live PubMed tests run by default.
+The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. ESearch and EFetch share one local `System.Threading.RateLimiting` token-bucket request gate for the NCBI E-utilities quota. EFetch is chunked by `FetchBatchSize`; duplicate ESearch PMIDs are deduplicated before fetching, and duplicate EFetch article records are deduplicated by stable identifier before returning provider-neutral candidates. Transient 429, 5xx, network, and timeout failures use bounded retry with `Retry-After` support, exponential backoff, jitter, and cancellation-aware delay. Multiple planned queries are also executed sequentially. No live PubMed tests run by default.
 
 A valid plan may produce zero PubMed results. Zero-result searches are persisted. Later stages continue without fabricating studies or evidence; synthesis records explicit insufficient evidence when no validated findings exist.
 
@@ -273,7 +277,7 @@ The system stores values reported by PubMed when available:
 - authors
 - source
 
-Missing values stay missing. The system does not infer missing DOI, PMID, authors, publication types, sample sizes, effect sizes, confidence intervals, or conclusions.
+Missing values stay missing. The system does not infer missing DOI, PMID, authors, publication types, sample sizes, effect sizes, confidence intervals, or conclusions. PubMed records without a valid numeric PMID or non-empty title are skipped as malformed source records.
 
 ## Study Identity And Search Provenance
 
@@ -425,8 +429,8 @@ The compose API service enables config-gated startup migrations with `Database__
 - No full-text extraction or RAG/vector search exists yet.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
 - Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
-- PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
-- Rate limiting is conservative and local to the process; no distributed rate limiter exists.
+- PubMed rate limiting is conservative and local to the process; no distributed rate limiter exists.
+- PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
 - Production migration strategy is not decided yet.
 - OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.

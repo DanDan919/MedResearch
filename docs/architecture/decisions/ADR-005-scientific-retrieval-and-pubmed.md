@@ -1,6 +1,6 @@
 # ADR-005: Add Provider-Neutral Scientific Retrieval with PubMed as the First Source
 
-Status: Accepted; query-generation portion superseded by ADR-006
+Status: Accepted; query-generation portion superseded by ADR-006; PubMed hardening details superseded by ADR-011
 Date: 2026-08-30
 
 ## Context
@@ -59,4 +59,4 @@ The `Searching` stage now performs real PubMed retrieval and persists normalized
 
 The initial deterministic query builder was intentionally simple and not scientifically optimal. ADR-006 replaces it with structured AI research planning while keeping source adapters and LLM adapters separate.
 
-Rate handling is conservative and local to the PubMed adapter. There is no distributed rate limiter yet. Automatic retries are not implemented in this milestone; source failures follow the existing safe run failure path.
+The initial milestone kept rate handling conservative and local to the PubMed adapter, with no distributed rate limiter and no automatic retries. ADR-011 later hardens the adapter with explicit NCBI-policy validation, centralized local rate limiting, EFetch batching, and bounded transient retries.

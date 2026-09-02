@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using MedResearch.Application.Research.Literature;
 
@@ -6,6 +7,8 @@ namespace MedResearch.Infrastructure.Literature.PubMed;
 public sealed class PubMedArticleMapper
 {
     private const string Source = "PubMed";
+    private static readonly Regex PmidPattern = new("^[0-9]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex MedlineYearPattern = new("(?<year>[12][0-9]{3})", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public IReadOnlyCollection<ScientificStudyCandidate> MapArticles(string xml)
     {
@@ -31,7 +34,7 @@ public sealed class PubMedArticleMapper
         var pubmedData = article.Element("PubmedData");
         var articleElement = citation?.Element("Article");
 
-        var pmid = Normalize(citation?.Element("PMID")?.Value);
+        var pmid = NormalizePmid(citation?.Element("PMID")?.Value);
         var title = NormalizeText(articleElement?.Element("ArticleTitle"));
 
         if (string.IsNullOrWhiteSpace(pmid) || string.IsNullOrWhiteSpace(title))
@@ -68,7 +71,7 @@ public sealed class PubMedArticleMapper
             .Elements("ELocationID")
             .FirstOrDefault(element => string.Equals((string?)element.Attribute("EIdType"), "doi", StringComparison.OrdinalIgnoreCase));
 
-        return Normalize(articleIdDoi?.Value ?? electronicLocationDoi?.Value)?.ToLowerInvariant();
+        return NormalizeDoi(articleIdDoi?.Value ?? electronicLocationDoi?.Value);
     }
 
     private static string? ReadAbstract(XElement? articleElement)
@@ -148,11 +151,29 @@ public sealed class PubMedArticleMapper
 
     private static PublicationParts ReadPublicationDate(XElement? articleElement)
     {
-        var pubDate = articleElement?
+        var journalPubDate = articleElement?
             .Element("Journal")?
             .Element("JournalIssue")?
             .Element("PubDate");
 
+        var journalDate = ReadPubDate(journalPubDate);
+        if (journalDate.HasAnyPart)
+        {
+            return journalDate;
+        }
+
+        var electronicArticleDate = articleElement?
+            .Elements("ArticleDate")
+            .FirstOrDefault(element => string.Equals((string?)element.Attribute("DateType"), "Electronic", StringComparison.OrdinalIgnoreCase));
+
+        var articleDate = ReadDateElements(electronicArticleDate ?? articleElement?.Element("ArticleDate"));
+        return articleDate.HasAnyPart
+            ? articleDate
+            : new PublicationParts(null, null, null, null);
+    }
+
+    private static PublicationParts ReadPubDate(XElement? pubDate)
+    {
         if (pubDate is null)
         {
             return new PublicationParts(null, null, null, null);
@@ -162,6 +183,34 @@ public sealed class PubMedArticleMapper
         var month = ParseMonth(pubDate.Element("Month")?.Value);
         var day = ParseInt(pubDate.Element("Day")?.Value);
 
+        if (!year.HasValue)
+        {
+            var medlineDate = Normalize(pubDate.Element("MedlineDate")?.Value);
+            if (!string.IsNullOrWhiteSpace(medlineDate))
+            {
+                year = ParseMedlineYear(medlineDate);
+                month = ParseMedlineMonth(medlineDate);
+            }
+        }
+
+        return BuildPublicationParts(year, month, day);
+    }
+
+    private static PublicationParts ReadDateElements(XElement? dateElement)
+    {
+        if (dateElement is null)
+        {
+            return new PublicationParts(null, null, null, null);
+        }
+
+        return BuildPublicationParts(
+            ParseInt(dateElement.Element("Year")?.Value),
+            ParseMonth(dateElement.Element("Month")?.Value),
+            ParseInt(dateElement.Element("Day")?.Value));
+    }
+
+    private static PublicationParts BuildPublicationParts(int? year, int? month, int? day)
+    {
         DateOnly? publicationDate = null;
         if (year.HasValue && month.HasValue && day.HasValue &&
             DateOnly.TryParse($"{year.Value:0000}-{month.Value:00}-{day.Value:00}", out var parsedDate))
@@ -211,6 +260,56 @@ public sealed class PubMedArticleMapper
         };
     }
 
+    private static int? ParseMedlineYear(string medlineDate)
+    {
+        var match = MedlineYearPattern.Match(medlineDate);
+        return match.Success && int.TryParse(match.Groups["year"].Value, out var year)
+            ? year
+            : null;
+    }
+
+    private static int? ParseMedlineMonth(string medlineDate)
+    {
+        foreach (var token in medlineDate.Split([' ', '-', '/', ';', ','], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var month = ParseMonth(token);
+            if (month.HasValue)
+            {
+                return month;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? NormalizePmid(string? value)
+    {
+        var normalized = Normalize(value);
+        return normalized is not null && PmidPattern.IsMatch(normalized)
+            ? normalized
+            : null;
+    }
+
+    private static string? NormalizeDoi(string? value)
+    {
+        var normalized = Normalize(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        foreach (var prefix in new[] { "doi:", "https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/" })
+        {
+            if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized[prefix.Length..].Trim();
+                break;
+            }
+        }
+
+        return normalized.Length == 0 ? null : normalized.ToLowerInvariant();
+    }
+
     private static string? NormalizeText(XElement? element)
     {
         return Normalize(element?.Value);
@@ -223,5 +322,8 @@ public sealed class PubMedArticleMapper
             : string.Join(' ', value.Split(null as char[], StringSplitOptions.RemoveEmptyEntries));
     }
 
-    private sealed record PublicationParts(DateOnly? PublicationDate, int? Year, int? Month, int? Day);
+    private sealed record PublicationParts(DateOnly? PublicationDate, int? Year, int? Month, int? Day)
+    {
+        public bool HasAnyPart => PublicationDate.HasValue || Year.HasValue || Month.HasValue || Day.HasValue;
+    }
 }
