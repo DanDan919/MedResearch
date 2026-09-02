@@ -40,24 +40,40 @@ jobs:
       - name: Test
         shell: pwsh
         run: |
-          dotnet test MedResearch.slnx --configuration Release --no-build --logger trx --results-directory TestResults
-          $testExitCode = $LASTEXITCODE
+          $testExitCode = 0
+          $testProjects = @(
+            @{ Name = 'Domain'; Path = 'tests/MedResearch.Domain.Tests/MedResearch.Domain.Tests.csproj' },
+            @{ Name = 'Application'; Path = 'tests/MedResearch.Application.Tests/MedResearch.Application.Tests.csproj' },
+            @{ Name = 'Infrastructure'; Path = 'tests/MedResearch.Infrastructure.Tests/MedResearch.Infrastructure.Tests.csproj' },
+            @{ Name = 'Integration'; Path = 'tests/MedResearch.IntegrationTests/MedResearch.IntegrationTests.csproj' }
+          )
+
+          foreach ($project in $testProjects) {
+            $resultsDirectory = Join-Path 'TestResults' $project.Name
+            dotnet test $project.Path --configuration Release --no-build --logger "trx;LogFileName=$($project.Name).trx" --results-directory $resultsDirectory
+            if ($LASTEXITCODE -ne 0) {
+              $testExitCode = $LASTEXITCODE
+            }
+          }
 
           function Escape-Annotation([string] $value) {
             return $value.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
           }
 
-          Get-ChildItem -Path TestResults -Recurse -Filter *.trx | ForEach-Object {
+          Get-ChildItem -Path TestResults -Recurse -Filter *.trx | Sort-Object FullName | ForEach-Object {
             $trxPath = $_.FullName
             $counters = Select-Xml -Path $trxPath -XPath "//*[local-name()='Counters']" | Select-Object -First 1
             if ($counters -ne $null) {
               $node = $counters.Node
-              $counterMessage = "total=$($node.total) executed=$($node.executed) passed=$($node.passed) failed=$($node.failed) skipped=$($node.notExecuted)"
+              $total = [int] $node.total
+              $executed = [int] $node.executed
+              $skipped = [Math]::Max([int] $node.notExecuted, $total - $executed)
+              $counterMessage = "total=$total executed=$executed passed=$($node.passed) failed=$($node.failed) skipped=$skipped"
               Write-Host "TRX $($_.Name): $counterMessage"
               Write-Host "::notice title=TRX $($_.Name)::$counterMessage"
 
-              if ($env:MEDRESEARCH_REQUIRE_DOCKER_TESTS -eq 'true' -and [int] $node.notExecuted -gt 0) {
-                Write-Host "::error title=Unexpected skipped tests::$($_.Name) reported $($node.notExecuted) skipped tests while MEDRESEARCH_REQUIRE_DOCKER_TESTS=true"
+              if ($env:MEDRESEARCH_REQUIRE_DOCKER_TESTS -eq 'true' -and $skipped -gt 0) {
+                Write-Host "::error title=Unexpected skipped tests::$($_.Name) reported $skipped skipped tests while MEDRESEARCH_REQUIRE_DOCKER_TESTS=true"
                 $testExitCode = 1
               }
             }
