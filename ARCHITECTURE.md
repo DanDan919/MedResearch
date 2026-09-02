@@ -287,7 +287,7 @@ Missing values stay missing. The system does not infer missing DOI, PMID, author
 
 `LiteratureSearch` records which source was searched, which query was sent, when it ran, how many results were returned, how many studies were newly persisted, how many were duplicates, and the optional `ResearchPlanId` that produced the query.
 
-`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered during one research run.
+`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered during one research run. Evidence remains run-scoped even when Study identity is shared across runs; report citations point to Evidence and project authoritative Study metadata from persistence. The same-run citation invariant is enforced at the Application validation boundary and covered by tests rather than by a cross-table PostgreSQL constraint.
 
 ## PostgreSQL Claiming Strategy
 
@@ -388,7 +388,7 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 
 ## Health Checks
 
-The API maps standard ASP.NET Core health checks at `/health`. Infrastructure registers a DbContext health check named `postgresql`, so the endpoint proves the API can reach the configured PostgreSQL database.
+The API maps standard ASP.NET Core health checks at `/health`, `/health/live`, and `/health/ready`. `/health/live` is an application liveness endpoint with no dependency checks. `/health/ready` includes the Infrastructure DbContext check named `postgresql`, so readiness proves the API can reach the configured PostgreSQL database without requiring OpenAI, PubMed, or other external providers.
 
 ## Local Docker Environment
 
@@ -421,7 +421,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
 - No full-text extraction or RAG/vector search exists yet.
-- No automatic recovery exists yet for runs left in progress after a process crash.
+- Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
 - Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
 - PubMed retry policy is not implemented; failures are surfaced to the existing run failure path.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.

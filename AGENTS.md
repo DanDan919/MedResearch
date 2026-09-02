@@ -42,6 +42,8 @@ Before significant changes, read:
 27. Study/evidence direction counts are descriptive corpus context only, not certainty weights, vote counts, or statistical estimators.
 28. PostgreSQL integration behavior must be verified against real PostgreSQL; do not replace database-specific tests with EF Core InMemory.
 29. ResearchRun processing leases must not permit stale workers to overwrite a run after ownership has transferred.
+30. Normal automated tests must not call live OpenAI, PubMed, or arbitrary internet services; use fake providers or fake HTTP.
+31. `Study` identity is global, but `Evidence`, `EvidenceExtraction`, `EvidenceEvaluation`, and report citations must remain scoped to the relevant `ResearchRun`.
 
 ## Development Trail
 

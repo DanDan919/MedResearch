@@ -76,3 +76,32 @@ Root cause: `AddDbContext` registered scoped context options, while `AddDbContex
 Decision / fix: Registered the DbContext factory with scoped lifetime so heartbeat/recovery queue operations can create independent DbContext instances without violating service-provider validation.
 Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally after the fix, with Docker-backed PostgreSQL tests skipped because Docker Desktop is unavailable.
 Remaining concerns: CI must run the Docker-backed PostgreSQL suite with Docker available to verify runtime SQL behavior.
+
+## 2026-09-02
+
+Date: 2026-09-02
+Area: CI PostgreSQL diagnostics
+Problem: A green test command can hide lost PostgreSQL confidence if Docker-required tests are unexpectedly skipped.
+Observed behavior: GitHub Actions already ran the Testcontainers suite successfully, but the workflow only surfaced TRX counters as notices and did not independently fail on nonzero skipped tests.
+Root cause: The Testcontainers fixture correctly fails Docker unavailability when `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, but future accidental skips could still appear only as TRX metadata.
+Decision / fix: Tightened the CI TRX parsing step so any skipped tests fail the workflow when Docker-backed tests are required.
+Verification: Pending the next GitHub Actions run after this audit commit.
+Remaining concerns: If future CI intentionally skips non-Docker tests, split the guard by test category instead of allowing broad skips.
+
+Date: 2026-09-02
+Area: Architecture documentation
+Problem: `ARCHITECTURE.md` still listed crash recovery as missing after lease-based reclaim and fencing had been implemented.
+Observed behavior: The worker code uses lease owner, expiry, heartbeat, and monotonically increasing lease version, but Current Limitations still said no automatic recovery existed.
+Root cause: Documentation lag after the worker recovery milestone.
+Decision / fix: Updated architecture and current-state documentation to describe stage-level lease recovery accurately and keep exactly-once external work out of scope.
+Verification: Documentation review during the architecture audit.
+Remaining concerns: Keep future ADR/current-state updates synchronized when worker semantics change.
+
+Date: 2026-09-02
+Area: Report citation graph trust boundary
+Problem: PostgreSQL FKs prove report citations reference existing Evidence rows, but they do not by themselves prove the cited Evidence belongs to the same ResearchRun as the report.
+Observed behavior: Application synthesis validation enforces same-run EvidenceIds before persistence, and synthesis corpus loading scopes Evidence to the current run.
+Root cause: A cross-table same-run invariant would require redundant run ids, triggers, or a different join table shape beyond the current simple claim-to-evidence FK graph.
+Decision / fix: Added a PostgreSQL integration test reconstructing the report claim/evidence/study graph for a shared Study and documented that Application validation is the trust boundary for same-run citation scope.
+Verification: Pending local and CI test runs after this audit commit.
+Remaining concerns: Revisit database-level enforcement if unvalidated report persistence paths are introduced.

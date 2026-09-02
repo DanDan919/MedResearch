@@ -125,6 +125,55 @@ public sealed class ResearchReportStoreTests
         Assert.Equal(second.EvidenceIds[0], evidence.EvidenceId);
     }
 
+    [SkippableFact]
+    public async Task ReportCitationGraph_UsesRunScopedEvidenceAndAuthoritativeSharedStudyMetadata()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var first = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        var second = await SeedSecondRunForExistingStudyAsync(first.StudyId);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchSynthesisStore(context);
+            await store.PersistReportAsync(CreateCompletedResult(second.RunId, second.EvidenceIds), CancellationToken.None);
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        var citationRows = await (
+            from report in verification.ResearchReports.AsNoTracking()
+            join claim in verification.ResearchReportClaims.AsNoTracking()
+                on report.Id equals claim.ResearchReportId
+            join link in verification.ResearchReportClaimEvidence.AsNoTracking()
+                on claim.Id equals link.ResearchReportClaimId
+            join evidence in verification.Evidence.AsNoTracking()
+                on link.EvidenceId equals evidence.Id
+            join study in verification.Studies.AsNoTracking()
+                on evidence.StudyId equals study.Id
+            where report.ResearchRunId == second.RunId
+            orderby claim.Ordinal, link.Ordinal
+            select new
+            {
+                ReportRunId = report.ResearchRunId,
+                EvidenceRunId = evidence.ResearchRunId,
+                EvidenceId = evidence.Id,
+                StudyId = study.Id,
+                study.Pmid,
+                study.Doi,
+                study.Title,
+                evidence.SupportingText
+            }).ToArrayAsync();
+
+        var row = Assert.Single(citationRows);
+        Assert.Equal(second.RunId, row.ReportRunId);
+        Assert.Equal(second.RunId, row.EvidenceRunId);
+        Assert.Equal(second.EvidenceIds[0], row.EvidenceId);
+        Assert.Equal(first.StudyId, row.StudyId);
+        Assert.Equal(first.Pmid, row.Pmid);
+        Assert.Equal(first.Doi, row.Doi);
+        Assert.Equal("Sleep and recall report", row.Title);
+        Assert.Equal("reported improved recall in 120 adults", row.SupportingText);
+    }
+
     private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount)
     {
         await using var context = _fixture.CreateDbContext();

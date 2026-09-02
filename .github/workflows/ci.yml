@@ -55,6 +55,11 @@ jobs:
               $counterMessage = "total=$($node.total) executed=$($node.executed) passed=$($node.passed) failed=$($node.failed) skipped=$($node.notExecuted)"
               Write-Host "TRX $($_.Name): $counterMessage"
               Write-Host "::notice title=TRX $($_.Name)::$counterMessage"
+
+              if ($env:MEDRESEARCH_REQUIRE_DOCKER_TESTS -eq 'true' -and [int] $node.notExecuted -gt 0) {
+                Write-Host "::error title=Unexpected skipped tests::$($_.Name) reported $($node.notExecuted) skipped tests while MEDRESEARCH_REQUIRE_DOCKER_TESTS=true"
+                $testExitCode = 1
+              }
             }
 
             Select-Xml -Path $trxPath -XPath "//*[local-name()='UnitTestResult' and @outcome='Failed']" | ForEach-Object {

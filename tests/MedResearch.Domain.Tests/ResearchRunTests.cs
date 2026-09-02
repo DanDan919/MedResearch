@@ -40,6 +40,18 @@ public sealed class ResearchRunTests
         Assert.Equal(ResearchRunStatus.Queued, run.Status);
     }
 
+    [Theory]
+    [MemberData(nameof(InvalidTransitions))]
+    public void ResearchRun_RejectsRepresentativeInvalidLifecycleTransitions(
+        ResearchRunStatus initialStatus,
+        Action<ResearchRun> transition)
+    {
+        var run = CreateRunAtStatus(initialStatus);
+
+        Assert.Throws<InvalidOperationException>(() => transition(run));
+        Assert.Equal(initialStatus, run.Status);
+    }
+
     [Fact]
     public void Complete_RequiresSynthesisStatus()
     {
@@ -154,5 +166,72 @@ public sealed class ResearchRunTests
         run.StartSynthesis(startedAt.AddMinutes(4));
 
         return run;
+    }
+
+    private static ResearchRun CreateRunAtStatus(ResearchRunStatus status)
+    {
+        var run = CreateRun();
+        var startedAt = DateTimeOffset.UtcNow;
+
+        switch (status)
+        {
+            case ResearchRunStatus.Queued:
+                return run;
+            case ResearchRunStatus.Planning:
+                run.StartPlanning(startedAt);
+                return run;
+            case ResearchRunStatus.Searching:
+                run.StartPlanning(startedAt);
+                run.StartSearching(startedAt.AddMinutes(1));
+                return run;
+            case ResearchRunStatus.Extracting:
+                run.StartPlanning(startedAt);
+                run.StartSearching(startedAt.AddMinutes(1));
+                run.StartExtraction(startedAt.AddMinutes(2));
+                return run;
+            case ResearchRunStatus.Evaluating:
+                run.StartPlanning(startedAt);
+                run.StartSearching(startedAt.AddMinutes(1));
+                run.StartExtraction(startedAt.AddMinutes(2));
+                run.StartEvaluation(startedAt.AddMinutes(3));
+                return run;
+            case ResearchRunStatus.Synthesizing:
+                run.StartPlanning(startedAt);
+                run.StartSearching(startedAt.AddMinutes(1));
+                run.StartExtraction(startedAt.AddMinutes(2));
+                run.StartEvaluation(startedAt.AddMinutes(3));
+                run.StartSynthesis(startedAt.AddMinutes(4));
+                return run;
+            case ResearchRunStatus.Completed:
+                run.StartPlanning(startedAt);
+                run.StartSearching(startedAt.AddMinutes(1));
+                run.StartExtraction(startedAt.AddMinutes(2));
+                run.StartEvaluation(startedAt.AddMinutes(3));
+                run.StartSynthesis(startedAt.AddMinutes(4));
+                run.Complete(startedAt.AddMinutes(5));
+                return run;
+            case ResearchRunStatus.Failed:
+                run.Fail("Failed.", startedAt);
+                return run;
+            case ResearchRunStatus.Cancelled:
+                run.Cancel(startedAt);
+                return run;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported research run status.");
+        }
+    }
+
+    public static TheoryData<ResearchRunStatus, Action<ResearchRun>> InvalidTransitions()
+    {
+        return new TheoryData<ResearchRunStatus, Action<ResearchRun>>
+        {
+            { ResearchRunStatus.Queued, run => run.StartEvaluation(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Searching, run => run.Complete(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Extracting, run => run.StartSynthesis(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Evaluating, run => run.StartSearching(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Completed, run => run.StartSearching(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Failed, run => run.StartPlanning(DateTimeOffset.UtcNow) },
+            { ResearchRunStatus.Cancelled, run => run.StartSynthesis(DateTimeOffset.UtcNow) }
+        };
     }
 }
