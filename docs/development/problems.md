@@ -121,7 +121,7 @@ Problem: The PubMed adapter used conservative manual request spacing, but it did
 Observed behavior: 429, 5xx, network failures, and timeouts immediately failed the search path; configured request pacing was expressed as an interval rather than an official-policy-bounded request rate.
 Root cause: The first PubMed milestone intentionally kept provider behavior simple and deferred production-grade retry/rate semantics.
 Decision / fix: Added validated PubMed options, optional API-key-aware rate ceilings, a centralized token-bucket request gate, bounded transient retry with Retry-After support, and deterministic fake-HTTP tests.
-Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally; CI verification is pending after push.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally. GitHub Actions run `33613213245` completed successfully for commit `d21379542c605846b34168535877ad9207590bef`.
 Remaining concerns: Rate limiting remains local to one process and is not a distributed NCBI quota coordinator.
 
 Date: 2026-09-02
