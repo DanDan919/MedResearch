@@ -6,9 +6,9 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities and Europe PMC REST search, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded PubMed metadata. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
 
 ## Stack Direction
 
@@ -18,6 +18,7 @@ A client can submit a research question, receive a queued research run id, and r
 - EF Core and PostgreSQL
 - OpenAI Responses API for strict structured planning, evidence extraction, evidence evaluation, and evidence synthesis output
 - PubMed retrieval through official NCBI E-utilities
+- Europe PMC retrieval through the official Articles REST API
 - Docker Compose for local development
 - xUnit
 - Testcontainers for PostgreSQL integration tests
@@ -49,7 +50,7 @@ docs/
 
 ## Local Development
 
-Copy `.env.example` to `.env` if you want to override local ports, development database values, OpenAI credentials, or PubMed options. The checked-in values are development-only defaults and placeholders, not production secrets.
+Copy `.env.example` to `.env` if you want to override local ports, development database values, OpenAI credentials, PubMed options, or Europe PMC options. The checked-in values are development-only defaults and placeholders, not production secrets.
 
 ```bash
 docker compose up --build
@@ -90,6 +91,17 @@ PubMed can be configured with:
 - `PubMed:ApiKey`, optional secret, sent as `api_key` only when configured
 - `PubMed:MaxRetryAttempts`, development default `2`, bounded to 0-5
 - `PubMed:RetryBaseDelayMilliseconds`, development default `250`
+
+Europe PMC can be configured with:
+
+- `EuropePmc:Enabled`, default `true`
+- `EuropePmc:BaseUrl`, default `https://www.ebi.ac.uk/europepmc/webservices/rest/`
+- `EuropePmc:MaxResultsPerQuery`, development default `10`, bounded to 1-200
+- `EuropePmc:PageSize`, development default `25`, bounded to 1-100
+- `EuropePmc:TimeoutSeconds`, development default `15`, bounded to 1-120
+- `EuropePmc:MaxRequestsPerSecond`, development default `2`, bounded to 1-5 as a conservative local policy
+- `EuropePmc:MaxRetryAttempts`, development default `2`, bounded to 0-5
+- `EuropePmc:RetryBaseDelayMilliseconds`, development default `250`
 
 Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`. The API can start and expose health endpoints without an OpenAI API key; a real processing run that reaches an OpenAI-backed stage fails through the normal safe failure path if required provider configuration is absent.
 
@@ -141,18 +153,23 @@ The prompt version is `research-planner-v1`. The planner is allowed to produce q
 
 ## Scientific Retrieval
 
-`Searching` currently uses PubMed only. The flow is:
+`Searching` is now multi-source. Application depends on provider-neutral literature contracts and a single `IScientificLiteratureSearchCoordinator`; Infrastructure supplies enabled `IScientificLiteratureSource` adapters for PubMed and Europe PMC.
 
 ```text
-ResearchQuestion -> ResearchPlan -> SearchQueries -> ESearch PMIDs -> batched EFetch XML -> normalized Study candidates -> PostgreSQL
+ResearchQuestion -> ResearchPlan -> SearchQueries -> source-specific searches -> normalized Study candidates -> Study identity resolution -> ResearchStudyDiscovery -> PostgreSQL
 ```
 
-Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. PubMed requests include configured `tool`/`email` identification and optional `api_key`; all ESearch and EFetch calls share one local rate limiter. ESearch uses `db=pubmed`, `retmode=json`, and bounded `retmax`; EFetch uses `db=pubmed`, `retmode=xml`, and bounded batches rather than one request per PMID. Transient 429/5xx/network/timeout failures are retried with bounded backoff, while bad requests and malformed successful payloads fail fast. If more than one query discovers the same Study, MedResearch preserves multiple discovery paths while downstream extraction and synthesis process the Study once per ResearchRun. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
+Each planned query is executed once per enabled source. One query against PubMed and Europe PMC therefore creates two `LiteratureSearch` provenance rows, not one merged search. Each discovered publication creates a `ResearchStudyDiscovery` for that specific search execution. The same canonical `Study` can have multiple discovery paths in one run, while downstream extraction, evaluation, and synthesis deduplicate study work by `StudyId` within the run.
 
-Stored study metadata is limited to values reported by PubMed: PMID, normalized DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts. PubMed records without a valid PMID or title are skipped rather than title-merged or assigned synthetic identity.
+PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, followed by batched EFetch XML. Requests include configured `tool`/`email` identification and optional `api_key`; ESearch and EFetch share one local token-bucket limiter. PubMed History Server retrieval remains deliberately deferred while `MaxResultsPerQuery` is small and direct ID batching is sufficient.
+
+Europe PMC uses the official Articles REST `/search` endpoint with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination through `cursorMark`/`nextCursorMark`. The adapter maps only source-reported PMID, PMCID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and provider record identity. It skips records without title or any stable identifier rather than merging by title.
+
+Study identity is deterministic over normalized PMID, PMCID, and DOI. Missing metadata stays missing. Existing non-null metadata is not overwritten by null incoming values. New non-conflicting identifiers and metadata may enrich an existing Study. If an incoming candidate's stable identifiers point to different persisted Studies, MedResearch treats it as a hard identity conflict, logs bounded diagnostics, preserves existing Studies, skips the ambiguous discovery, and continues processing other candidates.
+
+Both adapters use HttpClientFactory, bounded timeouts, cancellation tokens, local rate limiting, and bounded retries for transient provider failures. Zero-result searches are successful scientific searches and are persisted as zero-result `LiteratureSearch` rows; provider failures, malformed successful payloads, cancellation, and local configuration errors remain distinct operational outcomes.
 
 ## Evidence Extraction
-
 `Extracting` currently works at abstract level only. A study with no usable PubMed abstract is recorded as a skipped extraction with `NoExtractableText`; it is not sent to the LLM provider and does not fail the run.
 
 Extracted `Evidence` rows are tied to both the global `Study` and the specific `ResearchRun`. Each completed attempt also creates an `EvidenceExtraction` provenance row with provider, model, prompt version, source scope, extraction timestamp, evidence count, and grounding validation status.
@@ -208,7 +225,7 @@ dotnet test
 docker compose config
 ```
 
-Domain, Application, Infrastructure, architecture-boundary, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP for ESearch, EFetch, request parameter, batching, retry, cancellation, XML parsing, and normalization behavior; they do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped locally when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory. CI sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, so Docker/Testcontainers unavailability fails the run instead of silently skipping PostgreSQL coverage. Normal CI does not require `OPENAI_API_KEY`, NCBI credentials, or live internet calls to OpenAI/PubMed.
+Domain, Application, Infrastructure, architecture-boundary, and API tests run without Docker. Planner, evidence extractor, evidence evaluator, and evidence synthesizer tests use fake LLM providers. OpenAI adapter tests use fake HTTP and do not call the live OpenAI API. PubMed adapter tests use local fixtures and fake HTTP for ESearch, EFetch, request parameter, batching, retry, cancellation, XML parsing, and normalization behavior; Europe PMC adapter tests use deterministic fake HTTP for request parameters, cursor pagination, retry, cancellation, JSON parsing, mapping, and deduplication. They do not call the live internet. PostgreSQL integration tests use Testcontainers and run against real PostgreSQL when Docker is reachable. They are skipped locally when Docker is installed but the engine is unavailable; they do not fall back to EF Core InMemory. CI sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, so Docker/Testcontainers unavailability fails the run instead of silently skipping PostgreSQL coverage. Normal CI does not require `OPENAI_API_KEY`, NCBI credentials, Europe PMC credentials, or live internet calls to OpenAI/PubMed/Europe PMC.
 
 ## Development Notes
 
@@ -224,3 +241,12 @@ dotnet test tests/MedResearch.LivePubMedSmokeTests/MedResearch.LivePubMedSmokeTe
 ```
 
 `PubMed__ApiKey` or `PUBMED_API_KEY` is optional. The live smoke test requests one result and is not a load test.
+### Optional Live Europe PMC Smoke Test
+
+The optional live Europe PMC smoke test is also outside `MedResearch.slnx`, so normal `dotnet test` and CI do not call Europe PMC. To run it explicitly, set `MEDRESEARCH_RUN_LIVE_EUROPEPMC_TESTS=true`, then run:
+
+```bash
+dotnet test tests/MedResearch.LiveEuropePmcSmokeTests/MedResearch.LiveEuropePmcSmokeTests.csproj
+```
+
+The live smoke test requests one result through the Europe PMC REST search endpoint and is not a load test.

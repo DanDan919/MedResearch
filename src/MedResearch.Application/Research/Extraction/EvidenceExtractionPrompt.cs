@@ -122,6 +122,7 @@ public static class EvidenceExtractionPrompt
             StudyId: {context.StudyId}
             Title: {context.Title}
             PMID: {context.Pmid ?? "null"}
+            PMCID: {context.Pmcid ?? "null"}
             DOI: {context.Doi ?? "null"}
             Journal: {context.Journal ?? "null"}
             PublicationDate: {context.PublicationDate?.ToString("yyyy-MM-dd") ?? "null"}

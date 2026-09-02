@@ -164,7 +164,7 @@ public static class ResearchSynthesisPrompt
         }
 
         return string.Join("\n---\n", studies.Select(study =>
-            $"StudyId: {study.StudyId}\nTitle: {study.Title}\nPMID: {study.Pmid ?? "null"}\nDOI: {study.Doi ?? "null"}\nJournal: {study.Journal ?? "null"}\nPublicationDate: {study.PublicationDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "null"}\nPublicationTypes: {Join(study.PublicationTypes)}\nSource: {study.Source}\nEvaluation: {FormatEvaluation(study.Evaluation)}\nEvidence:\n{JoinEvidence(study.Evidence)}"));
+            $"StudyId: {study.StudyId}\nTitle: {study.Title}\nPMID: {study.Pmid ?? "null"}\nPMCID: {study.Pmcid ?? "null"}\nDOI: {study.Doi ?? "null"}\nJournal: {study.Journal ?? "null"}\nPublicationDate: {study.PublicationDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "null"}\nPublicationTypes: {Join(study.PublicationTypes)}\nSource: {study.Source}\nEvaluation: {FormatEvaluation(study.Evaluation)}\nEvidence:\n{JoinEvidence(study.Evidence)}"));
     }
 
     private static string FormatEvaluation(SynthesisEvaluationContext? evaluation)

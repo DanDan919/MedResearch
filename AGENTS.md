@@ -44,6 +44,8 @@ Before significant changes, read:
 29. ResearchRun processing leases must not permit stale workers to overwrite a run after ownership has transferred.
 30. Normal automated tests must not call live OpenAI, PubMed, or arbitrary internet services; use fake providers or fake HTTP.
 31. `Study` identity is global, but `Evidence`, `EvidenceExtraction`, `EvidenceEvaluation`, and report citations must remain scoped to the relevant `ResearchRun`.
+32. Scientific search source expansion must preserve per-source and per-search `LiteratureSearch`/`ResearchStudyDiscovery` provenance; do not collapse multiple providers into one search record.
+33. Stable `Study` identity uses normalized PMID, PMCID, and DOI only; never merge studies by title, fuzzy metadata, author similarity, or year.
 
 ## Development Trail
 

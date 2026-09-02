@@ -30,7 +30,7 @@ Date: 2026-09-02
   - `BackgroundResearchWorker` runs as an ASP.NET Core hosted service in `MedResearch.Api` and uses an operational worker instance id.
   - `ResearchRunProcessor` advances claimed runs through Planning, Searching, Extracting, Evaluating, Synthesizing, and Completed while renewing processing leases.
   - `Planning` calls the structured Research Planner and persists a validated `ResearchPlan`.
-  - `Searching` consumes persisted `ResearchPlan.SearchQueries` and performs real PubMed retrieval through provider-neutral Application contracts.
+  - `Searching` consumes persisted `ResearchPlan.SearchQueries` and performs real PubMed plus Europe PMC retrieval through provider-neutral Application contracts and a multi-source coordinator.
   - `Extracting` performs source-grounded abstract-level evidence extraction for discovered studies.
   - `Evaluating` performs structured source-aware methodological evidence evaluation from study metadata, extraction provenance, and grounded evidence.
   - `Synthesizing` builds bounded current-run synthesis context and persists a traceable `ResearchReport` with claims linked to Evidence.
@@ -46,13 +46,20 @@ Date: 2026-09-02
   - Normal tests use fake LLM providers or fake HTTP and do not call the live OpenAI API.
 - Scientific literature retrieval:
   - `IScientificLiteratureSource`
+  - `IScientificLiteratureSearchCoordinator`
   - `IScientificSearchResultStore`
   - PubMed implementation using official NCBI E-utilities `esearch.fcgi` and `efetch.fcgi`
+  - Europe PMC implementation using the official Articles REST `/search` endpoint with JSON `resultType=core`
   - PubMed `tool`/`email` identification support and optional `api_key`
   - PubMed result limit default: 10, fetch batch size default: 25, max request rate default: 2 requests/second
-  - central local token-bucket rate limiting across ESearch and EFetch
+  - source-specific central local token-bucket rate limiting across PubMed ESearch/EFetch and Europe PMC REST pages
   - bounded retry for transient 429, 5xx, network, and timeout failures
   - batched EFetch retrieval instead of one request per PMID
+  - one planned query executes once per enabled source, preserving separate `LiteratureSearch` rows per source
+  - Europe PMC bounded cursor pagination through `cursorMark`/`nextCursorMark`
+  - deterministic identifier normalization for PMID, PMCID, and DOI
+  - hard stable-identifier conflicts are skipped/logged rather than silently merged
+  - concurrent Study identity upserts serialize through PostgreSQL transaction-scoped advisory locks plus filtered unique indexes
   - multiple planned queries execute sequentially
   - zero-result searches are persisted and do not fabricate studies or evidence
 - Source-grounded evidence extraction:
@@ -106,11 +113,12 @@ Date: 2026-09-02
     - `20260901021148_AddTraceableResearchReports`
     - `20260901063528_AddResearchRunProcessingLeases`
     - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
+    - `20260902150845_AddStudyPmcidIdentity`
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
   - development-only defaults in `.env.example`
-  - OpenAI and PubMed environment placeholders in `.env.example`, including PubMed rate/batch/retry knobs
+  - OpenAI, PubMed, and Europe PMC environment placeholders in `.env.example`, including source rate/batch/page/retry knobs
   - `EvidenceExtraction__MaxStudiesPerRun` wired from `.env.example`
   - `EvidenceEvaluation__MaxStudiesPerRun` wired from `.env.example`
   - `Synthesis__MaxStudies`, `Synthesis__MaxEvidenceFindings`, and `Synthesis__MaxClaims` wired from `.env.example`
@@ -148,9 +156,9 @@ Date: 2026-09-02
 - Tests:
   - Domain unit tests for question validation, research run lifecycle behavior, and representative invalid transition matrix checks.
   - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, provider failure propagation, and source-level architecture boundaries for Domain/Application.
-  - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior, including request parameters, optional API key handling, batching, retry, cancellation, XML edge cases, and DOI/PMID normalization.
+  - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior, including request parameters, optional API key handling, batching, retry, cancellation, XML edge cases, and DOI/PMID normalization; Europe PMC fake HTTP behavior, including request parameters, cursor pagination, retry, cancellation, malformed JSON, mapping, deduplication, and PMID/PMCID/DOI normalization.
   - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
-  - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, extraction deduplication after repeated discovery, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, PMCID identity, hard multi-identifier conflicts, multi-source discovery provenance, extraction deduplication after repeated discovery, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
   - GitHub Actions CI requires Docker-backed Testcontainers tests with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` and fails on unexpected skipped tests in required-Docker mode.
 
 ## Environment Status
@@ -158,16 +166,16 @@ Date: 2026-09-02
 - GitHub remote is configured as `https://github.com/DanDan919/MedResearch.git`.
 - Docker CLI and Docker Compose are installed, but Docker Desktop engine is not reachable at `//./pipe/dockerDesktopLinuxEngine` in this environment.
 - Local Docker Compose health-check runtime verification has not passed because the Docker Compose stack cannot start while the engine is unavailable. `/health/ready` is covered by the PostgreSQL-backed fake-provider integration test when Docker is available.
-- An optional live PubMed smoke test project exists outside `MedResearch.slnx`; it is not run by default or by normal CI. Normal tests use fixtures and fake HTTP.
+- Optional live PubMed and Europe PMC smoke test projects exist outside `MedResearch.slnx`; they are not run by default or by normal CI. Normal tests use fixtures and fake HTTP.
 - No live OpenAI smoke test is configured or run by default. Normal tests use fake LLM providers and fake HTTP.
 
 ## Next Logical Milestone
 
-Keep hardening trust boundaries, retry behavior, and operational diagnostics before expanding external scientific or LLM providers. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
+Keep hardening trust boundaries, retry behavior, provider diagnostics, and identity-conflict observability before adding a third scientific source or another LLM provider. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.
 
 ## Not Yet Implemented
 
-- Crossref, Europe PMC, OpenAlex, Semantic Scholar, publisher API, or other non-PubMed source integrations.
+- Crossref, OpenAlex, Semantic Scholar, publisher API, or additional non-PubMed/non-Europe-PMC source integrations.
 - Additional LLM providers beyond OpenAI.
 - Full-text extraction.
 - Formal study quality frameworks such as GRADE, RoB 2, ROBINS-I, AMSTAR-2, or NOS.
@@ -176,7 +184,15 @@ Keep hardening trust boundaries, retry behavior, and operational diagnostics bef
 - Semantic outcome harmonization.
 - Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
-- Distributed PubMed rate limiting across multiple API instances.
+- Distributed PubMed/Europe PMC rate limiting across multiple API instances.
 - PubMed History Server retrieval for larger result windows.
 - OpenAI retry policy.
 - Production migration strategy.
+
+## Milestone 12 Notes
+
+- Actual starting HEAD was `b0e5e7c` on `main`, not the older pre-PubMed-hardening reference.
+- Official Europe PMC REST documentation was checked before implementation. The adapter uses production base `https://www.ebi.ac.uk/europepmc/webservices/rest/`, `/search`, `format=json`, `resultType=core`, `pageSize`, and `cursorMark` pagination.
+- `Study` now includes nullable normalized `Pmcid` with a filtered unique PostgreSQL index.
+- `ScientificLiteratureSearchCoordinator` is the single Application orchestration boundary for enabled sources. It records each source/query execution independently and only fails a query when every enabled source fails.
+- Normal CI and normal local tests remain deterministic and make no live PubMed or Europe PMC requests.

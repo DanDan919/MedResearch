@@ -183,7 +183,7 @@ public sealed class ResearchApiTests
     {
         var coverage = new ResearchReportCoverageReadModel(1, 1, 1, status == ResearchReportStatus.Completed ? 1 : 0, status == ResearchReportStatus.Completed ? 1 : 0, status == ResearchReportStatus.Completed ? 1 : 0, 1, 0, 1, false, false, true, ["PubMed"]);
         ResearchReportClaimReadModel[] claims = status == ResearchReportStatus.Completed
-            ? [new ResearchReportClaimReadModel(Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Supported conclusion claim.", 0, [new ResearchReportCitationReadModel(evidenceId, Guid.NewGuid(), "12345678", "10.1000/authoritative", "Authoritative study title", "supporting excerpt", EvidenceDirection.Positive, 0)])]
+            ? [new ResearchReportClaimReadModel(Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Supported conclusion claim.", 0, [new ResearchReportCitationReadModel(evidenceId, Guid.NewGuid(), "12345678", null, "10.1000/authoritative", "Authoritative study title", "supporting excerpt", EvidenceDirection.Positive, 0)])]
             : [];
 
         return new ResearchReportReadModel(

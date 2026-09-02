@@ -10,7 +10,7 @@ namespace MedResearch.Infrastructure.Literature.PubMed;
 
 public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSource
 {
-    public const string PubMedSourceName = "PubMed";
+    public const string PubMedSourceName = ScientificLiteratureSourceNames.PubMed;
     private const int MaximumErrorBodyBytes = 1024;
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(30);
 
@@ -326,6 +326,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
     {
         var deduplicated = new List<ScientificStudyCandidate>();
         var seenPmids = new HashSet<string>(StringComparer.Ordinal);
+        var seenPmcids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var seenDois = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var candidate in candidates)

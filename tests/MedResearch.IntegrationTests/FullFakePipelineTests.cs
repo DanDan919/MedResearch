@@ -285,6 +285,7 @@ public sealed partial class FullFakePipelineTests
 
             var candidate = new ScientificStudyCandidate(
                 "99123456",
+                null,
                 "10.1000/medresearch-e2e-sleep-recall",
                 "Fake randomized sleep recall trial",
                 AbstractText,
@@ -295,6 +296,7 @@ public sealed partial class FullFakePipelineTests
                 15,
                 ["Randomized Controlled Trial"],
                 ["Ada Lovelace"],
+                "99123456",
                 SourceName);
 
             return Task.FromResult(new ScientificSearchResult(SourceName, DateTimeOffset.UtcNow, 1, [candidate]));

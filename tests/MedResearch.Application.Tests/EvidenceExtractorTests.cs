@@ -202,6 +202,7 @@ public sealed class EvidenceExtractorTests
             "Sleep and memory",
             abstractText,
             "12345678",
+            null,
             "10.1000/example",
             "Journal",
             new DateOnly(2026, 1, 1),

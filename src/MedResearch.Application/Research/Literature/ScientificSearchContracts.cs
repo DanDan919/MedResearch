@@ -10,6 +10,7 @@ public sealed record ScientificSearchResult(
 
 public sealed record ScientificStudyCandidate(
     string? Pmid,
+    string? Pmcid,
     string? Doi,
     string Title,
     string? Abstract,
@@ -20,6 +21,7 @@ public sealed record ScientificStudyCandidate(
     int? PublicationDay,
     IReadOnlyCollection<string> PublicationTypes,
     IReadOnlyCollection<string> Authors,
+    string? ProviderRecordId,
     string Source);
 
 public sealed record ScientificSearchPersistenceRequest(

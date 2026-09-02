@@ -73,6 +73,7 @@ public sealed record ResearchReportCitationReadModel(
     Guid EvidenceId,
     Guid StudyId,
     string? Pmid,
+    string? Pmcid,
     string? Doi,
     string Title,
     string SupportingText,

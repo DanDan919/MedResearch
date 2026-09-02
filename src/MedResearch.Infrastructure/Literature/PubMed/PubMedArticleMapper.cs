@@ -1,13 +1,13 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using MedResearch.Application.Research.Literature;
+using MedResearch.Infrastructure.Literature.Identity;
 
 namespace MedResearch.Infrastructure.Literature.PubMed;
 
 public sealed class PubMedArticleMapper
 {
-    private const string Source = "PubMed";
-    private static readonly Regex PmidPattern = new("^[0-9]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private const string Source = ScientificLiteratureSourceNames.PubMed;
     private static readonly Regex MedlineYearPattern = new("(?<year>[12][0-9]{3})", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public IReadOnlyCollection<ScientificStudyCandidate> MapArticles(string xml)
@@ -34,7 +34,7 @@ public sealed class PubMedArticleMapper
         var pubmedData = article.Element("PubmedData");
         var articleElement = citation?.Element("Article");
 
-        var pmid = NormalizePmid(citation?.Element("PMID")?.Value);
+        var pmid = ScientificIdentifierNormalizer.NormalizePmid(citation?.Element("PMID")?.Value);
         var title = NormalizeText(articleElement?.Element("ArticleTitle"));
 
         if (string.IsNullOrWhiteSpace(pmid) || string.IsNullOrWhiteSpace(title))
@@ -46,6 +46,7 @@ public sealed class PubMedArticleMapper
 
         return new ScientificStudyCandidate(
             pmid,
+            null,
             ReadDoi(articleElement, pubmedData),
             title,
             ReadAbstract(articleElement),
@@ -57,6 +58,7 @@ public sealed class PubMedArticleMapper
             publicationParts.Day,
             ReadPublicationTypes(articleElement),
             ReadAuthors(articleElement),
+            pmid,
             Source);
     }
 
@@ -71,7 +73,7 @@ public sealed class PubMedArticleMapper
             .Elements("ELocationID")
             .FirstOrDefault(element => string.Equals((string?)element.Attribute("EIdType"), "doi", StringComparison.OrdinalIgnoreCase));
 
-        return NormalizeDoi(articleIdDoi?.Value ?? electronicLocationDoi?.Value);
+        return ScientificIdentifierNormalizer.NormalizeDoi(articleIdDoi?.Value ?? electronicLocationDoi?.Value);
     }
 
     private static string? ReadAbstract(XElement? articleElement)
@@ -282,33 +284,6 @@ public sealed class PubMedArticleMapper
         return null;
     }
 
-    private static string? NormalizePmid(string? value)
-    {
-        var normalized = Normalize(value);
-        return normalized is not null && PmidPattern.IsMatch(normalized)
-            ? normalized
-            : null;
-    }
-
-    private static string? NormalizeDoi(string? value)
-    {
-        var normalized = Normalize(value);
-        if (normalized is null)
-        {
-            return null;
-        }
-
-        foreach (var prefix in new[] { "doi:", "https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/" })
-        {
-            if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                normalized = normalized[prefix.Length..].Trim();
-                break;
-            }
-        }
-
-        return normalized.Length == 0 ? null : normalized.ToLowerInvariant();
-    }
 
     private static string? NormalizeText(XElement? element)
     {

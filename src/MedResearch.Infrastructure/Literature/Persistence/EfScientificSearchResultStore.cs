@@ -1,17 +1,29 @@
 using MedResearch.Application.Research.Literature;
 using MedResearch.Domain;
+using MedResearch.Infrastructure.Literature.Identity;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MedResearch.Infrastructure.Literature.Persistence;
 
 public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
 {
     private readonly MedResearchDbContext _dbContext;
+    private readonly ILogger<EfScientificSearchResultStore> _logger;
 
     public EfScientificSearchResultStore(MedResearchDbContext dbContext)
+        : this(dbContext, NullLogger<EfScientificSearchResultStore>.Instance)
+    {
+    }
+
+    public EfScientificSearchResultStore(
+        MedResearchDbContext dbContext,
+        ILogger<EfScientificSearchResultStore> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     public async Task<ScientificSearchPersistenceResult> PersistSearchResultsAsync(
@@ -28,23 +40,46 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         foreach (var candidate in request.Candidates)
         {
             var normalizedCandidate = NormalizeCandidate(candidate);
-            var identityKey = GetIdentityKey(normalizedCandidate);
+            var identityKeys = GetIdentityKeys(normalizedCandidate);
 
-            if (identityKey is not null && studiesByIdentity.TryGetValue(identityKey, out var alreadyDiscoveredStudy))
+            var trackedMatches = identityKeys
+                .Where(studiesByIdentity.ContainsKey)
+                .Select(identityKey => studiesByIdentity[identityKey])
+                .DistinctBy(study => study.Id)
+                .ToArray();
+
+            if (trackedMatches.Length > 1)
             {
                 duplicateCount++;
+                LogIdentityConflict(request, normalizedCandidate, "Current search batch contains identifiers already attached to different Studies.");
+                continue;
+            }
+
+            if (trackedMatches.Length == 1)
+            {
+                duplicateCount++;
+                EnrichStudyMetadata(trackedMatches[0], normalizedCandidate);
                 await AddDiscoveryIfMissingAsync(
                     request.ResearchRunId,
                     request.SearchExecutionId,
-                    alreadyDiscoveredStudy.Id,
+                    trackedMatches[0].Id,
                     normalizedCandidate,
                     discoveredAt,
                     cancellationToken);
                 continue;
             }
 
-            var study = await FindExistingStudyAsync(normalizedCandidate, cancellationToken);
+            await AcquireIdentityLocksAsync(identityKeys, cancellationToken);
 
+            var resolution = await ResolveExistingStudyAsync(normalizedCandidate, cancellationToken);
+            if (resolution.IsConflict)
+            {
+                duplicateCount++;
+                LogIdentityConflict(request, normalizedCandidate, "Candidate identifiers match more than one existing Study.");
+                continue;
+            }
+
+            var study = resolution.Study;
             if (study is null)
             {
                 study = CreateStudy(normalizedCandidate);
@@ -54,9 +89,10 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             else
             {
                 duplicateCount++;
+                EnrichStudyMetadata(study, normalizedCandidate);
             }
 
-            if (identityKey is not null)
+            foreach (var identityKey in identityKeys)
             {
                 studiesByIdentity[identityKey] = study;
             }
@@ -87,10 +123,12 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         return new ScientificSearchPersistenceResult(request.SearchExecutionId, persistedCount, duplicateCount);
     }
 
-    private async Task<Study?> FindExistingStudyAsync(
+    private async Task<StudyResolution> ResolveExistingStudyAsync(
         ScientificStudyCandidate candidate,
         CancellationToken cancellationToken)
     {
+        var matches = new List<Study>();
+
         if (!string.IsNullOrWhiteSpace(candidate.Pmid))
         {
             var byPmid = await _dbContext.Studies
@@ -98,19 +136,53 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
 
             if (byPmid is not null)
             {
-                return byPmid;
+                matches.Add(byPmid);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.Pmcid))
+        {
+            var byPmcid = await _dbContext.Studies
+                .SingleOrDefaultAsync(study => study.Pmcid == candidate.Pmcid, cancellationToken);
+
+            if (byPmcid is not null)
+            {
+                matches.Add(byPmcid);
             }
         }
 
         if (!string.IsNullOrWhiteSpace(candidate.Doi))
         {
-            return await _dbContext.Studies
+            var byDoi = await _dbContext.Studies
                 .SingleOrDefaultAsync(study => study.Doi == candidate.Doi, cancellationToken);
+
+            if (byDoi is not null)
+            {
+                matches.Add(byDoi);
+            }
         }
 
-        return null;
+        var distinctMatches = matches.DistinctBy(study => study.Id).ToArray();
+        return distinctMatches.Length switch
+        {
+            0 => StudyResolution.NotFound,
+            1 => StudyResolution.Found(distinctMatches[0]),
+            _ => StudyResolution.Conflict
+        };
     }
 
+
+    private async Task AcquireIdentityLocksAsync(
+        IReadOnlyCollection<string> identityKeys,
+        CancellationToken cancellationToken)
+    {
+        foreach (var identityKey in identityKeys.Order(StringComparer.OrdinalIgnoreCase))
+        {
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({identityKey}, 0))",
+                cancellationToken);
+        }
+    }
     private async Task AddDiscoveryIfMissingAsync(
         Guid researchRunId,
         Guid searchExecutionId,
@@ -136,7 +208,7 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             searchExecutionId,
             studyId,
             candidate.Source,
-            candidate.Pmid ?? candidate.Doi,
+            candidate.ProviderRecordId ?? candidate.Pmid ?? candidate.Pmcid ?? candidate.Doi,
             discoveredAt));
     }
 
@@ -148,6 +220,7 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             candidate.Abstract,
             candidate.Doi,
             candidate.Pmid,
+            candidate.Pmcid,
             candidate.Journal,
             candidate.PublicationDate,
             candidate.PublicationYear,
@@ -158,40 +231,55 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             candidate.Source);
     }
 
+    private static void EnrichStudyMetadata(Study study, ScientificStudyCandidate candidate)
+    {
+        study.EnrichMissingMetadata(
+            candidate.Abstract,
+            candidate.Doi,
+            candidate.Pmid,
+            candidate.Pmcid,
+            candidate.Journal,
+            candidate.PublicationDate,
+            candidate.PublicationYear,
+            candidate.PublicationMonth,
+            candidate.PublicationDay,
+            candidate.PublicationTypes.ToArray(),
+            candidate.Authors.ToArray());
+    }
+
     private static ScientificStudyCandidate NormalizeCandidate(ScientificStudyCandidate candidate)
     {
         return candidate with
         {
-            Pmid = NormalizeIdentifier(candidate.Pmid),
-            Doi = NormalizeDoi(candidate.Doi),
+            Pmid = ScientificIdentifierNormalizer.NormalizePmid(candidate.Pmid),
+            Pmcid = ScientificIdentifierNormalizer.NormalizePmcid(candidate.Pmcid),
+            Doi = ScientificIdentifierNormalizer.NormalizeDoi(candidate.Doi),
+            ProviderRecordId = ScientificIdentifierNormalizer.NormalizeWhitespace(candidate.ProviderRecordId),
             PublicationTypes = NormalizeCollection(candidate.PublicationTypes),
             Authors = NormalizeCollection(candidate.Authors)
         };
     }
 
-    private static string? GetIdentityKey(ScientificStudyCandidate candidate)
+    private static IReadOnlyCollection<string> GetIdentityKeys(ScientificStudyCandidate candidate)
     {
+        var identityKeys = new List<string>(capacity: 3);
+
         if (!string.IsNullOrWhiteSpace(candidate.Pmid))
         {
-            return $"pmid:{candidate.Pmid}";
+            identityKeys.Add($"pmid:{candidate.Pmid}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.Pmcid))
+        {
+            identityKeys.Add($"pmcid:{candidate.Pmcid}");
         }
 
         if (!string.IsNullOrWhiteSpace(candidate.Doi))
         {
-            return $"doi:{candidate.Doi}";
+            identityKeys.Add($"doi:{candidate.Doi}");
         }
 
-        return null;
-    }
-
-    private static string? NormalizeIdentifier(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static string? NormalizeDoi(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+        return identityKeys;
     }
 
     private static IReadOnlyCollection<string> NormalizeCollection(IReadOnlyCollection<string> values)
@@ -201,5 +289,30 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             .Where(value => value.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private void LogIdentityConflict(
+        ScientificSearchPersistenceRequest request,
+        ScientificStudyCandidate candidate,
+        string reason)
+    {
+        _logger.LogWarning(
+            "ScientificStudyIdentityConflict. ResearchRunId: {ResearchRunId}; LiteratureSearchId: {LiteratureSearchId}; Source: {Source}; HasPmid: {HasPmid}; HasPmcid: {HasPmcid}; HasDoi: {HasDoi}; Reason: {Reason}",
+            request.ResearchRunId,
+            request.SearchExecutionId,
+            request.Source,
+            !string.IsNullOrWhiteSpace(candidate.Pmid),
+            !string.IsNullOrWhiteSpace(candidate.Pmcid),
+            !string.IsNullOrWhiteSpace(candidate.Doi),
+            reason);
+    }
+
+    private sealed record StudyResolution(Study? Study, bool IsConflict)
+    {
+        public static StudyResolution NotFound { get; } = new(null, false);
+
+        public static StudyResolution Conflict { get; } = new(null, true);
+
+        public static StudyResolution Found(Study study) => new(study, false);
     }
 }

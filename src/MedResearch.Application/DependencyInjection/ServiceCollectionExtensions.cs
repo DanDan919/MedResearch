@@ -1,5 +1,6 @@
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Planning;
+using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Processing;
@@ -15,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CreateResearchUseCase>();
         services.AddScoped<GetResearchUseCase>();
         services.AddScoped<IResearchPlanner, ResearchPlanner>();
+        services.AddScoped<IScientificLiteratureSearchCoordinator, ScientificLiteratureSearchCoordinator>();
         services.AddScoped<EvidenceGroundingValidator>();
         services.AddScoped<EvidenceNumericGroundingValidator>();
         services.AddScoped<EvidenceExtractionDraftValidator>();

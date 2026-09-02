@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Literature;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,6 +52,19 @@ public sealed class InfrastructureConfigurationTests
         Assert.NotNull(provider);
     }
 
+    [Fact]
+    public void AddInfrastructure_RegistersEnabledScientificLiteratureSources()
+    {
+        var configuration = CreateConfiguration([]);
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        using var provider = services.BuildServiceProvider();
+
+        var sources = provider.GetServices<IScientificLiteratureSource>().Select(source => source.SourceName).Order().ToArray();
+
+        Assert.Equal([ScientificLiteratureSourceNames.EuropePmc, ScientificLiteratureSourceNames.PubMed], sources);
+    }
 
     [Fact]
     public void AddInfrastructure_RejectsPubMedRateAboveOfficialLimitWithoutApiKey()
@@ -104,7 +118,7 @@ public sealed class InfrastructureConfigurationTests
     }
 
     [Fact]
-    public void AddInfrastructure_RejectsInvalidPubMedBatchAndRetryConfiguration()
+    public void AddInfrastructure_RejectsPubMedInvalidBatchAndRetryConfiguration()
     {
         var configuration = CreateConfiguration(new Dictionary<string, string?>
         {
@@ -116,6 +130,26 @@ public sealed class InfrastructureConfigurationTests
 
         Assert.Contains("PubMed:FetchBatchSize", exception.Message);
     }
+
+    [Theory]
+    [InlineData("EuropePmc:MaxResultsPerQuery", "201")]
+    [InlineData("EuropePmc:PageSize", "101")]
+    [InlineData("EuropePmc:MaxRequestsPerSecond", "6")]
+    [InlineData("EuropePmc:MaxRetryAttempts", "6")]
+    [InlineData("EuropePmc:RetryBaseDelayMilliseconds", "0")]
+    public void AddInfrastructure_RejectsInvalidEuropePmcBounds(string key, string value)
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            [key] = value
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+
+        Assert.Contains(key, exception.Message);
+    }
+
     private static IConfiguration CreateConfiguration(Dictionary<string, string?> overrides)
     {
         var values = new Dictionary<string, string?>
@@ -135,7 +169,14 @@ public sealed class InfrastructureConfigurationTests
             ["PubMed:MaxRequestsPerSecond"] = "2",
             ["PubMed:FetchBatchSize"] = "25",
             ["PubMed:MaxRetryAttempts"] = "2",
-            ["PubMed:RetryBaseDelayMilliseconds"] = "250"
+            ["PubMed:RetryBaseDelayMilliseconds"] = "250",
+            ["EuropePmc:BaseUrl"] = "https://www.ebi.ac.uk/europepmc/webservices/rest/",
+            ["EuropePmc:MaxResultsPerQuery"] = "10",
+            ["EuropePmc:PageSize"] = "25",
+            ["EuropePmc:TimeoutSeconds"] = "15",
+            ["EuropePmc:MaxRequestsPerSecond"] = "2",
+            ["EuropePmc:MaxRetryAttempts"] = "2",
+            ["EuropePmc:RetryBaseDelayMilliseconds"] = "250"
         };
 
         foreach (var (key, value) in overrides)

@@ -80,12 +80,14 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 (discovery, study) => new { discovery, study })
             .OrderBy(item => item.discovery.DiscoveredAt)
             .ThenBy(item => item.study.Pmid)
+            .ThenBy(item => item.study.Pmcid)
             .ThenBy(item => item.study.Doi)
             .ThenBy(item => item.study.Id)
             .Select(item => new SynthesisStudySnapshot(
                 item.study.Id,
                 item.study.Title,
                 item.study.Pmid,
+                item.study.Pmcid,
                 item.study.Doi,
                 item.study.Journal,
                 item.study.PublicationDate,
@@ -320,6 +322,7 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                         row.Evidence.Id,
                         row.Study.Id,
                         row.Study.Pmid,
+                        row.Study.Pmcid,
                         row.Study.Doi,
                         row.Study.Title,
                         row.Evidence.SupportingText,

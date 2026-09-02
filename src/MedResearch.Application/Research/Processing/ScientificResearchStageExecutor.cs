@@ -13,8 +13,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
 {
     private readonly IResearchPlanner _researchPlanner;
     private readonly IResearchPlanStore _researchPlanStore;
-    private readonly IScientificLiteratureSource _literatureSource;
-    private readonly IScientificSearchResultStore _searchResultStore;
+    private readonly IScientificLiteratureSearchCoordinator _literatureSearchCoordinator;
     private readonly IEvidenceExtractor _evidenceExtractor;
     private readonly IEvidenceExtractionStore _evidenceExtractionStore;
     private readonly EvidenceExtractionOptions _evidenceExtractionOptions;
@@ -29,8 +28,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     public ScientificResearchStageExecutor(
         IResearchPlanner researchPlanner,
         IResearchPlanStore researchPlanStore,
-        IScientificLiteratureSource literatureSource,
-        IScientificSearchResultStore searchResultStore,
+        IScientificLiteratureSearchCoordinator literatureSearchCoordinator,
         IEvidenceExtractor evidenceExtractor,
         IEvidenceExtractionStore evidenceExtractionStore,
         EvidenceExtractionOptions evidenceExtractionOptions,
@@ -44,8 +42,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     {
         _researchPlanner = researchPlanner;
         _researchPlanStore = researchPlanStore;
-        _literatureSource = literatureSource;
-        _searchResultStore = searchResultStore;
+        _literatureSearchCoordinator = literatureSearchCoordinator;
         _evidenceExtractor = evidenceExtractor;
         _evidenceExtractionStore = evidenceExtractionStore;
         _evidenceExtractionOptions = evidenceExtractionOptions;
@@ -106,10 +103,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             throw new ResearchPlanValidationException("No accepted research plan exists for the research run.");
         }
 
-        foreach (var query in plan.SearchQueries)
-        {
-            await ExecuteSearchQueryAsync(context, plan, query, cancellationToken);
-        }
+        await _literatureSearchCoordinator.SearchAsync(context.ResearchRunId, plan.Id, plan.SearchQueries, cancellationToken);
     }
 
     private async Task ExecuteExtractingStageAsync(
@@ -268,94 +262,5 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             result.Statistics.IncludedEvidenceFindingCount,
             synthesisContext.OutcomeDirectionSummaries.Count(summary => summary.ConflictStatus == SynthesisConflictStatus.Present),
             stopwatch.ElapsedMilliseconds);
-    }
-
-    private async Task ExecuteSearchQueryAsync(
-        ResearchStageExecutionContext context,
-        ResearchPlan plan,
-        string query,
-        CancellationToken cancellationToken)
-    {
-        var searchExecutionId = Guid.NewGuid();
-        var stopwatch = Stopwatch.StartNew();
-
-        _logger.LogInformation(
-            "ScientificSearchStarted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}",
-            context.ResearchRunId,
-            plan.Id,
-            _literatureSource.SourceName,
-            searchExecutionId);
-
-        try
-        {
-            var searchResult = await _literatureSource.SearchAsync(
-                new ScientificSearchRequest(context.ResearchRunId, searchExecutionId, query),
-                cancellationToken);
-
-            foreach (var candidate in searchResult.Candidates)
-            {
-                _logger.LogInformation(
-                    "ScientificStudyDiscovered. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; PMID: {Pmid}; DOI: {Doi}",
-                    context.ResearchRunId,
-                    plan.Id,
-                    candidate.Source,
-                    searchExecutionId,
-                    candidate.Pmid,
-                    candidate.Doi);
-            }
-
-            var persistenceResult = await _searchResultStore.PersistSearchResultsAsync(
-                new ScientificSearchPersistenceRequest(
-                    searchExecutionId,
-                    context.ResearchRunId,
-                    plan.Id,
-                    searchResult.Source,
-                    query,
-                    searchResult.SearchedAt,
-                    searchResult.ReturnedResultCount,
-                    searchResult.Candidates),
-                cancellationToken);
-
-            stopwatch.Stop();
-
-            _logger.LogInformation(
-                "ScientificStudiesPersisted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; PersistedCount: {PersistedCount}; DuplicateCount: {DuplicateCount}",
-                context.ResearchRunId,
-                plan.Id,
-                searchResult.Source,
-                searchExecutionId,
-                persistenceResult.PersistedCount,
-                persistenceResult.DuplicateCount);
-
-            _logger.LogInformation(
-                "ScientificSearchCompleted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; ResultCount: {ResultCount}; PersistedCount: {PersistedCount}; DuplicateCount: {DuplicateCount}; DurationMs: {DurationMs}",
-                context.ResearchRunId,
-                plan.Id,
-                searchResult.Source,
-                searchExecutionId,
-                searchResult.ReturnedResultCount,
-                persistenceResult.PersistedCount,
-                persistenceResult.DuplicateCount,
-                stopwatch.ElapsedMilliseconds);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            stopwatch.Stop();
-
-            _logger.LogError(
-                exception,
-                "ScientificSearchFailed. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; DurationMs: {DurationMs}",
-                context.ResearchRunId,
-                plan.Id,
-                _literatureSource.SourceName,
-                searchExecutionId,
-                stopwatch.ElapsedMilliseconds);
-
-            throw;
-        }
     }
 }

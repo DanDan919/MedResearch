@@ -19,6 +19,7 @@ public sealed record EvidenceExtractionStudyContext(
     string Title,
     string? Abstract,
     string? Pmid,
+    string? Pmcid,
     string? Doi,
     string? Journal,
     DateOnly? PublicationDate,

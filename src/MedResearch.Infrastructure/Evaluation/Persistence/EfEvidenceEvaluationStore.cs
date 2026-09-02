@@ -66,6 +66,7 @@ public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
                 (extraction, study) => new { extraction, study })
             .OrderBy(item => item.extraction.ExtractedAt)
             .ThenBy(item => item.study.Pmid)
+            .ThenBy(item => item.study.Pmcid)
             .ThenBy(item => item.study.Doi)
             .ThenBy(item => item.study.Id)
             .Take(maxStudies)
@@ -106,6 +107,7 @@ public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
                 item.study.Title,
                 item.study.Abstract,
                 item.study.Pmid,
+                item.study.Pmcid,
                 item.study.Doi,
                 item.study.Journal,
                 item.study.PublicationDate,

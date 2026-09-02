@@ -1,18 +1,19 @@
 using System.Threading.RateLimiting;
 using MedResearch.Infrastructure.Literature;
+using Microsoft.Extensions.Options;
 
-namespace MedResearch.Infrastructure.Literature.PubMed;
+namespace MedResearch.Infrastructure.Literature.EuropePmc;
 
-public interface IPubMedRequestGate
+public interface IEuropePmcRequestGate
 {
     ValueTask WaitAsync(CancellationToken cancellationToken);
 }
 
-public sealed class TokenBucketPubMedRequestGate : IPubMedRequestGate, IDisposable
+public sealed class TokenBucketEuropePmcRequestGate : IEuropePmcRequestGate, IDisposable
 {
     private readonly TokenBucketRateLimiter _limiter;
 
-    public TokenBucketPubMedRequestGate(Microsoft.Extensions.Options.IOptions<PubMedOptions> options)
+    public TokenBucketEuropePmcRequestGate(IOptions<EuropePmcOptions> options)
     {
         var value = options.Value;
         value.Validate();
@@ -33,7 +34,7 @@ public sealed class TokenBucketPubMedRequestGate : IPubMedRequestGate, IDisposab
         using var lease = await _limiter.AcquireAsync(permitCount: 1, cancellationToken).ConfigureAwait(false);
         if (!lease.IsAcquired)
         {
-            throw new ScientificLiteratureRateLimitException("PubMed local request rate limiter queue rejected the request.");
+            throw new ScientificLiteratureRateLimitException("Europe PMC local request rate limiter queue rejected the request.");
         }
     }
 

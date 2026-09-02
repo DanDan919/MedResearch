@@ -32,6 +32,10 @@ internal sealed class StudyConfiguration : IEntityTypeConfiguration<Study>
             .HasColumnName("pmid")
             .HasMaxLength(64);
 
+        builder.Property(study => study.Pmcid)
+            .HasColumnName("pmcid")
+            .HasMaxLength(64);
+
         builder.Property(study => study.Journal)
             .HasColumnName("journal")
             .HasMaxLength(512);
@@ -72,6 +76,11 @@ internal sealed class StudyConfiguration : IEntityTypeConfiguration<Study>
         builder.HasIndex(study => study.Pmid)
             .HasDatabaseName("ux_studies_pmid")
             .HasFilter("pmid IS NOT NULL")
+            .IsUnique();
+
+        builder.HasIndex(study => study.Pmcid)
+            .HasDatabaseName("ux_studies_pmcid")
+            .HasFilter("pmcid IS NOT NULL")
             .IsUnique();
     }
 }

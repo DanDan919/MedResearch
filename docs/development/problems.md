@@ -132,3 +132,38 @@ Root cause: The initial retrieval implementation optimized for the smallest work
 Decision / fix: Added `PubMed:FetchBatchSize`, chunked EFetch requests, deduplicated duplicate ESearch PMIDs before fetch, and deduplicated duplicate EFetch article records before returning provider-neutral candidates.
 Verification: Deterministic fake-HTTP tests cover 7 PMID with batch size 3, zero-PMID no-fetch behavior, and duplicate ESearch/EFetch records.
 Remaining concerns: History Server retrieval is deferred until result windows grow beyond small bounded direct PMID batches.
+Date: 2026-09-02
+Area: Multi-source Study identity
+Problem: Europe PMC can supply PMCID and provider source/id values, but the Study model previously had only PMID/DOI identity fields.
+Observed behavior: A Europe PMC result with PMCID but no PMID/DOI would either need to remain no-ID-like or could only be associated through weaker metadata if future code attempted it.
+Root cause: The original single-source PubMed integration did not need PMCID as a stable publication identifier.
+Decision / fix: Added nullable `Study.Pmcid`, normalized PMCID handling, a filtered unique PostgreSQL index, and PMCID-aware downstream context/citation projections.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` and `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally; Docker-backed PMCID integration tests are queued for CI because local Docker is unavailable.
+Remaining concerns: Provider-record-only Europe PMC entries without PMID, PMCID, or DOI are skipped rather than represented with a separate provider-record identity table.
+
+Date: 2026-09-02
+Area: Multi-identifier conflict handling
+Problem: The prior identity resolver was safe for simple PMID/DOI duplicates but did not explicitly treat an incoming candidate whose identifiers point to different existing Studies as a hard conflict.
+Observed behavior: In a future multi-source scenario, a candidate could contain PMID from Study A and DOI/PMCID from Study B, making any automatic choice unsafe.
+Root cause: Single-source retrieval usually saw one dominant PubMed identifier path, so the conflict graph was not explicit.
+Decision / fix: Resolve all stable identifiers together. If they match more than one existing Study, log bounded diagnostics, skip the ambiguous discovery, preserve existing Studies, and continue with other results.
+Verification: Added PostgreSQL integration coverage for hard multi-identifier conflicts, PMCID deduplication, source-specific discovery paths, and downstream one-work-item-per-Study behavior.
+Remaining concerns: Conflicts are logged and counted as duplicates but not yet persisted in a dedicated provider-result diagnostics table.
+
+Date: 2026-09-02
+Area: Provider namespace coupling
+Problem: The initial Europe PMC rate gate reused a rate-limit exception declared in the PubMed namespace.
+Observed behavior: Europe PMC Infrastructure code had a dependency on PubMed implementation namespace for a shared literature concern.
+Root cause: The PubMed hardening milestone introduced the exception inside the first provider implementation.
+Decision / fix: Moved `ScientificLiteratureRateLimitException` into a provider-neutral Infrastructure literature namespace.
+Verification: `dotnet build E:\MedResearch\MedResearch.slnx --no-restore` passed after the decoupling.
+Remaining concerns: Consider consolidating provider retry/gate primitives only if a third source creates real duplication pressure.
+
+Date: 2026-09-02
+Area: Concurrent Study upsert
+Problem: Normalized PMID/PMCID/DOI unique indexes protected the database, but two workers discovering the same new Study concurrently could still race through SELECT-then-INSERT and make one search fail with a unique-constraint exception instead of recording duplicate provenance.
+Observed behavior: Code inspection during Europe PMC integration showed identity resolution queried before insert without serializing on stable identifiers.
+Root cause: Single-source sequential PubMed search did not exercise concurrent cross-provider discovery pressure.
+Decision / fix: Added PostgreSQL transaction-scoped advisory locks over normalized identity keys before Study resolution, while keeping filtered unique indexes as the final authority.
+Verification: Added a Docker-backed PostgreSQL integration test for concurrent PubMed/Europe PMC upserts of the same stable identity; local Docker is unavailable, so CI is the authoritative execution environment.
+Remaining concerns: Advisory locks are local to PostgreSQL and deliberate for this monolith; provider-result conflicts are still logged rather than persisted as first-class diagnostics.

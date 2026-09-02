@@ -43,6 +43,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var studyOrder = snapshot.Studies
             .OrderBy(study => study.DiscoveredAt)
             .ThenBy(study => study.Pmid)
+            .ThenBy(study => study.Pmcid)
             .ThenBy(study => study.Doi)
             .ThenBy(study => study.StudyId)
             .Where(study => studiesWithValidatedEvidence.Contains(study.StudyId))
@@ -70,6 +71,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             .Where(study => selectedStudyIds.Contains(study.StudyId))
             .OrderBy(study => Array.IndexOf(studyOrder, study.StudyId))
             .ThenBy(study => study.Pmid)
+            .ThenBy(study => study.Pmcid)
             .ThenBy(study => study.Doi)
             .ThenBy(study => study.StudyId)
             .Select(study =>
@@ -82,6 +84,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
                     study.StudyId,
                     study.Title,
                     study.Pmid,
+                    study.Pmcid,
                     study.Doi,
                     study.Journal,
                     study.PublicationDate,

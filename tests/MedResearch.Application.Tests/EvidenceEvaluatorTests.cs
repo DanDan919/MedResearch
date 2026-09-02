@@ -50,6 +50,7 @@ public sealed class EvidenceEvaluationSignalBuilderTests
             "Sleep and recall",
             abstractText,
             "12345678",
+            null,
             "10.1000/example",
             "Journal",
             new DateOnly(2026, 1, 1),

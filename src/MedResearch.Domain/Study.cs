@@ -17,6 +17,7 @@ public sealed class Study
             @abstract,
             doi,
             pmid,
+            null,
             journal,
             publicationDate,
             publicationDate?.Year,
@@ -34,6 +35,39 @@ public sealed class Study
         string? @abstract,
         string? doi,
         string? pmid,
+        string? journal,
+        DateOnly? publicationDate,
+        int? publicationYear,
+        int? publicationMonth,
+        int? publicationDay,
+        string[]? publicationTypes,
+        string[]? authors,
+        string source)
+        : this(
+            id,
+            title,
+            @abstract,
+            doi,
+            pmid,
+            null,
+            journal,
+            publicationDate,
+            publicationYear,
+            publicationMonth,
+            publicationDay,
+            publicationTypes,
+            authors,
+            source)
+    {
+    }
+
+    public Study(
+        Guid id,
+        string title,
+        string? @abstract,
+        string? doi,
+        string? pmid,
+        string? pmcid,
         string? journal,
         DateOnly? publicationDate,
         int? publicationYear,
@@ -62,10 +96,11 @@ public sealed class Study
 
         Id = id;
         Title = title.Trim();
-        Abstract = string.IsNullOrWhiteSpace(@abstract) ? null : @abstract.Trim();
-        Doi = string.IsNullOrWhiteSpace(doi) ? null : doi.Trim();
-        Pmid = string.IsNullOrWhiteSpace(pmid) ? null : pmid.Trim();
-        Journal = string.IsNullOrWhiteSpace(journal) ? null : journal.Trim();
+        Abstract = NormalizeOptional(@abstract);
+        Doi = NormalizeOptional(doi);
+        Pmid = NormalizeOptional(pmid);
+        Pmcid = NormalizeOptional(pmcid);
+        Journal = NormalizeOptional(journal);
         PublicationDate = publicationDate;
         PublicationYear = publicationYear;
         PublicationMonth = publicationMonth;
@@ -77,29 +112,64 @@ public sealed class Study
 
     public Guid Id { get; }
 
-    public string Title { get; }
+    public string Title { get; private set; }
 
-    public string? Abstract { get; }
+    public string? Abstract { get; private set; }
 
-    public string? Doi { get; }
+    public string? Doi { get; private set; }
 
-    public string? Pmid { get; }
+    public string? Pmid { get; private set; }
 
-    public string? Journal { get; }
+    public string? Pmcid { get; private set; }
 
-    public DateOnly? PublicationDate { get; }
+    public string? Journal { get; private set; }
 
-    public int? PublicationYear { get; }
+    public DateOnly? PublicationDate { get; private set; }
 
-    public int? PublicationMonth { get; }
+    public int? PublicationYear { get; private set; }
 
-    public int? PublicationDay { get; }
+    public int? PublicationMonth { get; private set; }
 
-    public string[] PublicationTypes { get; }
+    public int? PublicationDay { get; private set; }
 
-    public string[] Authors { get; }
+    public string[] PublicationTypes { get; private set; }
 
-    public string Source { get; }
+    public string[] Authors { get; private set; }
+
+    public string Source { get; private set; }
+
+    public void EnrichMissingMetadata(
+        string? @abstract,
+        string? doi,
+        string? pmid,
+        string? pmcid,
+        string? journal,
+        DateOnly? publicationDate,
+        int? publicationYear,
+        int? publicationMonth,
+        int? publicationDay,
+        string[]? publicationTypes,
+        string[]? authors)
+    {
+        ValidatePublicationDateParts(publicationYear, publicationMonth, publicationDay);
+
+        Abstract ??= NormalizeOptional(@abstract);
+        Doi ??= NormalizeOptional(doi);
+        Pmid ??= NormalizeOptional(pmid);
+        Pmcid ??= NormalizeOptional(pmcid);
+        Journal ??= NormalizeOptional(journal);
+        PublicationDate ??= publicationDate;
+        PublicationYear ??= publicationYear;
+        PublicationMonth ??= publicationMonth;
+        PublicationDay ??= publicationDay;
+        PublicationTypes = MergeCollection(PublicationTypes, publicationTypes);
+        Authors = MergeCollection(Authors, authors);
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 
     private static string[] NormalizeCollection(string[]? values)
     {
@@ -111,6 +181,14 @@ public sealed class Study
         return values
             .Select(value => value.Trim())
             .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string[] MergeCollection(string[] existing, string[]? incoming)
+    {
+        return existing
+            .Concat(NormalizeCollection(incoming))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

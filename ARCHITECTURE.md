@@ -40,7 +40,7 @@ Implemented use cases are:
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
 - `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
-- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, PubMed retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and traceable report generation during `Synthesizing`.
+- `ScientificResearchStageExecutor`: performs structured planning during `Planning`, multi-source scientific retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and traceable report generation during `Synthesizing`.
 
 Application defines ports that reflect current use cases:
 
@@ -48,7 +48,8 @@ Application defines ports that reflect current use cases:
 - `IResearchRunQueue`: worker-specific boundary for claiming queued runs and persisting progress/failure state.
 - `IStructuredLlmClient`: provider-neutral boundary for strict structured generation.
 - `IResearchPlanStore`: persistence boundary for accepted research plans.
-- `IScientificLiteratureSource`: provider-neutral scientific search boundary.
+- `IScientificLiteratureSource`: provider-neutral scientific source boundary.
+- `IScientificLiteratureSearchCoordinator`: single orchestration boundary for executing enabled scientific sources per planned query while preserving per-source provenance.
 - `IScientificSearchResultStore`: persistence boundary for normalized scientific candidates, search provenance, and discovery links.
 - `IEvidenceExtractor`: provider-neutral Application service for validating one study extraction request.
 - `IEvidenceExtractionStore`: persistence boundary for discovered-study extraction work items, extraction provenance, and extracted findings.
@@ -59,7 +60,7 @@ Application defines ports that reflect current use cases:
 - `IResearchSynthesizer`: provider-neutral Application service for validated evidence synthesis.
 - `IResearchReportStore`: persistence/read boundary for synthesized reports, claims, and citations.
 
-These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, and PubMed adapters.
+These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, PubMed, and Europe PMC adapters.
 
 ## HTTP API
 
@@ -86,7 +87,7 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed metadata from accepted plan search queries. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. `Synthesizing` builds a bounded current-run context, creates a validated traceable `ResearchReport`, and persists claims linked to Evidence. Runs move to `Completed` only after the report exists, including explicit insufficient-evidence reports.
+`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed and Europe PMC metadata from accepted plan search queries through provider-neutral source adapters. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. `Synthesizing` builds a bounded current-run context, creates a validated traceable `ResearchReport`, and persists claims linked to Evidence. Runs move to `Completed` only after the report exists, including explicit insufficient-evidence reports.
 
 ## AI Research Planning
 
@@ -136,40 +137,27 @@ If OpenAI is selected but model or API key configuration is missing, the provide
 
 ## Scientific Retrieval
 
-Application depends on provider-neutral scientific retrieval contracts. Infrastructure currently provides one implementation: PubMed through official NCBI E-utilities.
+Application depends on provider-neutral scientific retrieval contracts. Infrastructure currently provides two implementations: PubMed through official NCBI E-utilities and Europe PMC through the official Articles REST API. Multi-source orchestration is centralized in `ScientificLiteratureSearchCoordinator` rather than scattered through pipeline code.
 
-Current PubMed flow:
+Current search flow:
 
 ```text
 ResearchPlan.SearchQueries
-  -> sequential source search requests
-  -> ESearch db=pubmed retmode=json returns distinct PMIDs
-  -> batched EFetch db=pubmed retmode=xml returns article metadata
-  -> PubMed transport parsing in Infrastructure
+  -> ScientificLiteratureSearchCoordinator
+  -> PubMedScientificLiteratureSource and EuropePmcScientificLiteratureSource when enabled
+  -> source-specific HTTP parsing in Infrastructure
   -> ScientificStudyCandidate records
-  -> PostgreSQL persistence
+  -> EfScientificSearchResultStore identity resolution
+  -> canonical Study + LiteratureSearch + ResearchStudyDiscovery
 ```
 
-The previous deterministic question-to-query builder has been removed. Searching does not derive PubMed queries directly from the raw research question; it consumes the accepted `ResearchPlan.SearchQueries` produced during Planning.
+One planned query executed against two sources creates two `LiteratureSearch` rows. That preserves source execution semantics: a PubMed zero-result search, a Europe PMC successful search, and a provider failure are different operational/provenance facts. `ResearchStudyDiscovery` links one `LiteratureSearch` to one canonical `Study`, so one Study may have multiple discovery paths in the same ResearchRun. Downstream extraction, evaluation, and synthesis group by `StudyId` for one work item per Study per run while retaining source/search provenance for coverage and traceability.
 
-PubMed configuration lives under `PubMed`:
+PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, followed by batched EFetch XML. Requests include configured `tool`/`email` identification and optional `api_key`; ESearch and EFetch share one local `System.Threading.RateLimiting` token-bucket gate. History Server retrieval remains deliberately deferred because current `MaxResultsPerQuery` is bounded and direct ID batching keeps the implementation simpler without one-request-per-PMID behavior.
 
-- `BaseUrl`
-- `Enabled`, default `true`
-- `MaxResultsPerQuery`, default 10 and bounded to 1-200
-- `FetchBatchSize`, default 25 and bounded to 1-200
-- `MaxRequestsPerSecond`, default 2; validated against documented NCBI limits of 3 without `ApiKey` and 10 with `ApiKey`
-- `TimeoutSeconds`, default 15 and bounded to 1-120
-- `Tool`, default `MedResearch`, sent on E-utilities requests
-- optional `Email`, sent when configured
-- optional `ApiKey`, sent as `api_key` when configured
-- `MaxRetryAttempts`, default 2 and bounded to 0-5
-- `RetryBaseDelayMilliseconds`, default 250
+Europe PMC uses `GET /search` against `https://www.ebi.ac.uk/europepmc/webservices/rest/` with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination using `cursorMark` and `nextCursorMark`. `core` is used so the current abstract-level pipeline can receive title, abstract, identifiers, authors, publication date metadata, journal metadata, and publication types without a second detail endpoint per result.
 
-The adapter uses HttpClientFactory and does not create a new HttpClient per request. It performs ESearch and EFetch sequentially and does not aggressively parallelize PubMed calls. ESearch and EFetch share one local `System.Threading.RateLimiting` token-bucket request gate for the NCBI E-utilities quota. EFetch is chunked by `FetchBatchSize`; duplicate ESearch PMIDs are deduplicated before fetching, and duplicate EFetch article records are deduplicated by stable identifier before returning provider-neutral candidates. Transient 429, 5xx, network, and timeout failures use bounded retry with `Retry-After` support, exponential backoff, jitter, and cancellation-aware delay. Multiple planned queries are also executed sequentially. No live PubMed tests run by default.
-
-A valid plan may produce zero PubMed results. Zero-result searches are persisted. Later stages continue without fabricating studies or evidence; synthesis records explicit insufficient evidence when no validated findings exist.
-
+Both source adapters use HttpClientFactory, bounded timeouts, cancellation propagation, local rate limiting, bounded transient retry for 429/5xx/network/timeout failures, `Retry-After` support where supplied, and bounded sanitized diagnostic bodies. Bad requests and malformed successful payloads fail fast. Normal automated tests use fake HTTP and do not call live scientific providers.
 ## Evidence Extraction
 
 Application performs evidence extraction through `EvidenceExtractor`, which reuses the existing provider-neutral `IStructuredLlmClient`. Infrastructure continues to own the concrete OpenAI HTTP adapter; Application does not depend on OpenAI-specific contracts.
@@ -262,12 +250,13 @@ The synthesis context is bounded by `Synthesis:MaxStudies`, `Synthesis:MaxEviden
 Outcome summaries use exact normalized outcome labels only. MedResearch deliberately does not semantically merge outcome names, detect cohort overlap, resolve systematic-review/primary-study citation overlap, vote count, or produce statistical certainty estimates.
 ## Scientific Data Integrity
 
-External source data is untrusted input. OpenAI and PubMed transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
+External source data is untrusted input. OpenAI, PubMed, and Europe PMC transport models remain in Infrastructure and are normalized or deserialized before crossing into Application-facing contracts.
 
-The system stores values reported by PubMed when available:
+The system stores values reported by scientific providers when available:
 
 - PMID
 - DOI
+- PMCID
 - title
 - abstract
 - journal
@@ -277,22 +266,27 @@ The system stores values reported by PubMed when available:
 - authors
 - source
 
-Missing values stay missing. The system does not infer missing DOI, PMID, authors, publication types, sample sizes, effect sizes, confidence intervals, or conclusions. PubMed records without a valid numeric PMID or non-empty title are skipped as malformed source records.
+Missing values stay missing. The system does not infer missing DOI, PMID, PMCID, authors, publication types, sample sizes, effect sizes, confidence intervals, or conclusions. Provider records without a non-empty title or at least one stable identifier are skipped as malformed source records.
 
 ## Study Identity And Search Provenance
 
-`Study` represents global scientific study identity. Stable identifiers drive deduplication:
+`Study` represents global scientific publication identity. Stable identifiers drive deduplication:
 
-- PMID is preferred for PubMed records.
-- DOI is used where appropriate.
-- Fuzzy title matching is not used.
+- PMID is normalized as trimmed numeric text.
+- PMCID is normalized to uppercase `PMC` plus digits.
+- DOI is normalized by trimming, stripping recognized `doi:`/DOI URL prefixes, and lowercasing for comparison.
+
+PMID, PMCID, and DOI are each backed by filtered unique PostgreSQL indexes when present. During persistence, normalized identity keys are also protected by PostgreSQL transaction-scoped advisory locks so concurrent source upserts for the same publication serialize before SELECT/INSERT resolution. Fuzzy title matching, author similarity, year matching, and provider-record-id-only merging are not used.
+
+Identity resolution considers all stable identifiers supplied by a candidate. If all matching identifiers point to the same existing `Study`, the Study is reused. If an existing Study lacks a non-conflicting incoming identifier or metadata field, MedResearch may enrich the null/empty field. Null or poorer incoming metadata does not erase existing non-null metadata. Conflicting non-null metadata is not silently overwritten.
+
+If an incoming candidate's stable identifiers point to different persisted Studies, the result is a hard identity conflict. MedResearch logs bounded diagnostics, preserves the existing Studies, skips the ambiguous discovery, records the search counts, and continues with other candidates. It does not pick a winning provider or merge entities by title.
 
 `ResearchPlan` records accepted structured planning output for one research run, including provider, model, prompt version, and generated timestamp.
 
-`LiteratureSearch` records which source was searched, which query was sent, when it ran, how many results were returned, how many studies were newly persisted, how many were duplicates, and the optional `ResearchPlanId` that produced the query.
+`LiteratureSearch` records which source was searched, which query was sent, when it ran, how many results were returned, how many studies were newly persisted, how many were duplicates/conflicts, and the optional `ResearchPlanId` that produced the query.
 
-`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered through a specific query during one research run. The same global Study can have multiple discovery paths in the same run when multiple searches return it; downstream extraction and synthesis deduplicate study work by StudyId while retaining LiteratureSearch provenance. Evidence remains run-scoped even when Study identity is shared across runs; report citations point to Evidence and project authoritative Study metadata from persistence. The same-run citation invariant is enforced at the Application validation boundary and covered by tests rather than by a cross-table PostgreSQL constraint.
-
+`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered through a specific source/query during one research run. The same global Study can have multiple discovery paths in the same run when multiple searches or sources return it; downstream extraction and synthesis deduplicate study work by StudyId while retaining LiteratureSearch provenance. Evidence remains run-scoped even when Study identity is shared across runs; report citations point to Evidence and project authoritative Study metadata from persistence. The same-run citation invariant is enforced at the Application validation boundary and covered by tests rather than by a cross-table PostgreSQL constraint.
 ## PostgreSQL Claiming Strategy
 
 `PostgreSqlResearchRunQueue` claims queued or expired in-progress work with a short PostgreSQL transaction and an atomic `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED ...) RETURNING ...` statement. A queued claim moves a run from `Queued` to `Planning`; a reclaim keeps the existing in-progress status. Both paths set lease owner, acquisition time, expiry, heartbeat time, increment `processing_lease_version`, set `started_at` when needed, and return the associated research question text before committing.
@@ -351,13 +345,14 @@ Migrations:
 - `20260901021148_AddTraceableResearchReports`
 - `20260901063528_AddResearchRunProcessingLeases`
 - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
+- `20260902150845_AddStudyPmcidIdentity`
 
 ## Database Schema
 
 - `research_questions`: GUID primary key, required question text, creation timestamp.
 - `research_runs`: GUID primary key, required `research_question_id` FK, string-backed status, created/started/completed timestamps, optional failure reason, processing lease owner/acquired/expires/heartbeat timestamps, and processing lease version.
 - `research_plans`: GUID primary key, required `research_run_id` and `research_question_id` FKs, authoritative original question, optional PICO-like text fields, array fields for outcomes, preferred study types, search queries, and exclusion hints, plus provider, model, prompt version, and generated timestamp.
-- `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, journal, publication date/date parts, publication types, and authors.
+- `studies`: GUID primary key, required title and source, optional abstract, DOI, PMID, PMCID, journal, publication date/date parts, publication types, and authors.
 - `literature_searches`: GUID primary key, required `research_run_id` FK, optional `research_plan_id` FK, source, query, searched timestamp, result count, persisted count, duplicate count.
 - `research_study_discoveries`: GUID primary key, required FKs to research run, literature search, and study, plus source identifier and discovery timestamp.
 - `evidence_extractions`: GUID primary key, required `research_run_id` and `study_id` FKs, status, optional skip reason, source scope, optional provider/model, prompt version, extraction timestamp, evidence count, and grounding validation flag.
@@ -375,6 +370,7 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 - `research_plans(research_question_id)` for question-to-plan lookup.
 - filtered unique `studies(doi)` for DOI deduplication when DOI is present.
 - filtered unique `studies(pmid)` for PMID deduplication when PMID is present.
+- filtered unique `studies(pmcid)` for PMCID deduplication when PMCID is present.
 - `literature_searches(research_run_id, searched_at)` for run provenance lookup.
 - `literature_searches(research_plan_id)` for plan provenance lookup.
 - `research_study_discoveries(research_run_id, study_id)` for run/study provenance lookups when a Study has one or more discovery paths in a run.
@@ -423,14 +419,15 @@ The compose API service enables config-gated startup migrations with `Database__
 
 ## Current Limitations
 
-- No Crossref, Europe PMC, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
+- No Crossref, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
 - No full-text extraction or RAG/vector search exists yet.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
 - Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
-- PubMed rate limiting is conservative and local to the process; no distributed rate limiter exists.
+- PubMed and Europe PMC rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
+- Europe PMC live availability is verified only through an optional smoke test, not normal CI.
 - Production migration strategy is not decided yet.
 - OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.

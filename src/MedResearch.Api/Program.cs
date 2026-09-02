@@ -191,6 +191,7 @@ static ResearchReportResponse ToReportResponse(ResearchReportReadModel report)
                 citation.EvidenceId,
                 citation.StudyId,
                 citation.Pmid,
+                citation.Pmcid,
                 citation.Doi,
                 citation.Title,
                 citation.SupportingText,

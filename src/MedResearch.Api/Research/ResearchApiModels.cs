@@ -57,6 +57,7 @@ public sealed record ResearchReportCitationResponse(
     Guid EvidenceId,
     Guid StudyId,
     string? Pmid,
+    string? Pmcid,
     string? Doi,
     string Title,
     string SupportingText,

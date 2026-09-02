@@ -279,8 +279,7 @@ public sealed class ScientificResearchStageExecutorTests
         return new ScientificResearchStageExecutor(
             planner,
             planStore,
-            source,
-            store,
+            new ScientificLiteratureSearchCoordinator([source], store, NullLogger<ScientificLiteratureSearchCoordinator>.Instance),
             evidenceExtractor ?? new RecordingEvidenceExtractor(null),
             evidenceExtractionStore ?? new RecordingEvidenceExtractionStore([], 0),
             new EvidenceExtractionOptions(),
@@ -317,6 +316,7 @@ public sealed class ScientificResearchStageExecutorTests
     {
         return new ScientificStudyCandidate(
             pmid,
+            null,
             doi,
             "Sleep and memory",
             null,
@@ -327,6 +327,7 @@ public sealed class ScientificResearchStageExecutorTests
             null,
             ["Journal Article"],
             ["Ada Lovelace"],
+            pmid,
             "PubMed");
     }
 
@@ -341,6 +342,7 @@ public sealed class ScientificResearchStageExecutorTests
             "Sleep and recall",
             abstractText,
             "12345678",
+            null,
             "10.1000/example",
             "Journal",
             new DateOnly(2026, 1, 1),
@@ -361,6 +363,7 @@ public sealed class ScientificResearchStageExecutorTests
             "Sleep and recall",
             "A randomized trial reported improved recall in 120 adults.",
             "12345678",
+            null,
             "10.1000/example",
             "Journal",
             new DateOnly(2026, 1, 1),
@@ -470,6 +473,7 @@ public sealed class ScientificResearchStageExecutorTests
                 group.Key,
                 "Sleep and recall",
                 "12345678",
+            null,
                 "10.1000/example",
                 "Journal",
                 new DateOnly(2026, 1, 1),

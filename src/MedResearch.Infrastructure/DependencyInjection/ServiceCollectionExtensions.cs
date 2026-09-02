@@ -9,6 +9,7 @@ using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
 using MedResearch.Infrastructure.Evaluation.Persistence;
+using MedResearch.Infrastructure.Literature.EuropePmc;
 using MedResearch.Infrastructure.Literature.Persistence;
 using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
@@ -74,8 +75,26 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new Uri(pubMedOptions.BaseUrl, UriKind.Absolute);
             client.Timeout = pubMedOptions.Timeout;
         });
-        services.AddScoped<IScientificLiteratureSource>(provider =>
-            provider.GetRequiredService<PubMedScientificLiteratureSource>());
+        if (pubMedOptions.Enabled)
+        {
+            services.AddScoped<IScientificLiteratureSource>(provider =>
+                provider.GetRequiredService<PubMedScientificLiteratureSource>());
+        }
+
+        var europePmcOptions = CreateEuropePmcOptions(configuration);
+        services.AddSingleton(Options.Create(europePmcOptions));
+        services.AddSingleton<IEuropePmcRequestGate, TokenBucketEuropePmcRequestGate>();
+        services.AddSingleton<IEuropePmcRetryDelay, EuropePmcRetryDelay>();
+        services.AddHttpClient<EuropePmcScientificLiteratureSource>(client =>
+        {
+            client.BaseAddress = new Uri(europePmcOptions.BaseUrl, UriKind.Absolute);
+            client.Timeout = europePmcOptions.Timeout;
+        });
+        if (europePmcOptions.Enabled)
+        {
+            services.AddScoped<IScientificLiteratureSource>(provider =>
+                provider.GetRequiredService<EuropePmcScientificLiteratureSource>());
+        }
 
         var evidenceExtractionOptions = CreateEvidenceExtractionOptions(configuration);
         services.AddSingleton(evidenceExtractionOptions);
@@ -217,6 +236,33 @@ public static class ServiceCollectionExtensions
             FetchBatchSize = ReadPositiveInt(section["FetchBatchSize"], 25, "PubMed:FetchBatchSize"),
             MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "PubMed:MaxRetryAttempts"),
             RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "PubMed:RetryBaseDelayMilliseconds")
+        };
+
+        options.Validate();
+        return options;
+    }
+
+    private static EuropePmcOptions CreateEuropePmcOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(EuropePmcOptions.SectionName);
+        var enabled = true;
+        if (bool.TryParse(section["Enabled"], out var configuredEnabled))
+        {
+            enabled = configuredEnabled;
+        }
+
+        var options = new EuropePmcOptions
+        {
+            Enabled = enabled,
+            BaseUrl = string.IsNullOrWhiteSpace(section["BaseUrl"])
+                ? "https://www.ebi.ac.uk/europepmc/webservices/rest/"
+                : section["BaseUrl"]!,
+            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"], 10, "EuropePmc:MaxResultsPerQuery"),
+            PageSize = ReadPositiveInt(section["PageSize"], 25, "EuropePmc:PageSize"),
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "EuropePmc:TimeoutSeconds"),
+            MaxRequestsPerSecond = ReadPositiveInt(section["MaxRequestsPerSecond"], 2, "EuropePmc:MaxRequestsPerSecond"),
+            MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "EuropePmc:MaxRetryAttempts"),
+            RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "EuropePmc:RetryBaseDelayMilliseconds")
         };
 
         options.Validate();

@@ -119,6 +119,7 @@ public sealed class SynthesisContextBuilderTests
             studyId,
             $"Study {index}",
             (12345678 + index).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            null,
             $"10.1000/{index}",
             "Journal",
             new DateOnly(2026, 1, 1),
@@ -339,7 +340,7 @@ public sealed class ResearchSynthesizerTests
     private static SynthesisContext CreateContext(IReadOnlyCollection<SynthesisEvidenceContext> evidence)
     {
         var runId = evidence.FirstOrDefault()?.ResearchRunId ?? Guid.NewGuid();
-        var studies = evidence.GroupBy(item => item.StudyId).Select(group => new SynthesisStudyContext(group.Key, "Study title", "12345678", "10.1000/example", "Journal", new DateOnly(2026, 1, 1), ["Journal Article"], ["Ada"], "PubMed", null, group.ToArray())).ToArray();
+        var studies = evidence.GroupBy(item => item.StudyId).Select(group => new SynthesisStudyContext(group.Key, "Study title", "12345678", null, "10.1000/example", "Journal", new DateOnly(2026, 1, 1), ["Journal Article"], ["Ada"], "PubMed", null, group.ToArray())).ToArray();
         var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
         return new SynthesisContext(runId, Guid.NewGuid(), "Does sleep improve recall?", null, statistics, coverage, studies, [], ["Abstract-level evidence only."]);
