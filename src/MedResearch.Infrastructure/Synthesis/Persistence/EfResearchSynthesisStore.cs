@@ -67,6 +67,12 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
         var discoveredStudies = await _dbContext.ResearchStudyDiscoveries
             .AsNoTracking()
             .Where(discovery => discovery.ResearchRunId == researchRunId)
+            .GroupBy(discovery => discovery.StudyId)
+            .Select(group => new
+            {
+                StudyId = group.Key,
+                DiscoveredAt = group.Min(discovery => discovery.DiscoveredAt)
+            })
             .Join(
                 _dbContext.Studies.AsNoTracking(),
                 discovery => discovery.StudyId,

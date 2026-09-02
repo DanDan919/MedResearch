@@ -122,6 +122,107 @@ public sealed class ScientificSearchResultStoreTests
             CancellationToken.None));
     }
 
+    [SkippableFact]
+    public async Task PersistSearchResultsAsync_SameStudyFromTwoSearchesInSameRunPreservesBothDiscoveryPaths()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var runId = await SeedResearchRunAsync("Does discovery provenance preserve repeated query paths?");
+        var firstSearchId = Guid.NewGuid();
+        var secondSearchId = Guid.NewGuid();
+        var candidate = CreateCandidate("91000004", "10.2000/example.4");
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfScientificSearchResultStore(context);
+            await store.PersistSearchResultsAsync(
+                CreateRequest(firstSearchId, runId, "query a", [candidate]),
+                CancellationToken.None);
+        }
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfScientificSearchResultStore(context);
+            var result = await store.PersistSearchResultsAsync(
+                CreateRequest(secondSearchId, runId, "query b", [candidate]),
+                CancellationToken.None);
+
+            Assert.Equal(0, result.PersistedCount);
+            Assert.Equal(1, result.DuplicateCount);
+        }
+
+        await using var verificationContext = _fixture.CreateDbContext();
+        var study = await verificationContext.Studies.SingleAsync(study => study.Pmid == "91000004", CancellationToken.None);
+        var searches = await verificationContext.LiteratureSearches
+            .Where(search => search.ResearchRunId == runId)
+            .OrderBy(search => search.Query)
+            .ToArrayAsync(CancellationToken.None);
+        var discoveries = await verificationContext.ResearchStudyDiscoveries
+            .Where(discovery => discovery.ResearchRunId == runId && discovery.StudyId == study.Id)
+            .OrderBy(discovery => discovery.LiteratureSearchId)
+            .ToArrayAsync(CancellationToken.None);
+
+        Assert.Equal(["query a", "query b"], searches.Select(search => search.Query).ToArray());
+        Assert.Equal(2, discoveries.Length);
+        Assert.Equal(new[] { firstSearchId, secondSearchId }.Order().ToArray(), discoveries.Select(discovery => discovery.LiteratureSearchId).Order().ToArray());
+    }
+
+    [SkippableFact]
+    public async Task PersistSearchResultsAsync_CandidatesWithoutStableIdentifiersRemainSeparateStudyRows()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var runId = await SeedResearchRunAsync("Do null identifiers avoid unsafe title-based merging?");
+        var searchExecutionId = Guid.NewGuid();
+
+        await using var context = _fixture.CreateDbContext();
+        var store = new EfScientificSearchResultStore(context);
+        var result = await store.PersistSearchResultsAsync(
+            CreateRequest(searchExecutionId, runId, "null identifiers", [CreateCandidate(null, null), CreateCandidate(null, null)]),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.PersistedCount);
+        Assert.Equal(0, result.DuplicateCount);
+        Assert.Equal(2, await context.ResearchStudyDiscoveries.CountAsync(discovery => discovery.ResearchRunId == runId, CancellationToken.None));
+        Assert.Equal(2, await context.Studies.CountAsync(study => study.Pmid == null && study.Doi == null, CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task PersistSearchResultsAsync_SamePmidWithConflictingDoiReusesExistingStudyWithoutOverwritingMetadata()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var firstRunId = await SeedResearchRunAsync("Does PMID remain authoritative first?");
+        var secondRunId = await SeedResearchRunAsync("Does conflicting DOI stay non-destructive?");
+        const string pmid = "91000005";
+        const string originalDoi = "10.2000/original";
+        const string conflictingDoi = "10.2000/conflict";
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfScientificSearchResultStore(context);
+            await store.PersistSearchResultsAsync(
+                CreateRequest(Guid.NewGuid(), firstRunId, "original", [CreateCandidate(pmid, originalDoi)]),
+                CancellationToken.None);
+        }
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfScientificSearchResultStore(context);
+            var result = await store.PersistSearchResultsAsync(
+                CreateRequest(Guid.NewGuid(), secondRunId, "conflict", [CreateCandidate(pmid, conflictingDoi)]),
+                CancellationToken.None);
+
+            Assert.Equal(0, result.PersistedCount);
+            Assert.Equal(1, result.DuplicateCount);
+        }
+
+        await using var verificationContext = _fixture.CreateDbContext();
+        var study = await verificationContext.Studies.SingleAsync(study => study.Pmid == pmid, CancellationToken.None);
+        Assert.Equal(originalDoi, study.Doi);
+        Assert.DoesNotContain(await verificationContext.Studies.ToArrayAsync(CancellationToken.None), study => study.Doi == conflictingDoi);
+    }
+
     private async Task<Guid> SeedResearchRunAsync(string questionText)
     {
         await using var context = _fixture.CreateDbContext();

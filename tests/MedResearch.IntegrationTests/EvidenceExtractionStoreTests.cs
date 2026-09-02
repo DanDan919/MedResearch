@@ -131,6 +131,32 @@ public sealed class EvidenceExtractionStoreTests
     }
 
     [SkippableFact]
+    public async Task FindStudiesForExtractionAsync_MultipleDiscoveryPathsYieldOneStudyWorkItem()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedDiscoveredStudyAsync("Does repeated discovery duplicate extraction work?", "Recall improved after sleep.");
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var secondSearch = new LiteratureSearch(Guid.NewGuid(), seed.RunId, "PubMed", "sleep memory", DateTimeOffset.UtcNow.AddSeconds(1), 1, 0, 1);
+            var secondDiscovery = new ResearchStudyDiscovery(Guid.NewGuid(), seed.RunId, secondSearch.Id, seed.StudyId, "PubMed", RandomPmid(), DateTimeOffset.UtcNow.AddSeconds(1));
+            context.LiteratureSearches.Add(secondSearch);
+            context.ResearchStudyDiscoveries.Add(secondDiscovery);
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfEvidenceExtractionStore(context);
+            var workItems = await store.FindStudiesForExtractionAsync(seed.RunId, EvidenceExtractionPrompt.Version, 10, CancellationToken.None);
+
+            Assert.Equal(1, workItems.TotalDiscoveredStudyCount);
+            var study = Assert.Single(workItems.Studies);
+            Assert.Equal(seed.StudyId, study.StudyId);
+        }
+    }
+
+    [SkippableFact]
     public async Task PersistExtractionResultAsync_PreservesNullableScientificFieldsAsNull()
     {
         SkipIfPostgreSqlUnavailable();

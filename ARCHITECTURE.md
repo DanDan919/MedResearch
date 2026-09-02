@@ -287,7 +287,7 @@ Missing values stay missing. The system does not infer missing DOI, PMID, author
 
 `LiteratureSearch` records which source was searched, which query was sent, when it ran, how many results were returned, how many studies were newly persisted, how many were duplicates, and the optional `ResearchPlanId` that produced the query.
 
-`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered during one research run. Evidence remains run-scoped even when Study identity is shared across runs; report citations point to Evidence and project authoritative Study metadata from persistence. The same-run citation invariant is enforced at the Application validation boundary and covered by tests rather than by a cross-table PostgreSQL constraint.
+`ResearchStudyDiscovery` links a `ResearchRun`, a `LiteratureSearch`, and a global `Study`. This preserves the distinction between a paper existing globally and a paper being discovered through a specific query during one research run. The same global Study can have multiple discovery paths in the same run when multiple searches return it; downstream extraction and synthesis deduplicate study work by StudyId while retaining LiteratureSearch provenance. Evidence remains run-scoped even when Study identity is shared across runs; report citations point to Evidence and project authoritative Study metadata from persistence. The same-run citation invariant is enforced at the Application validation boundary and covered by tests rather than by a cross-table PostgreSQL constraint.
 
 ## PostgreSQL Claiming Strategy
 
@@ -346,6 +346,7 @@ Migrations:
 - `20260831171340_AddStructuredEvidenceEvaluations`
 - `20260901021148_AddTraceableResearchReports`
 - `20260901063528_AddResearchRunProcessingLeases`
+- `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
 
 ## Database Schema
 
@@ -372,7 +373,8 @@ Indexes and constraints are intentionally limited to current lookup/query needs:
 - filtered unique `studies(pmid)` for PMID deduplication when PMID is present.
 - `literature_searches(research_run_id, searched_at)` for run provenance lookup.
 - `literature_searches(research_plan_id)` for plan provenance lookup.
-- unique `research_study_discoveries(research_run_id, study_id)` so one run does not link the same global study twice.
+- `research_study_discoveries(research_run_id, study_id)` for run/study provenance lookups when a Study has one or more discovery paths in a run.
+- unique `research_study_discoveries(literature_search_id, study_id)` so one search execution links the same global study only once.
 - unique `evidence_extractions(research_run_id, study_id, prompt_version)` for extraction idempotency.
 - `evidence_extractions(research_run_id, status)` for run extraction status queries.
 - `evidence(research_run_id)`, `evidence(study_id)`, and `evidence(evidence_extraction_id)` for later run and source traceability lookups.

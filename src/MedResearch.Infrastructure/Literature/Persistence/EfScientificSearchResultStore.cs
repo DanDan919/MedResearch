@@ -120,9 +120,9 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         CancellationToken cancellationToken)
     {
         var alreadyTracked = _dbContext.ResearchStudyDiscoveries.Local.Any(
-            discovery => discovery.ResearchRunId == researchRunId && discovery.StudyId == studyId);
+            discovery => discovery.ResearchRunId == researchRunId && discovery.LiteratureSearchId == searchExecutionId && discovery.StudyId == studyId);
         var alreadyPersisted = await _dbContext.ResearchStudyDiscoveries.AnyAsync(
-            discovery => discovery.ResearchRunId == researchRunId && discovery.StudyId == studyId,
+            discovery => discovery.ResearchRunId == researchRunId && discovery.LiteratureSearchId == searchExecutionId && discovery.StudyId == studyId,
             cancellationToken);
 
         if (alreadyTracked || alreadyPersisted)

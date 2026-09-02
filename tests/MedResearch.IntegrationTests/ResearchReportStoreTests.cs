@@ -126,6 +126,31 @@ public sealed class ResearchReportStoreTests
     }
 
     [SkippableFact]
+    public async Task LoadCorpusAsync_MultipleDiscoveryPathsPreserveSearchProvenanceButDeduplicateStudySnapshot()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var secondSearch = new LiteratureSearch(Guid.NewGuid(), seed.RunId, "PubMed", "sleep memory", DateTimeOffset.UtcNow.AddSeconds(1), 1, 0, 1);
+            var secondDiscovery = new ResearchStudyDiscovery(Guid.NewGuid(), seed.RunId, secondSearch.Id, seed.StudyId, "PubMed", seed.Pmid, DateTimeOffset.UtcNow.AddSeconds(1));
+            context.LiteratureSearches.Add(secondSearch);
+            context.ResearchStudyDiscoveries.Add(secondDiscovery);
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        var store = new EfResearchSynthesisStore(verification);
+        var corpus = await store.LoadCorpusAsync(seed.RunId, CancellationToken.None);
+
+        var study = Assert.Single(corpus.Studies);
+        Assert.Equal(seed.StudyId, study.StudyId);
+        Assert.Equal(2, corpus.Searches.Count);
+        Assert.Equal(seed.EvidenceIds[0], Assert.Single(corpus.Evidence).EvidenceId);
+    }
+
+    [SkippableFact]
     public async Task ReportCitationGraph_UsesRunScopedEvidenceAndAuthoritativeSharedStudyMetadata()
     {
         SkipIfPostgreSqlUnavailable();

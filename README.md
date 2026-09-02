@@ -142,7 +142,7 @@ The prompt version is `research-planner-v1`. The planner is allowed to produce q
 ResearchQuestion -> ResearchPlan -> SearchQueries -> ESearch PMIDs -> EFetch XML -> normalized Study candidates -> PostgreSQL
 ```
 
-Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
+Multiple planned queries are executed sequentially. Each query creates its own `LiteratureSearch` provenance row linked to the originating `ResearchPlan`. If more than one query discovers the same Study, MedResearch preserves multiple discovery paths while downstream extraction and synthesis process the Study once per ResearchRun. Zero PubMed results for a valid query are persisted as a zero-result search and are not treated as infrastructure failure.
 
 Stored study metadata is limited to values reported by PubMed: PMID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and source. Missing values stay null or empty; the system does not infer scientific facts.
 

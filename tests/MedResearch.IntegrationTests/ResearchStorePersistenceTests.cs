@@ -72,6 +72,34 @@ public sealed class ResearchStorePersistenceTests
     }
 
     [SkippableFact]
+    public async Task OneResearchQuestion_CanOwnMultipleIndependentRuns()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var now = DateTimeOffset.UtcNow;
+        var question = new ResearchQuestion("Does the same question support independent reruns?", now);
+        var firstRun = new ResearchRun(question.Id, now);
+        var secondRun = new ResearchRun(question.Id, now.AddMinutes(1));
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.ResearchQuestions.Add(question);
+            context.ResearchRuns.AddRange(firstRun, secondRun);
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using var verificationContext = _fixture.CreateDbContext();
+        var runs = await verificationContext.ResearchRuns
+            .AsNoTracking()
+            .Where(run => run.ResearchQuestionId == question.Id)
+            .OrderBy(run => run.CreatedAt)
+            .ToArrayAsync(CancellationToken.None);
+
+        Assert.Equal([firstRun.Id, secondRun.Id], runs.Select(run => run.Id).ToArray());
+        Assert.All(runs, run => Assert.Equal(ResearchRunStatus.Queued, run.Status));
+    }
+
+    [SkippableFact]
     public async Task PersistInitialResearchAsync_RollsBackQuestionWhenRunRelationshipIsInvalid()
     {
         SkipIfPostgreSqlUnavailable();

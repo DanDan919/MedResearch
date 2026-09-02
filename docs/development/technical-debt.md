@@ -15,7 +15,7 @@
 - PubMed retrieval has no bounded retry policy yet. Network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures currently move the run through the existing safe failure path.
 - PubMed request pacing is conservative but local to one process. There is no distributed rate limiter across multiple API instances.
 - `ResearchPlannerPrompt`, `EvidenceExtractorPrompt`, `EvidenceEvaluationPrompt`, and `ResearchSynthesisPrompt` are versioned but still embedded in code. Move prompts to a resource/template mechanism when prompt review, localization, or runtime prompt experiments become real needs.
-- Study identity normalization is intentionally conservative. PMID and DOI unique indexes deduplicate reported identifiers, but DOI casing/format variants and studies without PMID/DOI are not semantically merged yet.
+- Study identity normalization is intentionally conservative. PMID and normalized DOI unique indexes deduplicate reported identifiers, but DOI format variants beyond casing, conflicting PMID/DOI combinations, and studies without PMID/DOI are not semantically merged yet.
 - The report claim/evidence join table enforces citation existence with FKs, while the same-ResearchRun citation invariant is enforced by Application validation and integration tests. A pure PostgreSQL constraint would require redundant run ids, triggers, or a different citation table shape.
 
 ## Watch List

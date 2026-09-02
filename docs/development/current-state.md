@@ -102,6 +102,7 @@ Date: 2026-09-02
     - `20260831171340_AddStructuredEvidenceEvaluations`
     - `20260901021148_AddTraceableResearchReports`
     - `20260901063528_AddResearchRunProcessingLeases`
+    - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
@@ -146,7 +147,7 @@ Date: 2026-09-02
   - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, provider failure propagation, and source-level architecture boundaries for Domain/Application.
   - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior.
   - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
-  - PostgreSQL integration tests using Testcontainers for research persistence, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, extraction deduplication after repeated discovery, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
   - GitHub Actions CI requires Docker-backed Testcontainers tests with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` and fails on unexpected skipped tests in required-Docker mode.
 
 ## Environment Status

@@ -54,7 +54,13 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
             .Where(discovery => !_dbContext.EvidenceExtractions.Any(extraction =>
                 extraction.ResearchRunId == researchRunId
                 && extraction.StudyId == discovery.StudyId
-                && extraction.PromptVersion == promptVersion));
+                && extraction.PromptVersion == promptVersion))
+            .GroupBy(discovery => discovery.StudyId)
+            .Select(group => new
+            {
+                StudyId = group.Key,
+                DiscoveredAt = group.Min(discovery => discovery.DiscoveredAt)
+            });
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 

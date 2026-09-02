@@ -58,7 +58,10 @@ internal sealed class ResearchStudyDiscoveryConfiguration : IEntityTypeConfigura
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(discovery => new { discovery.ResearchRunId, discovery.StudyId })
-            .HasDatabaseName("ux_research_study_discoveries_research_run_id_study_id")
+            .HasDatabaseName("ix_research_study_discoveries_research_run_id_study_id");
+
+        builder.HasIndex(discovery => new { discovery.LiteratureSearchId, discovery.StudyId })
+            .HasDatabaseName("ux_research_study_discoveries_literature_search_id_study_id")
             .IsUnique();
 
         builder.HasIndex(discovery => discovery.LiteratureSearchId)

@@ -85,7 +85,7 @@ Problem: A green test command can hide lost PostgreSQL confidence if Docker-requ
 Observed behavior: GitHub Actions already ran the Testcontainers suite successfully, but the workflow only surfaced TRX counters as notices and did not independently fail on nonzero skipped tests.
 Root cause: The Testcontainers fixture correctly fails Docker unavailability when `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, but future accidental skips could still appear only as TRX metadata.
 Decision / fix: Tightened the CI TRX parsing step so any skipped tests fail the workflow when Docker-backed tests are required.
-Verification: Pending the next GitHub Actions run after this audit commit.
+Verification: GitHub Actions run `33583825095` completed successfully after the audit commit; the TRX guard reported 0 skipped Docker-required integration tests.
 Remaining concerns: If future CI intentionally skips non-Docker tests, split the guard by test category instead of allowing broad skips.
 
 Date: 2026-09-02
@@ -103,5 +103,13 @@ Problem: PostgreSQL FKs prove report citations reference existing Evidence rows,
 Observed behavior: Application synthesis validation enforces same-run EvidenceIds before persistence, and synthesis corpus loading scopes Evidence to the current run.
 Root cause: A cross-table same-run invariant would require redundant run ids, triggers, or a different join table shape beyond the current simple claim-to-evidence FK graph.
 Decision / fix: Added a PostgreSQL integration test reconstructing the report claim/evidence/study graph for a shared Study and documented that Application validation is the trust boundary for same-run citation scope.
-Verification: Pending local and CI test runs after this audit commit.
+Verification: `dotnet test E:\MedResearch\MedResearch.slnx --no-build` passed locally after this audit change, with Docker-backed PostgreSQL tests skipped because Docker Desktop is unavailable. GitHub Actions run `33583825095` also completed successfully for the original report graph audit coverage.
 Remaining concerns: Revisit database-level enforcement if unvalidated report persistence paths are introduced.
+Date: 2026-09-02
+Area: Search provenance modeling
+Problem: A Study discovered by two different searches in the same ResearchRun could not preserve both discovery paths.
+Observed behavior: `research_study_discoveries` had a unique `(research_run_id, study_id)` index, and `EfScientificSearchResultStore` skipped adding a second discovery row once a run/study pair existed.
+Root cause: The schema mixed two different invariants: Study work should be deduplicated per run, but provenance should remain per search execution.
+Decision / fix: Changed discovery uniqueness to `(literature_search_id, study_id)`, kept a non-unique `(research_run_id, study_id)` lookup index, and deduplicated extraction/synthesis study work by StudyId while preserving multiple LiteratureSearch/discovery rows.
+Verification: `dotnet restore E:\MedResearch\MedResearch.slnx`, `dotnet build E:\MedResearch\MedResearch.slnx --no-restore`, `dotnet test E:\MedResearch\MedResearch.slnx --no-build`, and `dotnet ef migrations has-pending-model-changes` passed locally after the forward migration. Docker-backed PostgreSQL execution is pending the next CI run because local Docker Desktop is unavailable.
+Remaining concerns: If future reports need to expose per-query discovery paths directly, add a read model for discovery provenance instead of overloading synthesis Study snapshots.
