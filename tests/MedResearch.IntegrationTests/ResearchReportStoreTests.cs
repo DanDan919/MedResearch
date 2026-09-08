@@ -259,6 +259,7 @@ public sealed class ResearchReportStoreTests
         context.LiteratureSearches.Add(search);
         context.Studies.Add(study);
         context.ResearchStudyDiscoveries.Add(discovery);
+        context.SourceMaterials.Add(sourceMaterial);
         context.EvidenceExtractions.Add(extraction);
 
         var evidenceIds = new List<Guid>();
