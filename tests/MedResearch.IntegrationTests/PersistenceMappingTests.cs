@@ -138,6 +138,7 @@ public sealed class PersistenceMappingTests
         context.ResearchQuestions.Add(question);
         context.ResearchRuns.Add(run);
         context.Studies.Add(study);
+        context.SourceMaterials.Add(sourceMaterial);
         context.EvidenceExtractions.Add(extraction);
         context.Evidence.Add(evidence);
         await context.SaveChangesAsync();

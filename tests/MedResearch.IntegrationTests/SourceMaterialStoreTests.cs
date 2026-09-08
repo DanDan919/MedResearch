@@ -56,7 +56,7 @@ public sealed class SourceMaterialStoreTests
         await using (var context = _fixture.CreateDbContext())
         {
             var secondSearch = new LiteratureSearch(Guid.NewGuid(), seed.RunId, "EuropePmc", "sleep recall", DateTimeOffset.UtcNow.AddSeconds(1), 1, 0, 1);
-            var secondDiscovery = new ResearchStudyDiscovery(Guid.NewGuid(), seed.RunId, secondSearch.Id, seed.StudyId, "EuropePmc", "PMC123456", DateTimeOffset.UtcNow.AddSeconds(1));
+            var secondDiscovery = new ResearchStudyDiscovery(Guid.NewGuid(), seed.RunId, secondSearch.Id, seed.StudyId, "EuropePmc", seed.Pmcid, DateTimeOffset.UtcNow.AddSeconds(1));
             context.LiteratureSearches.Add(secondSearch);
             context.ResearchStudyDiscoveries.Add(secondDiscovery);
             await context.SaveChangesAsync(CancellationToken.None);
@@ -70,7 +70,7 @@ public sealed class SourceMaterialStoreTests
             Assert.Equal(1, studies.TotalDiscoveredStudyCount);
             var study = Assert.Single(studies.Studies);
             Assert.Equal(seed.StudyId, study.StudyId);
-            Assert.Equal("PMC123456", study.Pmcid);
+            Assert.Equal(seed.Pmcid, study.Pmcid);
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class SourceMaterialStoreTests
             await sourceStore.PersistSourceMaterialAsync(seed.StudyId, new SourceMaterialCandidate(
                 SourceMaterialType.StructuredFullText,
                 "EuropePmc",
-                "PMC123456",
+                seed.Pmcid,
                 "EuropePmcFullTextXml",
                 "## Methods\nRandomized methods.\n\n## Results\nFull text says recall improved in 120 adults.",
                 DateTimeOffset.UtcNow,
@@ -141,7 +141,8 @@ public sealed class SourceMaterialStoreTests
         var run = new ResearchRun(question.Id, question.CreatedAt);
         var plan = new ResearchPlan(Guid.NewGuid(), run.Id, question.Id, question.Text, "adults", "sleep", null, ["recall"], ["controlled trial"], ["sleep recall"], [], "FakeLLM", "fake-model", "research-planner-v1", DateTimeOffset.UtcNow);
         var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 1, 0, plan.Id);
-        var study = new Study(Guid.NewGuid(), "Sleep and recall", abstractText, $"10.9090/{Guid.NewGuid():N}", RandomPmid(), "PMC123456", "Journal", new DateOnly(2026, 1, 1), 2026, 1, 1, ["Journal Article"], ["Ada Lovelace"], "PubMed");
+        var pmcid = $"PMC{RandomPmid()}";
+        var study = new Study(Guid.NewGuid(), "Sleep and recall", abstractText, $"10.9090/{Guid.NewGuid():N}", RandomPmid(), pmcid, "Journal", new DateOnly(2026, 1, 1), 2026, 1, 1, ["Journal Article"], ["Ada Lovelace"], "PubMed");
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, study.Id, "PubMed", study.Pmid, DateTimeOffset.UtcNow);
 
         context.ResearchQuestions.Add(question);
@@ -152,7 +153,7 @@ public sealed class SourceMaterialStoreTests
         context.ResearchStudyDiscoveries.Add(discovery);
         await context.SaveChangesAsync(CancellationToken.None);
 
-        return new SeededStudy(run.Id, study.Id);
+        return new SeededStudy(run.Id, study.Id, study.Pmcid!);
     }
 
     private static SourceMaterialCandidate Candidate(string content)
@@ -185,5 +186,5 @@ public sealed class SourceMaterialStoreTests
         }
     }
 
-    private sealed record SeededStudy(Guid RunId, Guid StudyId);
+    private sealed record SeededStudy(Guid RunId, Guid StudyId, string Pmcid);
 }

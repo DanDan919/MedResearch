@@ -128,7 +128,7 @@ public sealed class ResearchReportStoreTests
         Assert.Equal(trace.evidence.StudyId, trace.study.Id);
         Assert.Equal(SourceMaterial.ComputeContentHash("A trial reported improved recall in 120 adults."), trace.source.ContentHash);
         Assert.Equal(1, trace.source.ContentVersion);
-        Assert.Equal("12345678", trace.study.Pmid);
+        Assert.Equal(seed.Pmid, trace.study.Pmid);
     }
     public async Task PersistReportAsync_PreservesInsufficientEvidenceReportWithoutClaims()
     {
