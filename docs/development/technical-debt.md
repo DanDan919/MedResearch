@@ -30,3 +30,9 @@
 - Keep CI as the authoritative PostgreSQL/Testcontainers runtime check while local Docker Desktop remains unavailable.
 - Consider an explicit opt-in live OpenAI smoke test only if the development workflow needs it.
 - Review whether evidence evaluation and synthesis should persist provider-attempt diagnostics separately from terminal run failures before adding retries or batch reprocessing.
+
+- EvidenceCorpus is an application read model over persisted rows rather than a versioned database snapshot. Reproducibility depends on immutable SourceMaterial and extraction references; a future audit/export requirement may justify persisting a corpus manifest.
+- SourceMaterial current-version uniqueness is protected by application/advisory-lock behavior and PostgreSQL identity indexes, but the schema does not yet express a partial unique current-version index for every logical source key.
+- Europe PMC full-text availability/failure diagnostics are currently operational logs, not a first-class persisted acquisition-attempt table.
+- The current Evidence numeric fields can store one reported effect value and optional interval/p-value, but they do not encode variance/standard error or a compatible effect-measure taxonomy sufficient for meta-analysis.
+- No statistical meta-analysis or raw EffectValue averaging is implemented; future quantitative synthesis needs explicit eligibility, normalization, and model semantics.

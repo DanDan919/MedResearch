@@ -83,10 +83,26 @@ public sealed class PersistenceMappingTests
             "Journal of Neuroscience Examples",
             new DateOnly(2026, 1, 15),
             "PubMed");
+        var sourceMaterial = SourceMaterial.Create(
+            study.Id,
+            SourceMaterialType.Abstract,
+            "PubMed",
+            study.Pmid,
+            "SearchMetadataAbstract",
+            study.Abstract!,
+            1,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            SourceMaterialAccessStatus.Unknown,
+            false,
+            ["Abstract"]);
         var extraction = new EvidenceExtraction(
             Guid.NewGuid(),
             run.Id,
             study.Id,
+            sourceMaterial.Id,
             EvidenceExtractionStatus.Completed,
             null,
             EvidenceSourceScope.Abstract,

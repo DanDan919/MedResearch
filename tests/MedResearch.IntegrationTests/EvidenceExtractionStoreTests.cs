@@ -21,7 +21,7 @@ public sealed class EvidenceExtractionStoreTests
         SkipIfPostgreSqlUnavailable();
 
         var seed = await SeedDiscoveredStudyAsync("Does sleep improve recall?", "Recall improved after sleep in 120 adults.");
-        var result = CreateCompletedResult(seed.RunId, seed.StudyId, [CreateFinding("recall", "Recall improved after sleep in 120 adults.")]);
+        var result = CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [CreateFinding("recall", "Recall improved after sleep in 120 adults.")]);
 
         await using (var context = _fixture.CreateDbContext())
         {
@@ -51,7 +51,7 @@ public sealed class EvidenceExtractionStoreTests
         SkipIfPostgreSqlUnavailable();
 
         var seed = await SeedDiscoveredStudyAsync("Does sleep affect memory outcomes?", "Recall improved after sleep. Attention did not clearly change.");
-        var result = CreateCompletedResult(seed.RunId, seed.StudyId, [
+        var result = CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [
             CreateFinding("recall", "Recall improved after sleep."),
             CreateFinding("attention", "Attention did not clearly change.", EvidenceDirection.NoClearEffect)
         ]);
@@ -73,8 +73,8 @@ public sealed class EvidenceExtractionStoreTests
 
         await using var context = _fixture.CreateDbContext();
         var store = new EfEvidenceExtractionStore(context);
-        await store.PersistExtractionResultAsync(CreateCompletedResult(first.RunId, first.StudyId, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
-        await store.PersistExtractionResultAsync(CreateCompletedResult(secondRunId, first.StudyId, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
+        await store.PersistExtractionResultAsync(CreateCompletedResult(first.RunId, first.StudyId, first.SourceMaterialId!.Value, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
+        await store.PersistExtractionResultAsync(CreateCompletedResult(secondRunId, first.StudyId, first.SourceMaterialId!.Value, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
 
         Assert.Equal(2, await context.EvidenceExtractions.CountAsync(extraction => extraction.StudyId == first.StudyId));
         Assert.Equal(2, await context.Evidence.CountAsync(evidence => evidence.StudyId == first.StudyId));
@@ -86,7 +86,7 @@ public sealed class EvidenceExtractionStoreTests
         SkipIfPostgreSqlUnavailable();
 
         var seed = await SeedDiscoveredStudyAsync("Does sleep idempotency work?", "Recall improved after sleep.");
-        var result = CreateCompletedResult(seed.RunId, seed.StudyId, [CreateFinding("recall", "Recall improved after sleep.")]);
+        var result = CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [CreateFinding("recall", "Recall improved after sleep.")]);
 
         await using var context = _fixture.CreateDbContext();
         var store = new EfEvidenceExtractionStore(context);
@@ -111,6 +111,7 @@ public sealed class EvidenceExtractionStoreTests
             var study = Assert.Single(workItems.Studies);
             Assert.Equal(seed.RunId, study.ResearchRunId);
             Assert.Equal(seed.StudyId, study.StudyId);
+            Assert.Equal(seed.SourceMaterialId, study.SourceMaterialId);
             Assert.Equal("Does preserved context work?", study.ResearchQuestion);
             Assert.Equal("adults", study.Plan?.Population);
         }
@@ -118,7 +119,7 @@ public sealed class EvidenceExtractionStoreTests
         await using (var context = _fixture.CreateDbContext())
         {
             var store = new EfEvidenceExtractionStore(context);
-            await store.PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
+            await store.PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [CreateFinding("recall", "Recall improved after sleep.")]), CancellationToken.None);
         }
 
         await using (var context = _fixture.CreateDbContext())
@@ -153,6 +154,7 @@ public sealed class EvidenceExtractionStoreTests
             Assert.Equal(1, workItems.TotalDiscoveredStudyCount);
             var study = Assert.Single(workItems.Studies);
             Assert.Equal(seed.StudyId, study.StudyId);
+            Assert.Equal(seed.SourceMaterialId, study.SourceMaterialId);
         }
     }
 
@@ -180,7 +182,7 @@ public sealed class EvidenceExtractionStoreTests
 
         await using var context = _fixture.CreateDbContext();
         var store = new EfEvidenceExtractionStore(context);
-        await store.PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, [finding]), CancellationToken.None);
+        await store.PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [finding]), CancellationToken.None);
 
         var evidence = await context.Evidence.SingleAsync(evidence => evidence.ResearchRunId == seed.RunId);
         Assert.Null(evidence.SampleSize);
@@ -221,6 +223,21 @@ public sealed class EvidenceExtractionStoreTests
             new DateOnly(2026, 1, 1),
             "PubMed");
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, study.Id, "PubMed", study.Pmid, DateTimeOffset.UtcNow);
+        var sourceMaterial = abstractText is null ? null : SourceMaterial.Create(
+            study.Id,
+            SourceMaterialType.Abstract,
+            "PubMed",
+            study.Pmid,
+            "SearchMetadataAbstract",
+            abstractText,
+            1,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            SourceMaterialAccessStatus.Unknown,
+            false,
+            ["Abstract"]);
 
         context.ResearchQuestions.Add(question);
         context.ResearchRuns.Add(run);
@@ -228,9 +245,13 @@ public sealed class EvidenceExtractionStoreTests
         context.LiteratureSearches.Add(search);
         context.Studies.Add(study);
         context.ResearchStudyDiscoveries.Add(discovery);
+        if (sourceMaterial is not null)
+        {
+            context.SourceMaterials.Add(sourceMaterial);
+        }
         await context.SaveChangesAsync(CancellationToken.None);
 
-        return new SeededStudy(run.Id, study.Id);
+        return new SeededStudy(run.Id, study.Id, sourceMaterial?.Id);
     }
 
     private async Task<Guid> SeedRunDiscoveryForExistingStudyAsync(Guid studyId, string questionText)
@@ -253,11 +274,13 @@ public sealed class EvidenceExtractionStoreTests
     private static EvidenceExtractionResult CreateCompletedResult(
         Guid runId,
         Guid studyId,
+        Guid sourceMaterialId,
         IReadOnlyCollection<AcceptedEvidenceFinding> findings)
     {
         return new EvidenceExtractionResult(
             runId,
             studyId,
+            sourceMaterialId,
             EvidenceExtractionStatus.Completed,
             null,
             EvidenceSourceScope.Abstract,
@@ -304,5 +327,5 @@ public sealed class EvidenceExtractionStoreTests
         }
     }
 
-    private sealed record SeededStudy(Guid RunId, Guid StudyId);
+    private sealed record SeededStudy(Guid RunId, Guid StudyId, Guid? SourceMaterialId);
 }

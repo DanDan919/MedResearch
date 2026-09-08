@@ -41,6 +41,7 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         {
             var normalizedCandidate = NormalizeCandidate(candidate);
             var identityKeys = GetIdentityKeys(normalizedCandidate);
+            await AcquireIdentityLocksAsync(identityKeys, cancellationToken);
 
             var trackedMatches = identityKeys
                 .Where(studiesByIdentity.ContainsKey)
@@ -66,10 +67,9 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
                     normalizedCandidate,
                     discoveredAt,
                     cancellationToken);
+                await AddAbstractSourceMaterialIfPresentAsync(trackedMatches[0].Id, normalizedCandidate, discoveredAt, cancellationToken);
                 continue;
             }
-
-            await AcquireIdentityLocksAsync(identityKeys, cancellationToken);
 
             var resolution = await ResolveExistingStudyAsync(normalizedCandidate, cancellationToken);
             if (resolution.IsConflict)
@@ -104,6 +104,7 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
                 normalizedCandidate,
                 discoveredAt,
                 cancellationToken);
+            await AddAbstractSourceMaterialIfPresentAsync(study.Id, normalizedCandidate, discoveredAt, cancellationToken);
         }
 
         _dbContext.LiteratureSearches.Add(new LiteratureSearch(
@@ -210,6 +211,83 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             candidate.Source,
             candidate.ProviderRecordId ?? candidate.Pmid ?? candidate.Pmcid ?? candidate.Doi,
             discoveredAt));
+    }
+
+    private async Task AddAbstractSourceMaterialIfPresentAsync(
+        Guid studyId,
+        ScientificStudyCandidate candidate,
+        DateTimeOffset retrievedAt,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(candidate.Abstract))
+        {
+            return;
+        }
+
+        var content = SourceMaterial.NormalizeContent(candidate.Abstract);
+        if (content.Length == 0)
+        {
+            return;
+        }
+
+        var providerSourceId = candidate.ProviderRecordId ?? candidate.Pmid ?? candidate.Pmcid ?? candidate.Doi;
+        var contentHash = SourceMaterial.ComputeContentHash(content);
+
+        if (_dbContext.SourceMaterials.Local.Any(material =>
+            material.StudyId == studyId
+            && material.Type == SourceMaterialType.Abstract
+            && material.Provider == candidate.Source
+            && material.ProviderSourceId == providerSourceId
+            && material.ContentHash == contentHash))
+        {
+            return;
+        }
+
+        var existingSameVersion = await _dbContext.SourceMaterials
+            .SingleOrDefaultAsync(material =>
+                material.StudyId == studyId
+                && material.Type == SourceMaterialType.Abstract
+                && material.Provider == candidate.Source
+                && material.ProviderSourceId == providerSourceId
+                && material.ContentHash == contentHash,
+                cancellationToken);
+        if (existingSameVersion is not null)
+        {
+            return;
+        }
+
+        var currentVersions = await _dbContext.SourceMaterials
+            .Where(material =>
+                material.StudyId == studyId
+                && material.Type == SourceMaterialType.Abstract
+                && material.Provider == candidate.Source
+                && material.ProviderSourceId == providerSourceId
+                && material.IsCurrent)
+            .ToArrayAsync(cancellationToken);
+        var nextVersion = currentVersions.Length == 0
+            ? 1
+            : currentVersions.Max(material => material.ContentVersion) + 1;
+
+        foreach (var current in currentVersions)
+        {
+            current.MarkNotCurrent();
+        }
+
+        _dbContext.SourceMaterials.Add(SourceMaterial.Create(
+            studyId,
+            SourceMaterialType.Abstract,
+            candidate.Source,
+            providerSourceId,
+            "SearchMetadataAbstract",
+            content,
+            nextVersion,
+            retrievedAt,
+            null,
+            null,
+            null,
+            SourceMaterialAccessStatus.Unknown,
+            false,
+            ["Abstract"]));
     }
 
     private static Study CreateStudy(ScientificStudyCandidate candidate)

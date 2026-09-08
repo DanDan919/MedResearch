@@ -72,6 +72,20 @@ public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
             .Take(maxStudies)
             .ToArrayAsync(cancellationToken);
 
+        var sourceMaterialIds = extractionStudies
+            .Select(item => item.extraction.SourceMaterialId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+        var sourceMaterials = sourceMaterialIds.Length == 0
+            ? []
+            : await _dbContext.SourceMaterials
+                .AsNoTracking()
+                .Where(sourceMaterial => sourceMaterialIds.Contains(sourceMaterial.Id))
+                .ToArrayAsync(cancellationToken);
+        var sourceMaterialById = sourceMaterials.ToDictionary(sourceMaterial => sourceMaterial.Id);
+
         var studyIds = extractionStudies.Select(item => item.study.Id).ToArray();
         var evidenceRows = await _dbContext.Evidence
             .AsNoTracking()
@@ -98,12 +112,22 @@ public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
             evidenceByStudyId.TryGetValue(item.study.Id, out var studyEvidence);
             studyEvidence ??= [];
 
+            var sourceMaterial = item.extraction.SourceMaterialId.HasValue && sourceMaterialById.TryGetValue(item.extraction.SourceMaterialId.Value, out var matchedSourceMaterial)
+                ? matchedSourceMaterial
+                : null;
+
             return new EvaluationStudyContext(
                 researchRunId,
                 runAndQuestion.ResearchQuestionId,
                 runAndQuestion.ResearchQuestion,
                 planContext,
                 item.study.Id,
+                sourceMaterial?.Id,
+                sourceMaterial?.Provider,
+                sourceMaterial?.Content,
+                sourceMaterial?.ContentHash,
+                sourceMaterial?.WasTruncated ?? false,
+                sourceMaterial?.SectionNames ?? [],
                 item.study.Title,
                 item.study.Abstract,
                 item.study.Pmid,

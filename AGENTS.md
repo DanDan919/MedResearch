@@ -52,3 +52,9 @@ Before significant changes, read:
 Record notable bugs, architectural problems, surprising behavior, and failed approaches in `docs/development/problems.md`. Do not record every trivial typo.
 
 Use ADRs for significant architectural decisions. If a decision is replaced, mark the old ADR as superseded instead of rewriting history.
+
+34. SourceMaterial is an immutable scientific content snapshot for extraction; completed EvidenceExtraction must retain its exact SourceMaterialId.
+
+35. EvidenceCorpus is run-scoped and must reject cross-run Evidence or incoherent Evidence -> EvidenceExtraction -> SourceMaterial -> Study lineage before synthesis.
+
+36. Structured full text is a source-coverage scope, not a universal methodological quality score; do not average raw effect values across incompatible studies.

@@ -5,16 +5,17 @@ namespace MedResearch.Application.Research.Synthesis;
 
 public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
 {
-    private readonly ISynthesisCorpusStore _corpusStore;
+    private readonly IEvidenceCorpusBuilder _evidenceCorpusBuilder;
     private readonly SynthesisOptions _options;
     private readonly ILogger<SynthesisContextBuilder> _logger;
 
     public SynthesisContextBuilder(
         ISynthesisCorpusStore corpusStore,
         SynthesisOptions options,
-        ILogger<SynthesisContextBuilder> logger)
+        ILogger<SynthesisContextBuilder> logger,
+        IEvidenceCorpusBuilder? evidenceCorpusBuilder = null)
     {
-        _corpusStore = corpusStore;
+        _evidenceCorpusBuilder = evidenceCorpusBuilder ?? new EvidenceCorpusBuilder(corpusStore);
         _options = options;
         _logger = logger;
     }
@@ -27,8 +28,8 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = await _corpusStore.LoadCorpusAsync(researchRunId, cancellationToken);
-        ValidateSnapshot(researchRunId, snapshot);
+        var corpus = await _evidenceCorpusBuilder.BuildAsync(researchRunId, cancellationToken);
+        var snapshot = corpus.Snapshot;
 
         var validatedEvidence = snapshot.Evidence
             .Where(evidence => evidence.EvidenceId != Guid.Empty)
@@ -108,16 +109,35 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var usesAbstractOnly = selectedEvidence.Length == 0
             || sourceScopes.All(scope => scope == EvidenceSourceScope.Abstract);
 
+        var completedExtractions = snapshot.Extractions
+            .Where(extraction => extraction.Status == EvidenceExtractionStatus.Completed)
+            .ToArray();
+        var noSourceMaterialStudyCount = snapshot.Extractions
+            .Where(extraction => extraction.Status == EvidenceExtractionStatus.Skipped && extraction.SkipReason == EvidenceExtractionSkipReason.NoExtractableText)
+            .Select(extraction => extraction.StudyId)
+            .Distinct()
+            .Count();
         var statistics = new SynthesisCorpusStatistics(
             snapshot.Studies.Count,
-            snapshot.Extractions.Count(extraction => extraction.Status == EvidenceExtractionStatus.Completed),
+            completedExtractions.Length,
             snapshot.Evaluations.Count(evaluation => evaluation.Status == EvidenceEvaluationStatus.Completed),
             validatedEvidence.Length,
             studies.Length,
             selectedEvidence.Length,
             snapshot.Searches.Count,
-            snapshot.Extractions.Count(extraction => extraction.Status == EvidenceExtractionStatus.Skipped && extraction.SkipReason == EvidenceExtractionSkipReason.NoExtractableText),
-            snapshot.Evaluations.Count(evaluation => evaluation.InsufficientSourceDomainCount > 0 || evaluation.Status == EvidenceEvaluationStatus.Skipped));
+            noSourceMaterialStudyCount,
+            snapshot.Evaluations.Count(evaluation => evaluation.InsufficientSourceDomainCount > 0 || evaluation.Status == EvidenceEvaluationStatus.Skipped),
+            completedExtractions
+                .Where(extraction => extraction.SourceScope is EvidenceSourceScope.FullText or EvidenceSourceScope.StructuredFullText)
+                .Select(extraction => extraction.StudyId)
+                .Distinct()
+                .Count(),
+            completedExtractions
+                .Where(extraction => extraction.SourceScope == EvidenceSourceScope.Abstract)
+                .Select(extraction => extraction.StudyId)
+                .Distinct()
+                .Count(),
+            noSourceMaterialStudyCount);
         var potentialConflictDetected = outcomeSummaries.Any(summary => summary.ConflictStatus == SynthesisConflictStatus.Present);
         var coverage = new SynthesisSourceCoverage(
             searchedSources,
@@ -149,75 +169,6 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             context.SourceCoverage.EvidenceTruncated);
 
         return context;
-    }
-
-    private static void ValidateSnapshot(Guid expectedResearchRunId, SynthesisCorpusSnapshot snapshot)
-    {
-        if (snapshot.ResearchRunId != expectedResearchRunId)
-        {
-            throw new ResearchSynthesisValidationException("Synthesis corpus did not preserve authoritative research run id.");
-        }
-
-        if (snapshot.ResearchQuestionId == Guid.Empty || string.IsNullOrWhiteSpace(snapshot.ResearchQuestion))
-        {
-            throw new ResearchSynthesisValidationException("Synthesis corpus requires a research question.");
-        }
-
-        var studyIds = snapshot.Studies.Select(study => study.StudyId).ToHashSet();
-        if (studyIds.Count != snapshot.Studies.Count || studyIds.Contains(Guid.Empty))
-        {
-            throw new ResearchSynthesisValidationException("Synthesis corpus contains invalid or duplicate studies.");
-        }
-
-        foreach (var evidence in snapshot.Evidence)
-        {
-            if (evidence.ResearchRunId != expectedResearchRunId)
-            {
-                throw new ResearchSynthesisValidationException("Evidence in synthesis corpus must belong to the current research run.");
-            }
-
-            if (!studyIds.Contains(evidence.StudyId))
-            {
-                throw new ResearchSynthesisValidationException("Evidence in synthesis corpus must belong to a discovered study in the same run.");
-            }
-        }
-
-        var evidenceIds = snapshot.Evidence.Select(evidence => evidence.EvidenceId).ToHashSet();
-        foreach (var evaluation in snapshot.Evaluations)
-        {
-            if (evaluation.ResearchRunId != expectedResearchRunId)
-            {
-                throw new ResearchSynthesisValidationException("Evidence evaluation in synthesis corpus must belong to the current research run.");
-            }
-
-            if (!studyIds.Contains(evaluation.StudyId))
-            {
-                throw new ResearchSynthesisValidationException("Evidence evaluation in synthesis corpus must belong to a discovered study in the same run.");
-            }
-
-            if (evaluation.EvidenceIds.Any(evidenceId => !evidenceIds.Contains(evidenceId)))
-            {
-                throw new ResearchSynthesisValidationException("Evidence evaluation references evidence outside the synthesis corpus.");
-            }
-        }
-
-        foreach (var extraction in snapshot.Extractions)
-        {
-            if (extraction.ResearchRunId != expectedResearchRunId)
-            {
-                throw new ResearchSynthesisValidationException("Evidence extraction in synthesis corpus must belong to the current research run.");
-            }
-
-            if (!studyIds.Contains(extraction.StudyId))
-            {
-                throw new ResearchSynthesisValidationException("Evidence extraction in synthesis corpus must belong to a discovered study in the same run.");
-            }
-        }
-
-        if (snapshot.Searches.Any(search => search.ResearchRunId != expectedResearchRunId))
-        {
-            throw new ResearchSynthesisValidationException("Literature search provenance in synthesis corpus must belong to the current research run.");
-        }
     }
 
     private static IReadOnlyCollection<SynthesisOutcomeDirectionSummary> BuildOutcomeSummaries(IReadOnlyCollection<SynthesisEvidenceContext> evidence)
@@ -267,6 +218,11 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         if (coverage.UsesAbstractLevelEvidenceOnly)
         {
             limitations.Add("Current evidence is abstract-level; full-text review and formal risk-of-bias assessment were not performed.");
+        }
+
+        if (statistics.StructuredFullTextStudyCount > 0 && statistics.AbstractOnlyStudyCount > 0)
+        {
+            limitations.Add("Some included publications were processed from abstract-only source material.");
         }
 
         if (evidenceTruncated)

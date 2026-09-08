@@ -149,7 +149,31 @@ public sealed class SynthesisContextBuilderTests
             ["Abstract-level source scope."],
             2,
             3)).ToArray();
-        var extractions = studies.Select(study => new SynthesisExtractionSnapshot(Guid.NewGuid(), runId, study.StudyId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, evidence.Count(item => item.StudyId == study.StudyId), true)).ToArray();
+        var extractionIds = studies.ToDictionary(study => study.StudyId, _ => Guid.NewGuid());
+        var sourceMaterialIds = studies.ToDictionary(study => study.StudyId, _ => Guid.NewGuid());
+        var evidenceWithLineage = evidence
+            .Select(item => item with { EvidenceExtractionId = extractionIds[item.StudyId] })
+            .ToArray();
+        var extractions = studies.Select(study => new SynthesisExtractionSnapshot(
+            extractionIds[study.StudyId],
+            runId,
+            study.StudyId,
+            EvidenceExtractionStatus.Completed,
+            null,
+            EvidenceSourceScope.Abstract,
+            sourceMaterialIds[study.StudyId],
+            evidenceWithLineage.Count(item => item.StudyId == study.StudyId),
+            true)).ToArray();
+        var sourceMaterials = studies.Select(study => new SynthesisSourceMaterialSnapshot(
+            sourceMaterialIds[study.StudyId],
+            study.StudyId,
+            SourceMaterialType.Abstract,
+            study.Source,
+            study.Pmid,
+            SourceMaterial.ComputeContentHash("reported result"),
+            1,
+            false,
+            true)).ToArray();
 
         return new SynthesisCorpusSnapshot(
             runId,
@@ -157,15 +181,16 @@ public sealed class SynthesisContextBuilderTests
             "Does sleep improve recall?",
             new SynthesisPlanContext(Guid.NewGuid(), "adults", "sleep", "wakefulness", ["recall"], ["controlled trial"], ["sleep recall"], []),
             studies,
-            evidence,
+            evidenceWithLineage,
             evaluations,
             [new SynthesisSearchSnapshot(Guid.NewGuid(), runId, "PubMed", "sleep recall", DateTimeOffset.UtcNow, studies.Length, studies.Length, 0)],
-            extractions);
+            extractions,
+            sourceMaterials);
     }
 
     private static SynthesisEvidenceContext CreateEvidence(Guid runId, Guid studyId, Guid evidenceId, EvidenceDirection direction, string outcome = "recall")
     {
-        return new SynthesisEvidenceContext(evidenceId, runId, studyId, outcome, "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
+        return new SynthesisEvidenceContext(evidenceId, runId, studyId, Guid.NewGuid(), outcome, "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
     }
 
     private sealed class StaticSynthesisCorpusStore : ISynthesisCorpusStore
@@ -341,14 +366,14 @@ public sealed class ResearchSynthesizerTests
     {
         var runId = evidence.FirstOrDefault()?.ResearchRunId ?? Guid.NewGuid();
         var studies = evidence.GroupBy(item => item.StudyId).Select(group => new SynthesisStudyContext(group.Key, "Study title", "12345678", null, "10.1000/example", "Journal", new DateOnly(2026, 1, 1), ["Journal Article"], ["Ada"], "PubMed", null, group.ToArray())).ToArray();
-        var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0);
+        var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0, 0, studies.Length, 0);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
         return new SynthesisContext(runId, Guid.NewGuid(), "Does sleep improve recall?", null, statistics, coverage, studies, [], ["Abstract-level evidence only."]);
     }
 
     private static SynthesisEvidenceContext CreateEvidence(Guid runId, Guid studyId, Guid evidenceId, EvidenceDirection direction)
     {
-        return new SynthesisEvidenceContext(evidenceId, runId, studyId, "recall", "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
+        return new SynthesisEvidenceContext(evidenceId, runId, studyId, Guid.NewGuid(), "recall", "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
     }
 
     private static ResearchReportDraft CreateValidDraft(Guid evidenceId)

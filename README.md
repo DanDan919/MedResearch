@@ -8,7 +8,7 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities and Europe PMC REST search, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
-A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one study title/abstract/metadata item to the configured OpenAI provider, validates strict structured output, and persists source-grounded abstract-level evidence. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
+A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one selected SourceMaterial snapshot and study metadata to the configured OpenAI provider, validates strict structured output, and persists source-grounded evidence with explicit source scope. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, meta-analysis, formal GRADE, or formal risk-of-bias frameworks.
 
 ## Stack Direction
 
@@ -170,20 +170,21 @@ Study identity is deterministic over normalized PMID, PMCID, and DOI. Missing me
 Both adapters use HttpClientFactory, bounded timeouts, cancellation tokens, local rate limiting, and bounded retries for transient provider failures. Zero-result searches are successful scientific searches and are persisted as zero-result `LiteratureSearch` rows; provider failures, malformed successful payloads, cancellation, and local configuration errors remain distinct operational outcomes.
 
 ## Evidence Extraction
-`Extracting` currently works at abstract level only. A study with no usable PubMed abstract is recorded as a skipped extraction with `NoExtractableText`; it is not sent to the LLM provider and does not fail the run.
 
-Extracted `Evidence` rows are tied to both the global `Study` and the specific `ResearchRun`. Each completed attempt also creates an `EvidenceExtraction` provenance row with provider, model, prompt version, source scope, extraction timestamp, evidence count, and grounding validation status.
+Extracting first materializes bounded SourceMaterial snapshots for each distinct discovered Study. Search metadata abstracts are retained with provider provenance, and eligible Europe PMC records may add structured JATS full text through the official fullTextXML endpoint. No HTML scraping, arbitrary PDF download, paywall bypass, or publisher crawling is used.
 
-The prompt version is `evidence-extractor-v1`. Supporting excerpts must be present in the supplied abstract after deterministic normalization. Numeric fields are persisted only when the value appears in the supplied source text; otherwise they remain null.
+Source selection is deterministic: a current usable non-truncated StructuredFullText snapshot is preferred, then a current Abstract snapshot, otherwise the study receives a persisted NoExtractableText skip and no LLM call. Each completed EvidenceExtraction references the exact SourceMaterial snapshot used. Source content is hashed with SHA-256, historical versions remain available, and changed content creates a new version instead of mutating the source used by older evidence.
+
+The prompt version is evidence-extractor-v1. Supporting excerpts are validated against the selected source snapshot after deterministic normalization. Numeric fields are persisted only when the value appears in that source text; otherwise they remain null. Source scope is preserved as Abstract or StructuredFullText, including truncation metadata.
 
 ## Evidence Evaluation
 
-`Evaluating` creates one study-level `EvidenceEvaluation` per research run, study, and evaluator prompt version. It stores the grounded `EvidenceIds` considered, structured methodological domains, deterministic signal booleans, source-scope limitations, provenance, and a bounded overall methodological confidence category.
+Evaluating uses the exact source scope and grounded Evidence from the current run. Structured full text provides more available methodological information but is not treated as a study-quality score or certainty guarantee. Missing source detail remains Unknown or InsufficientSource, not a negative quality judgment.
+## Evidence Corpus and Synthesis
 
-Evaluation uses categorical states rather than arbitrary numeric quality scores. `Unknown` means MedResearch cannot determine a value from available validated information. `InsufficientSource` means the current source scope is not adequate for the judgment. `NotApplicable` means the domain does not conceptually apply. Source absence must not become a negative quality judgment.
+Before Synthesizing, EvidenceCorpusBuilder creates an explicit deterministic application read model over the persisted run-scoped graph. It validates Evidence, EvidenceExtraction, EvidenceEvaluation, and search provenance for the current ResearchRun, verifies Evidence -> EvidenceExtraction -> SourceMaterial -> Study lineage, deduplicates Studies, preserves conflict structure, and calculates descriptive source-coverage metrics. The corpus is then bounded by the Synthesis limits before any LLM call.
 
-The prompt version is `evidence-evaluator-v1`. The evaluator reuses `IStructuredLlmClient`; OpenAI remains an Infrastructure adapter. Normal tests use fake LLM providers. This is not GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
-
+Synthesis remains narrative evidence synthesis. Persisted claims may cite only Evidence accepted into the current corpus, and citation metadata is reconstructed from persistence. The system does not average raw EffectValue values or call the result statistical meta-analysis; compatible effect measures, variance, sample size, and a defined model are prerequisites for a future quantitative layer.
 ## Evidence Synthesis
 
 `Synthesizing` creates a persisted `ResearchReport` for the current research run. It uses only validated current-run Evidence, current-run Study metadata, search provenance, extraction provenance, and study-level EvidenceEvaluation records.
@@ -250,3 +251,9 @@ dotnet test tests/MedResearch.LiveEuropePmcSmokeTests/MedResearch.LiveEuropePmcS
 ```
 
 The live smoke test requests one result through the Europe PMC REST search endpoint and is not a load test.
+
+### Source-material development configuration
+
+SourceAcquisition:MaxStudiesPerRun, SourceAcquisition:MaxContentCharacters, and SourceAcquisition:PreferStructuredFullText bound acquisition. EuropePmcFullText controls the opt-in structured full-text adapter, including timeout, retry, and character limits. A full-text provider failure is logged as operational acquisition failure; unavailable full text falls back to an abstract when one exists and does not fail the research run.
+
+The normal solution tests are deterministic and do not call OpenAI, PubMed, Europe PMC, or live full-text endpoints. Optional live smoke projects are outside MedResearch.slnx and require explicit environment variables.

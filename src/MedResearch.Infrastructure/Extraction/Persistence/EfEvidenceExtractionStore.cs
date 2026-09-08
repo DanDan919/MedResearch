@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,17 @@ namespace MedResearch.Infrastructure.Extraction.Persistence;
 public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
 {
     private readonly MedResearchDbContext _dbContext;
+    private readonly SourceAcquisitionOptions _sourceOptions;
 
     public EfEvidenceExtractionStore(MedResearchDbContext dbContext)
+        : this(dbContext, new SourceAcquisitionOptions())
+    {
+    }
+
+    public EfEvidenceExtractionStore(MedResearchDbContext dbContext, SourceAcquisitionOptions sourceOptions)
     {
         _dbContext = dbContext;
+        _sourceOptions = sourceOptions;
     }
 
     public async Task<EvidenceExtractionWorkItemSet> FindStudiesForExtractionAsync(
@@ -48,23 +56,15 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
                 })
             .SingleAsync(item => item.ResearchRunId == researchRunId, cancellationToken);
 
-        var baseQuery = _dbContext.ResearchStudyDiscoveries
+        var discovered = await _dbContext.ResearchStudyDiscoveries
             .AsNoTracking()
             .Where(discovery => discovery.ResearchRunId == researchRunId)
-            .Where(discovery => !_dbContext.EvidenceExtractions.Any(extraction =>
-                extraction.ResearchRunId == researchRunId
-                && extraction.StudyId == discovery.StudyId
-                && extraction.PromptVersion == promptVersion))
             .GroupBy(discovery => discovery.StudyId)
             .Select(group => new
             {
                 StudyId = group.Key,
                 DiscoveredAt = group.Min(discovery => discovery.DiscoveredAt)
-            });
-
-        var totalCount = await baseQuery.CountAsync(cancellationToken);
-
-        var discoveredStudies = await baseQuery
+            })
             .Join(
                 _dbContext.Studies.AsNoTracking(),
                 discovery => discovery.StudyId,
@@ -75,7 +75,20 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
             .ThenBy(item => item.study.Pmcid)
             .ThenBy(item => item.study.Doi)
             .ThenBy(item => item.study.Id)
-            .Take(maxStudies)
+            .ToArrayAsync(cancellationToken);
+
+        var totalCount = discovered.Length;
+        var studyIds = discovered.Select(item => item.study.Id).ToArray();
+        var sourceMaterials = await _dbContext.SourceMaterials
+            .AsNoTracking()
+            .Where(material => studyIds.Contains(material.StudyId) && material.IsCurrent)
+            .ToArrayAsync(cancellationToken);
+        var sourceMaterialsByStudy = sourceMaterials
+            .GroupBy(material => material.StudyId)
+            .ToDictionary(group => group.Key, group => group.ToArray());
+        var existingExtractions = await _dbContext.EvidenceExtractions
+            .AsNoTracking()
+            .Where(extraction => extraction.ResearchRunId == researchRunId && extraction.PromptVersion == promptVersion)
             .ToArrayAsync(cancellationToken);
 
         var planContext = plan == null
@@ -88,13 +101,34 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
                 plan.PreferredStudyTypes,
                 plan.ExclusionHints);
 
-        var studies = discoveredStudies
-            .Select(item => new EvidenceExtractionStudyContext(
+        var studies = new List<EvidenceExtractionStudyContext>();
+        foreach (var item in discovered)
+        {
+            var selectedSource = sourceMaterialsByStudy.TryGetValue(item.study.Id, out var materials)
+                ? SelectBestSourceMaterial(materials)
+                : null;
+
+            var alreadyExtracted = existingExtractions.Any(extraction =>
+                extraction.StudyId == item.study.Id
+                && extraction.SourceMaterialId == selectedSource?.Id);
+            if (alreadyExtracted)
+            {
+                continue;
+            }
+
+            studies.Add(new EvidenceExtractionStudyContext(
                 researchRunId,
                 runAndQuestion.ResearchQuestionId,
                 runAndQuestion.ResearchQuestion,
                 planContext,
                 item.study.Id,
+                selectedSource?.Id,
+                selectedSource is null ? EvidenceSourceScope.Abstract : ToEvidenceSourceScope(selectedSource.Type),
+                selectedSource?.Provider,
+                selectedSource?.Content,
+                selectedSource?.ContentHash,
+                selectedSource?.WasTruncated ?? false,
+                selectedSource?.SectionNames ?? [],
                 item.study.Title,
                 item.study.Abstract,
                 item.study.Pmid,
@@ -104,8 +138,13 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
                 item.study.PublicationDate,
                 item.study.PublicationTypes,
                 item.study.Authors,
-                item.study.Source))
-            .ToArray();
+                item.study.Source));
+
+            if (studies.Count >= maxStudies)
+            {
+                break;
+            }
+        }
 
         return new EvidenceExtractionWorkItemSet(totalCount, studies);
     }
@@ -116,10 +155,24 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
+        if (result.SourceMaterialId.HasValue)
+        {
+            var sourceMaterialStudyId = await _dbContext.SourceMaterials
+                .AsNoTracking()
+                .Where(material => material.Id == result.SourceMaterialId.Value)
+                .Select(material => material.StudyId)
+                .SingleAsync(cancellationToken);
+            if (sourceMaterialStudyId != result.StudyId)
+            {
+                throw new InvalidOperationException("Evidence extraction source material must belong to the extraction study.");
+            }
+        }
+
         var existingExtraction = await _dbContext.EvidenceExtractions
             .SingleOrDefaultAsync(extraction =>
                 extraction.ResearchRunId == result.ResearchRunId
                 && extraction.StudyId == result.StudyId
+                && extraction.SourceMaterialId == result.SourceMaterialId
                 && extraction.PromptVersion == result.PromptVersion,
                 cancellationToken);
 
@@ -133,6 +186,7 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
             Guid.NewGuid(),
             result.ResearchRunId,
             result.StudyId,
+            result.SourceMaterialId,
             result.Status,
             result.SkipReason,
             result.SourceScope,
@@ -173,5 +227,24 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private SourceMaterial? SelectBestSourceMaterial(IReadOnlyCollection<SourceMaterial> sourceMaterials)
+    {
+        return sourceMaterials
+            .Where(material => !string.IsNullOrWhiteSpace(material.Content))
+            .OrderBy(material => _sourceOptions.PreferStructuredFullText && material.Type == SourceMaterialType.StructuredFullText ? 0 : 1)
+            .ThenBy(material => material.WasTruncated)
+            .ThenByDescending(material => material.ContentVersion)
+            .ThenBy(material => material.Provider)
+            .ThenBy(material => material.Id)
+            .FirstOrDefault();
+    }
+
+    private static EvidenceSourceScope ToEvidenceSourceScope(SourceMaterialType type)
+    {
+        return type == SourceMaterialType.StructuredFullText
+            ? EvidenceSourceScope.StructuredFullText
+            : EvidenceSourceScope.Abstract;
     }
 }

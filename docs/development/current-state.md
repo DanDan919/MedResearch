@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-09-02
+Date: 2026-09-08
 
 ## Exists Now
 
@@ -31,7 +31,7 @@ Date: 2026-09-02
   - `ResearchRunProcessor` advances claimed runs through Planning, Searching, Extracting, Evaluating, Synthesizing, and Completed while renewing processing leases.
   - `Planning` calls the structured Research Planner and persists a validated `ResearchPlan`.
   - `Searching` consumes persisted `ResearchPlan.SearchQueries` and performs real PubMed plus Europe PMC retrieval through provider-neutral Application contracts and a multi-source coordinator.
-  - `Extracting` performs source-grounded abstract-level evidence extraction for discovered studies.
+  - `Extracting` acquires bounded SourceMaterial and performs source-grounded evidence extraction with explicit abstract/full-text scope for discovered studies.
   - `Evaluating` performs structured source-aware methodological evidence evaluation from study metadata, extraction provenance, and grounded evidence.
   - `Synthesizing` builds bounded current-run synthesis context and persists a traceable `ResearchReport` with claims linked to Evidence.
   - Runs move to Completed only after report persistence succeeds or an explicit insufficient-evidence report is created.
@@ -114,6 +114,7 @@ Date: 2026-09-02
     - `20260901063528_AddResearchRunProcessingLeases`
     - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
     - `20260902150845_AddStudyPmcidIdentity`
+    - 20260908074149_AddSourceMaterials
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker
@@ -196,3 +197,15 @@ Keep hardening trust boundaries, retry behavior, provider diagnostics, and ident
 - `Study` now includes nullable normalized `Pmcid` with a filtered unique PostgreSQL index.
 - `ScientificLiteratureSearchCoordinator` is the single Application orchestration boundary for enabled sources. It records each source/query execution independently and only fails a query when every enabled source fails.
 - Normal CI and normal local tests remain deterministic and make no live PubMed or Europe PMC requests.
+
+## Source Material and Evidence Corpus
+
+The source-material layer is now persisted and used as the authoritative extraction input:
+
+- SourceMaterial stores exact abstract or bounded Europe PMC structured full-text snapshots with provider/retrieval provenance, SHA-256 content hash, version, current flag, access status, section names, and truncation metadata.
+- Same-content ingestion reuses a snapshot; changed content creates a new version and never mutates historical content referenced by an extraction.
+- EvidenceExtraction.SourceMaterialId is required for completed extraction and is included in extraction idempotency.
+- EvidenceCorpusBuilder validates a run-scoped EvidenceCorpus before synthesis. It rejects cross-run Evidence, mismatched Study/source lineage, ungrounded completed extractions, duplicate Study snapshots, and evaluation references outside the corpus.
+- The corpus computes descriptive source-coverage metrics and conservative normalized outcome conflicts. These metrics are not quality weights and are not statistical synthesis.
+- Europe PMC full text uses the official fullTextXML endpoint only. Unavailable full text falls back to an abstract; provider failure is logged distinctly; neither condition invents Evidence or automatically fails a run.
+- Normal CI remains external-service independent. Live Europe PMC full-text and live provider smoke tests remain explicit opt-in projects outside the solution.

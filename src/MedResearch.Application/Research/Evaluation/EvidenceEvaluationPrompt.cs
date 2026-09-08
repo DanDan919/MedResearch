@@ -63,7 +63,7 @@ public static class EvidenceEvaluationPrompt
             """
             You are a structured methodological evidence evaluation component for MedResearch.
             Use only the supplied MedResearch context. Do not use external knowledge about the paper.
-            Distinguish source absence from methodological weakness. Not reported in the abstract means Unknown or InsufficientSource, not Poor.
+            Distinguish source absence from methodological weakness. Not reported in the supplied source material means Unknown or InsufficientSource, not Poor.
             Do not invent randomization, blinding, allocation concealment, dropout rates, statistical power, confounding, single-center status, or author limitations.
             Do not assign numeric quality scores. Do not claim formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa, or any validated framework result.
             Statistical significance is not study quality. p < 0.05 is not high quality; p > 0.05 is not no effect.
@@ -75,6 +75,11 @@ public static class EvidenceEvaluationPrompt
             researchRunId: {context.ResearchRunId}
             studyId: {context.StudyId}
             sourceScope: {context.SourceScope}
+            sourceMaterialId: {context.SourceMaterialId?.ToString() ?? "null"}
+            sourceProvider: {context.SourceProvider ?? "null"}
+            sourceContentHash: {context.SourceContentHash ?? "null"}
+            sourceWasTruncated: {context.SourceWasTruncated}
+            sourceSections: {Join(context.SourceSectionNames)}
 
             Research question:
             {context.ResearchQuestion}

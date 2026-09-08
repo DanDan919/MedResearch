@@ -4,6 +4,7 @@ using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.Synthesis;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -104,6 +105,7 @@ public sealed class ScientificResearchStageExecutorTests
         var extractor = new RecordingEvidenceExtractor(new EvidenceExtractionResult(
             study.ResearchRunId,
             study.StudyId,
+            study.SourceMaterialId,
             EvidenceExtractionStatus.Completed,
             null,
             EvidenceSourceScope.Abstract,
@@ -137,6 +139,7 @@ public sealed class ScientificResearchStageExecutorTests
         var extractor = new RecordingEvidenceExtractor(new EvidenceExtractionResult(
             study.ResearchRunId,
             study.StudyId,
+            study.SourceMaterialId,
             EvidenceExtractionStatus.Skipped,
             EvidenceExtractionSkipReason.NoExtractableText,
             EvidenceSourceScope.Abstract,
@@ -280,6 +283,7 @@ public sealed class ScientificResearchStageExecutorTests
             planner,
             planStore,
             new ScientificLiteratureSearchCoordinator([source], store, NullLogger<ScientificLiteratureSearchCoordinator>.Instance),
+            new RecordingSourceMaterialAcquirer(),
             evidenceExtractor ?? new RecordingEvidenceExtractor(null),
             evidenceExtractionStore ?? new RecordingEvidenceExtractionStore([], 0),
             new EvidenceExtractionOptions(),
@@ -333,12 +337,20 @@ public sealed class ScientificResearchStageExecutorTests
 
     private static EvidenceExtractionStudyContext CreateExtractionStudy(string? abstractText)
     {
+        var sourceMaterialId = string.IsNullOrWhiteSpace(abstractText) ? (Guid?)null : Guid.NewGuid();
         return new EvidenceExtractionStudyContext(
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Does sleep improve recall?",
             null,
             Guid.NewGuid(),
+            sourceMaterialId,
+            EvidenceSourceScope.Abstract,
+            "PubMed",
+            abstractText,
+            abstractText is null ? null : SourceMaterial.ComputeContentHash(abstractText),
+            false,
+            ["Abstract"],
             "Sleep and recall",
             abstractText,
             "12345678",
@@ -360,6 +372,12 @@ public sealed class ScientificResearchStageExecutorTests
             "Does sleep improve recall?",
             new EvaluationPlanContext("adults", "sleep", "wakefulness", ["recall"], ["controlled trial"], []),
             Guid.NewGuid(),
+            Guid.NewGuid(),
+            "PubMed",
+            "A randomized trial reported improved recall in 120 adults.",
+            SourceMaterial.ComputeContentHash("A randomized trial reported improved recall in 120 adults."),
+            false,
+            ["Abstract"],
             "Sleep and recall",
             "A randomized trial reported improved recall in 120 adults.",
             "12345678",
@@ -483,7 +501,7 @@ public sealed class ScientificResearchStageExecutorTests
                 null,
                 group.ToArray()))
             .ToArray();
-        var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0);
+        var statistics = new SynthesisCorpusStatistics(studies.Length, studies.Length, 0, evidence.Count, studies.Length, evidence.Count, 1, 0, 0, 0, studies.Length, 0);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
 
         return new SynthesisContext(
@@ -504,6 +522,7 @@ public sealed class ScientificResearchStageExecutorTests
             evidenceId,
             runId,
             studyId,
+            Guid.NewGuid(),
             "recall",
             "Recall improved after sleep.",
             "reported improved recall in 120 adults",
@@ -700,6 +719,20 @@ public sealed class ScientificResearchStageExecutorTests
         }
     }
 
+
+    private sealed class RecordingSourceMaterialAcquirer : ISourceMaterialAcquirer
+    {
+        public int Calls { get; private set; }
+
+        public Task<SourceMaterialAcquisitionResult> AcquireForResearchRunAsync(
+            Guid researchRunId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            return Task.FromResult(new SourceMaterialAcquisitionResult(0, 0, 0, 0, 0, 0));
+        }
+    }
     private sealed class RecordingEvidenceExtractor : IEvidenceExtractor
     {
         private readonly EvidenceExtractionResult? _result;
@@ -728,6 +761,7 @@ public sealed class ScientificResearchStageExecutorTests
             return Task.FromResult(_result ?? new EvidenceExtractionResult(
                 context.ResearchRunId,
                 context.StudyId,
+                context.SourceMaterialId,
                 EvidenceExtractionStatus.Skipped,
                 EvidenceExtractionSkipReason.NoExtractableText,
                 EvidenceSourceScope.Abstract,

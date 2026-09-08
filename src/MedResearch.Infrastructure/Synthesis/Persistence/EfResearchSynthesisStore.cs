@@ -109,6 +109,7 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 evidence.Id,
                 evidence.ResearchRunId,
                 evidence.StudyId,
+                evidence.EvidenceExtractionId,
                 evidence.Outcome,
                 evidence.ResultSummary,
                 evidence.SupportingText,
@@ -169,8 +170,28 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 extraction.Status,
                 extraction.SkipReason,
                 extraction.SourceScope,
+                extraction.SourceMaterialId,
                 extraction.EvidenceCount,
                 extraction.GroundingValidated))
+            .ToArrayAsync(cancellationToken);
+        var sourceMaterials = await _dbContext.SourceMaterials
+            .AsNoTracking()
+            .Where(material => studyIds.Contains(material.StudyId))
+            .OrderBy(material => material.StudyId)
+            .ThenBy(material => material.Type)
+            .ThenBy(material => material.Provider)
+            .ThenByDescending(material => material.ContentVersion)
+            .ThenBy(material => material.Id)
+            .Select(material => new SynthesisSourceMaterialSnapshot(
+                material.Id,
+                material.StudyId,
+                material.Type,
+                material.Provider,
+                material.ProviderSourceId,
+                material.ContentHash,
+                material.ContentVersion,
+                material.WasTruncated,
+                material.IsCurrent))
             .ToArrayAsync(cancellationToken);
 
         return new SynthesisCorpusSnapshot(
@@ -182,7 +203,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             evidence,
             evaluations,
             searches,
-            extractions);
+            extractions,
+            sourceMaterials);
     }
 
     public async Task<bool> HasReportAsync(Guid researchRunId, string promptVersion, CancellationToken cancellationToken)
@@ -232,6 +254,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             result.Statistics.SearchQueryCount,
             result.Statistics.StudiesWithNoExtractableEvidence,
             result.Statistics.StudiesWithInsufficientEvaluationSource,
+            result.Statistics.StructuredFullTextStudyCount,
+            result.Statistics.AbstractOnlyStudyCount,
+            result.Statistics.NoSourceMaterialStudyCount,
             result.SourceCoverage.PotentialConflictDetected,
             result.SourceCoverage.EvidenceTruncated,
             result.SourceCoverage.UsesAbstractLevelEvidenceOnly,
@@ -353,6 +378,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             reportEntity.SearchQueryCount,
             reportEntity.StudiesWithNoExtractableEvidence,
             reportEntity.StudiesWithInsufficientEvaluationSource,
+            reportEntity.StructuredFullTextStudyCount,
+            reportEntity.AbstractOnlyStudyCount,
+            reportEntity.NoSourceMaterialStudyCount,
             reportEntity.PotentialConflictDetected,
             reportEntity.EvidenceTruncated,
             reportEntity.UsesAbstractLevelEvidenceOnly,

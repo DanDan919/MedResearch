@@ -58,6 +58,15 @@ services:
       EuropePmc__MaxRequestsPerSecond: ${EUROPEPMC_MAX_REQUESTS_PER_SECOND:-2}
       EuropePmc__MaxRetryAttempts: ${EUROPEPMC_MAX_RETRY_ATTEMPTS:-2}
       EuropePmc__RetryBaseDelayMilliseconds: ${EUROPEPMC_RETRY_BASE_DELAY_MILLISECONDS:-250}
+      SourceAcquisition__Enabled: ${SOURCE_ACQUISITION_ENABLED:-true}
+      SourceAcquisition__MaxStudiesPerRun: ${SOURCE_ACQUISITION_MAX_STUDIES_PER_RUN:-10}
+      SourceAcquisition__MaxContentCharacters: ${SOURCE_ACQUISITION_MAX_CONTENT_CHARACTERS:-30000}
+      SourceAcquisition__PreferStructuredFullText: ${SOURCE_ACQUISITION_PREFER_STRUCTURED_FULL_TEXT:-true}
+      EuropePmcFullText__Enabled: ${EUROPEPMC_FULLTEXT_ENABLED:-true}
+      EuropePmcFullText__MaxContentCharacters: ${EUROPEPMC_FULLTEXT_MAX_CONTENT_CHARACTERS:-30000}
+      EuropePmcFullText__TimeoutSeconds: "15"
+      EuropePmcFullText__MaxRetryAttempts: ${EUROPEPMC_FULLTEXT_MAX_RETRY_ATTEMPTS:-2}
+      EuropePmcFullText__RetryBaseDelayMilliseconds: ${EUROPEPMC_FULLTEXT_RETRY_BASE_DELAY_MILLISECONDS:-250}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

@@ -3,6 +3,7 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     private readonly IResearchPlanner _researchPlanner;
     private readonly IResearchPlanStore _researchPlanStore;
     private readonly IScientificLiteratureSearchCoordinator _literatureSearchCoordinator;
+    private readonly ISourceMaterialAcquirer _sourceMaterialAcquirer;
     private readonly IEvidenceExtractor _evidenceExtractor;
     private readonly IEvidenceExtractionStore _evidenceExtractionStore;
     private readonly EvidenceExtractionOptions _evidenceExtractionOptions;
@@ -29,6 +31,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         IResearchPlanner researchPlanner,
         IResearchPlanStore researchPlanStore,
         IScientificLiteratureSearchCoordinator literatureSearchCoordinator,
+        ISourceMaterialAcquirer sourceMaterialAcquirer,
         IEvidenceExtractor evidenceExtractor,
         IEvidenceExtractionStore evidenceExtractionStore,
         EvidenceExtractionOptions evidenceExtractionOptions,
@@ -43,6 +46,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         _researchPlanner = researchPlanner;
         _researchPlanStore = researchPlanStore;
         _literatureSearchCoordinator = literatureSearchCoordinator;
+        _sourceMaterialAcquirer = sourceMaterialAcquirer;
         _evidenceExtractor = evidenceExtractor;
         _evidenceExtractionStore = evidenceExtractionStore;
         _evidenceExtractionOptions = evidenceExtractionOptions;
@@ -110,6 +114,17 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         ResearchStageExecutionContext context,
         CancellationToken cancellationToken)
     {
+        var acquisition = await _sourceMaterialAcquirer.AcquireForResearchRunAsync(context.ResearchRunId, cancellationToken);
+        _logger.LogInformation(
+            "SourceAcquisitionStageCompleted. ResearchRunId: {ResearchRunId}; SelectedStudyCount: {SelectedStudyCount}; AbstractMaterialCount: {AbstractMaterialCount}; StructuredFullTextCount: {StructuredFullTextCount}; ReusedMaterialCount: {ReusedMaterialCount}; UnavailableFullTextCount: {UnavailableFullTextCount}; ProviderFailureCount: {ProviderFailureCount}",
+            context.ResearchRunId,
+            acquisition.SelectedStudyCount,
+            acquisition.AbstractMaterialCount,
+            acquisition.StructuredFullTextCount,
+            acquisition.ReusedMaterialCount,
+            acquisition.UnavailableFullTextCount,
+            acquisition.ProviderFailureCount);
+
         var maxStudies = _evidenceExtractionOptions.BoundedMaxStudiesPerRun;
         var stopwatch = Stopwatch.StartNew();
         var workItems = await _evidenceExtractionStore.FindStudiesForExtractionAsync(

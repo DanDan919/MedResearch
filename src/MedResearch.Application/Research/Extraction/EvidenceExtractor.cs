@@ -26,7 +26,7 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(context.Abstract))
+        if (context.SourceMaterialId is null || string.IsNullOrWhiteSpace(context.SourceContent))
         {
             _logger.LogInformation(
                 "EvidenceExtractionSkipped. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; PromptVersion: {PromptVersion}; Reason: {Reason}",
@@ -38,6 +38,7 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
             return new EvidenceExtractionResult(
                 context.ResearchRunId,
                 context.StudyId,
+                null,
                 EvidenceExtractionStatus.Skipped,
                 EvidenceExtractionSkipReason.NoExtractableText,
                 EvidenceSourceScope.Abstract,
@@ -53,10 +54,11 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
         var startedAt = DateTimeOffset.UtcNow;
 
         _logger.LogInformation(
-            "EvidenceExtractionStarted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceScope: {SourceScope}; PromptVersion: {PromptVersion}",
+            "EvidenceExtractionStarted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; SourceScope: {SourceScope}; PromptVersion: {PromptVersion}",
             context.ResearchRunId,
             context.StudyId,
-            EvidenceSourceScope.Abstract,
+            context.SourceMaterialId,
+            context.SourceScope,
             EvidenceExtractionPrompt.Version);
 
         try
@@ -72,9 +74,10 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
             var acceptedFindings = _validator.Validate(context, generationResult.Value);
 
             _logger.LogInformation(
-                "EvidenceExtractionCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; FindingCount: {FindingCount}; DurationMs: {DurationMs}",
+                "EvidenceExtractionCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; FindingCount: {FindingCount}; DurationMs: {DurationMs}",
                 context.ResearchRunId,
                 context.StudyId,
+                context.SourceMaterialId,
                 generationResult.Metadata.Provider,
                 generationResult.Metadata.Model,
                 EvidenceExtractionPrompt.Version,
@@ -84,9 +87,10 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
             return new EvidenceExtractionResult(
                 context.ResearchRunId,
                 context.StudyId,
+                context.SourceMaterialId,
                 EvidenceExtractionStatus.Completed,
                 null,
-                EvidenceSourceScope.Abstract,
+                context.SourceScope,
                 generationResult.Metadata.Provider,
                 generationResult.Metadata.Model,
                 EvidenceExtractionPrompt.Version,
@@ -102,9 +106,10 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
         {
             _logger.LogWarning(
                 exception,
-                "EvidenceGroundingValidationFailed. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; PromptVersion: {PromptVersion}; DurationMs: {DurationMs}",
+                "EvidenceGroundingValidationFailed. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; PromptVersion: {PromptVersion}; DurationMs: {DurationMs}",
                 context.ResearchRunId,
                 context.StudyId,
+                context.SourceMaterialId,
                 EvidenceExtractionPrompt.Version,
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             throw;
@@ -113,9 +118,10 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
         {
             _logger.LogWarning(
                 exception,
-                "EvidenceExtractionValidationFailed. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; PromptVersion: {PromptVersion}; DurationMs: {DurationMs}",
+                "EvidenceExtractionValidationFailed. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; PromptVersion: {PromptVersion}; DurationMs: {DurationMs}",
                 context.ResearchRunId,
                 context.StudyId,
+                context.SourceMaterialId,
                 EvidenceExtractionPrompt.Version,
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             throw;

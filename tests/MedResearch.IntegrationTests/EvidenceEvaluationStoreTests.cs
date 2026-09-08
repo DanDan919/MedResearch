@@ -183,7 +183,8 @@ public sealed class EvidenceEvaluationStoreTests
         var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 1, 0, plan.Id);
         var study = new Study(Guid.NewGuid(), "Sleep and recall", "A randomized trial reported improved recall in 120 adults.", $"10.7777/{Guid.NewGuid():N}", RandomPmid(), "Journal", new DateOnly(2026, 1, 1), "PubMed");
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, study.Id, "PubMed", study.Pmid, DateTimeOffset.UtcNow);
-        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, study.Id, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, evidenceCount, true);
+        var sourceMaterial = SourceMaterial.Create(study.Id, SourceMaterialType.Abstract, "PubMed", study.Pmid, "SearchMetadataAbstract", study.Abstract!, 1, DateTimeOffset.UtcNow, null, null, null, SourceMaterialAccessStatus.Unknown, false, ["Abstract"]);
+        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, study.Id, sourceMaterial.Id, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, evidenceCount, true);
 
         context.ResearchQuestions.Add(question);
         context.ResearchRuns.Add(run);
@@ -211,7 +212,8 @@ public sealed class EvidenceEvaluationStoreTests
         var question = new ResearchQuestion("Second run same study?", DateTimeOffset.UtcNow);
         var run = new ResearchRun(question.Id, question.CreatedAt);
         var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 0, 1);
-        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, studyId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, 1, true);
+        var sourceMaterialId = await context.SourceMaterials.Where(sourceMaterial => sourceMaterial.StudyId == studyId && sourceMaterial.IsCurrent).Select(sourceMaterial => sourceMaterial.Id).FirstAsync(CancellationToken.None);
+        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, studyId, sourceMaterialId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, 1, true);
         var evidence = new Evidence(Guid.NewGuid(), run.Id, studyId, extraction.Id, "recall", "Recall improved after sleep.", "reported improved recall in 120 adults", EvidenceDirection.Positive, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, true, "adults", "sleep", "placebo", "randomized controlled trial", 120, null, null, null, null, null);
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, studyId, "PubMed", RandomPmid(), DateTimeOffset.UtcNow);
 

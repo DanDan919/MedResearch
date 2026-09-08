@@ -49,7 +49,7 @@ public sealed class EvidenceEvaluationSignalBuilder
             hasConfidenceInterval,
             hasPValue,
             hasComparator,
-            InferStudyDesignHint(context.PublicationTypes, context.Title, context.Abstract),
+            InferStudyDesignHint(context.PublicationTypes, context.Title, context.SourceContent ?? context.Abstract),
             reportingLimitations.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 

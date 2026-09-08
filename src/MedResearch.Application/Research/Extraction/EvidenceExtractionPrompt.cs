@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MedResearch.Application.Research.Ai;
+using MedResearch.Domain;
 
 namespace MedResearch.Application.Research.Extraction;
 
@@ -18,7 +19,7 @@ public static class EvidenceExtractionPrompt
             {
                 findings = new
                 {
-                    description = "Zero to twelve source-grounded evidence findings from the supplied abstract only.",
+                    description = "Zero to twelve source-grounded evidence findings from the supplied SourceMaterial only.",
                     type = "array",
                     maxItems = 12,
                     items = new
@@ -46,7 +47,7 @@ public static class EvidenceExtractionPrompt
                         {
                             outcome = NullableString("Reported outcome or endpoint, otherwise null.", 300),
                             resultSummary = NullableString("Concise reported result for this outcome, otherwise null.", 800),
-                            supportingText = NullableString("Verbatim excerpt from the supplied abstract supporting this finding.", 1000),
+                            supportingText = NullableString("Verbatim excerpt from the supplied SourceMaterial supporting this finding.", 1000),
                             direction = new
                             {
                                 type = new[] { "string", "null" },
@@ -92,20 +93,26 @@ public static class EvidenceExtractionPrompt
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(context.ResearchQuestion);
         ArgumentException.ThrowIfNullOrWhiteSpace(context.Title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(context.SourceContent);
 
         return new EvidenceExtractionPromptText(
             """
             You are a structured evidence extraction component for MedResearch.
-            Extract only findings that are explicitly reported in the supplied PubMed title, abstract, and metadata.
+            Extract only findings that are explicitly reported in the supplied SourceMaterial text and authoritative metadata.
             The LLM is not a scientific source. Do not add background knowledge, causal interpretation, clinical advice, diagnoses, treatments, or conclusions beyond the supplied source text.
             Use null for absent data. Do not guess missing sample sizes, effect sizes, confidence intervals, p-values, study designs, comparators, populations, or effect directions.
-            supportingText must be a short verbatim excerpt from the supplied abstract. Do not paraphrase supportingText.
+            supportingText must be a short verbatim excerpt from the supplied SourceMaterial. Do not paraphrase supportingText.
             Prefer reported findings only. If a direction is not explicitly supported, use NotReported rather than inferring no effect.
             Return only the strict structured object requested by the schema.
             """,
             $"""
             Prompt version: {Version}
-            Source scope: abstract-level metadata only. Full text is not available.
+            SourceMaterialId: {context.SourceMaterialId}
+            Source scope: {context.SourceScope}
+            Source provider: {context.SourceProvider ?? "null"}
+            Source content hash: {context.SourceContentHash ?? "null"}
+            Source was truncated: {context.SourceWasTruncated}
+            Source sections: {Join(context.SourceSectionNames)}
 
             Research question:
             {context.ResearchQuestion}
@@ -130,8 +137,8 @@ public static class EvidenceExtractionPrompt
             Authors: {Join(context.Authors)}
             Source: {context.Source}
 
-            Supplied abstract:
-            {context.Abstract}
+            Supplied SourceMaterial:
+            {context.SourceContent}
             """);
     }
 

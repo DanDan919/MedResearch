@@ -4,6 +4,7 @@ using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +18,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetResearchUseCase>();
         services.AddScoped<IResearchPlanner, ResearchPlanner>();
         services.AddScoped<IScientificLiteratureSearchCoordinator, ScientificLiteratureSearchCoordinator>();
+        services.AddScoped<ISourceMaterialAcquirer, SourceMaterialAcquirer>();
+        services.AddSingleton<SourceAcquisitionOptions>();
         services.AddScoped<EvidenceGroundingValidator>();
         services.AddScoped<EvidenceNumericGroundingValidator>();
         services.AddScoped<EvidenceExtractionDraftValidator>();
@@ -28,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<EvidenceEvaluationDraftValidator>();
         services.AddScoped<IEvidenceEvaluator, EvidenceEvaluator>();
         services.AddScoped<ISynthesisContextBuilder, SynthesisContextBuilder>();
+        services.AddScoped<IEvidenceCorpusBuilder, EvidenceCorpusBuilder>();
         services.AddScoped<ResearchReportDraftValidator>();
         services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
         services.AddScoped<GetResearchReportUseCase>();

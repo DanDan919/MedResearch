@@ -193,12 +193,20 @@ public sealed class EvidenceExtractorTests
 
     private static EvidenceExtractionStudyContext CreateContext(string? abstractText)
     {
+        var sourceMaterialId = string.IsNullOrWhiteSpace(abstractText) ? (Guid?)null : Guid.NewGuid();
         return new EvidenceExtractionStudyContext(
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Does sleep affect memory?",
             new EvidenceExtractionPlanContext("adults", "sleep", null, ["memory"], ["controlled trial"], []),
             Guid.NewGuid(),
+            sourceMaterialId,
+            EvidenceSourceScope.Abstract,
+            "PubMed",
+            abstractText,
+            abstractText is null ? null : SourceMaterial.ComputeContentHash(abstractText),
+            false,
+            ["Abstract"],
             "Sleep and memory",
             abstractText,
             "12345678",
@@ -210,7 +218,6 @@ public sealed class EvidenceExtractorTests
             ["Ada Lovelace"],
             "PubMed");
     }
-
     private sealed class FakeStructuredLlmClient : IStructuredLlmClient
     {
         private readonly object _value;

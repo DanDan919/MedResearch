@@ -167,3 +167,19 @@ Root cause: Single-source sequential PubMed search did not exercise concurrent c
 Decision / fix: Added PostgreSQL transaction-scoped advisory locks over normalized identity keys before Study resolution, while keeping filtered unique indexes as the final authority.
 Verification: Added a Docker-backed PostgreSQL integration test for concurrent PubMed/Europe PMC upserts of the same stable identity; local Docker is unavailable, so CI is the authoritative execution environment.
 Remaining concerns: Advisory locks are local to PostgreSQL and deliberate for this monolith; provider-result conflicts are still logged rather than persisted as first-class diagnostics.
+
+## 2026-09-08
+
+Date: 2026-09-08
+Area: Evidence corpus trust boundary
+Problem: The persisted synthesis snapshot already scoped rows to a ResearchRun, but it did not independently validate the complete Evidence -> EvidenceExtraction -> SourceMaterial -> Study lineage before bounded context selection.
+Observed behavior: SynthesisContextBuilder validated run and study membership, while source-material identity was not represented in the synthesis read model.
+Root cause: SourceMaterial was introduced as an extraction concern first; synthesis still consumed the earlier corpus contract.
+Decision / fix: Added EvidenceCorpusBuilder, source-material and extraction lineage snapshots, EvidenceExtractionId on synthesis Evidence context, deterministic coverage, and negative Application tests for cross-run and cross-study lineage.
+Verification: Application build and tests passed; PostgreSQL graph reload coverage is added and will execute in CI when Docker is available.
+Remaining concerns: Same-run citation consistency remains an Application validation boundary because the current claim/evidence join table does not redundantly store ResearchRunId.
+
+Area: Documentation drift after source acquisition
+Problem: README and architecture text still described extraction as abstract-only after SourceMaterial and structured full-text acquisition existed.
+Decision / fix: Updated README, ARCHITECTURE.md, current-state, technical debt, and the Russian milestone log to describe actual source selection, immutability, fallback, corpus validation, and the no-scraping boundary.
+Verification: dotnet build, dotnet test, and EF model validation are part of the milestone verification.

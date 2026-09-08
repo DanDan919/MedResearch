@@ -87,7 +87,7 @@ The current pipeline advances runs through:
 Queued -> Planning -> Searching -> Extracting -> Evaluating -> Synthesizing -> Completed
 ```
 
-`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed and Europe PMC metadata from accepted plan search queries through provider-neutral source adapters. `Extracting` performs abstract-level structured evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. `Synthesizing` builds a bounded current-run context, creates a validated traceable `ResearchReport`, and persists claims linked to Evidence. Runs move to `Completed` only after the report exists, including explicit insufficient-evidence reports.
+`Planning` produces a validated persisted `ResearchPlan`. `Searching` retrieves real PubMed and Europe PMC metadata from accepted plan search queries through provider-neutral source adapters. `Extracting` performs bounded SourceMaterial acquisition and structured source-grounded evidence extraction from discovered studies. `Evaluating` creates structured source-aware methodological assessments from study metadata, extraction provenance, and grounded evidence. `Synthesizing` builds a bounded current-run context, creates a validated traceable `ResearchReport`, and persists claims linked to Evidence. Runs move to `Completed` only after the report exists, including explicit insufficient-evidence reports.
 
 ## AI Research Planning
 
@@ -155,37 +155,18 @@ One planned query executed against two sources creates two `LiteratureSearch` ro
 
 PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, followed by batched EFetch XML. Requests include configured `tool`/`email` identification and optional `api_key`; ESearch and EFetch share one local `System.Threading.RateLimiting` token-bucket gate. History Server retrieval remains deliberately deferred because current `MaxResultsPerQuery` is bounded and direct ID batching keeps the implementation simpler without one-request-per-PMID behavior.
 
-Europe PMC uses `GET /search` against `https://www.ebi.ac.uk/europepmc/webservices/rest/` with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination using `cursorMark` and `nextCursorMark`. `core` is used so the current abstract-level pipeline can receive title, abstract, identifiers, authors, publication date metadata, journal metadata, and publication types without a second detail endpoint per result.
+Europe PMC uses `GET /search` against `https://www.ebi.ac.uk/europepmc/webservices/rest/` with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination using `cursorMark` and `nextCursorMark`. `core` is used so the metadata search pipeline can receive title, abstract, identifiers, authors, publication date metadata, journal metadata, and publication types without a second detail endpoint per result.
 
 Both source adapters use HttpClientFactory, bounded timeouts, cancellation propagation, local rate limiting, bounded transient retry for 429/5xx/network/timeout failures, `Retry-After` support where supplied, and bounded sanitized diagnostic bodies. Bad requests and malformed successful payloads fail fast. Normal automated tests use fake HTTP and do not call live scientific providers.
 ## Evidence Extraction
 
-Application performs evidence extraction through `EvidenceExtractor`, which reuses the existing provider-neutral `IStructuredLlmClient`. Infrastructure continues to own the concrete OpenAI HTTP adapter; Application does not depend on OpenAI-specific contracts.
+Application performs extraction through EvidenceExtractor, which consumes a provider-neutral EvidenceExtractionStudyContext containing one exact persisted SourceMaterial snapshot. Infrastructure's EfEvidenceExtractionStore selects a usable current structured full-text snapshot first, then an abstract snapshot, with deterministic tie-breakers for truncation, version, provider, and id.
 
-Current extraction flow:
+Flow: Study -> SourceMaterial snapshot -> EvidenceExtractor -> IStructuredLlmClient -> strict JSON Schema output -> grounding against the same SourceMaterial.Content -> EvidenceExtraction.SourceMaterialId plus Evidence findings.
 
-```text
-ResearchStudyDiscovery + Study abstract
-  -> EvidenceExtractor
-  -> IStructuredLlmClient
-  -> strict JSON Schema output
-  -> deterministic grounding and numeric validation
-  -> EvidenceExtraction provenance + Evidence findings
-```
+SourceMaterial is immutable scientific content identity: content is normalized only for line endings and outer whitespace, then hashed with SHA-256 over UTF-8. A changed provider representation creates a new version and leaves historical versions available for old extractions. Europe PMC structured full text is parsed only from the official bounded fullTextXML endpoint with DTD/entity resolution disabled. Abstract fallback is a scientific coverage decision, not a pipeline failure; no usable source produces a persisted NoExtractableText skip and no LLM call.
 
-The approved LLM input scope is limited to the current research question, bounded `ResearchPlan` context, and the selected `Study` title, abstract, and metadata. No unrelated persisted records, secrets, raw provider payloads, or full-text claims are sent.
-
-The prompt version is `evidence-extractor-v1`. The prompt requires abstract-level extraction only, source-only behavior, null for absent fields, bounded direction labels, and no prose. The LLM is an extraction tool, not a scientific authority.
-
-Validation is deterministic:
-
-- `supportingText` must be a short excerpt present in the supplied abstract after whitespace/case normalization.
-- blank, excessive, or fabricated supporting excerpts fail validation.
-- numeric fields are kept only when the numeric value appears in the supplied abstract; otherwise they remain null.
-- duplicate findings are deduplicated before persistence.
-- unsupported directions or study design labels are rejected.
-
-A missing abstract is recorded as a skipped extraction with `NoExtractableText` and does not call the LLM. Provider, structured-output, validation, and grounding failures use the existing safe run failure path. Extraction runs sequentially and is bounded by `EvidenceExtraction:MaxStudiesPerRun`, default 10.
+The prompt version is evidence-extractor-v1. Supporting excerpts and numeric fields are validated against the exact selected source content. StructuredFullText means more source material is available; it is not a methodological quality score.
 
 ## Evidence Evaluation
 
@@ -215,6 +196,15 @@ A study with no extracted evidence is recorded as skipped with `NoExtractedEvide
 
 This evaluator is MedResearch's internal structured assessment. It is not formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
 
+## Evidence Corpus and Synthesis
+
+EvidenceCorpusBuilder is an explicit Application trust boundary over the run-scoped persistence graph. It is an in-memory read model rather than a new database table because the persisted rows already preserve reproducibility.
+
+Flow: ResearchRun -> distinct discovered Studies -> current SourceMaterial metadata -> run-scoped EvidenceExtractions -> grounded Evidence -> run-scoped EvidenceEvaluations -> deterministic EvidenceCorpus -> bounded SynthesisContext -> ResearchReport claims.
+
+The builder validates the authoritative ResearchRun id, unique Study snapshots, Evidence run/study scope, Extraction source lineage, grounded completed extraction status, Evaluation EvidenceIds, and search provenance. It computes coverage metrics and conservative normalized outcome groups while retaining positive/negative disagreement as conflict. Multiple discovery paths therefore remain provenance, not duplicate Study snapshots.
+
+Synthesis is narrative evidence synthesis. The current system does not average raw EffectValue values, vote-count studies, or label a report as statistical meta-analysis. Future quantitative synthesis must first establish compatible outcome/effect-measure/variance/sample-size eligibility and a defined statistical model.
 ## Evidence Synthesis
 
 Application performs evidence synthesis through `ResearchSynthesizer`, which reuses `IStructuredLlmClient` for strict structured output and validates model drafts before persistence.
@@ -346,6 +336,7 @@ Migrations:
 - `20260901063528_AddResearchRunProcessingLeases`
 - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
 - `20260902150845_AddStudyPmcidIdentity`
+    - 20260908074149_AddSourceMaterials
 
 ## Database Schema
 
@@ -411,7 +402,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - `LiteratureSearch`: minimal reproducibility record for a source query run during a research run.
 - `ResearchStudyDiscovery`: association between one research run/search execution and a global study.
 - `EvidenceExtraction`: one extraction attempt/status/provenance row for one research run, one study, and one prompt version.
-- `Evidence`: one source-grounded abstract-level finding linked to a research run, study, and extraction attempt. Supporting excerpts must be traceable to the supplied study abstract.
+- `Evidence`: one source-grounded finding linked to a research run, study, extraction attempt, and exact SourceMaterial snapshot. Supporting excerpts must be traceable to that source content.
 - `EvidenceEvaluation`: one internal structured methodological assessment for one research run, one study, and one evaluator prompt version. It is source-aware and categorical, not a numeric quality score or formal GRADE/RoB result.
 - `ResearchReport`: one persisted synthesis artifact for a research run and synthesizer prompt version, including report status, confidence category, source coverage, deterministic limitations, and provenance.
 - `ResearchReportClaim`: one accepted report claim with type, direction, text, and stable ordering.
@@ -422,7 +413,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - No Crossref, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
-- No full-text extraction or RAG/vector search exists yet.
+- No PDF/HTML scraping, publisher crawling, RAG, or vector search exists; bounded Europe PMC structured full text is supported.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
 - Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
@@ -431,3 +422,9 @@ The compose API service enables config-gated startup migrations with `Database__
 - Europe PMC live availability is verified only through an optional smoke test, not normal CI.
 - Production migration strategy is not decided yet.
 - OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.
+
+## Source Material and External Boundaries
+
+Source acquisition is limited to provider-reported metadata abstracts and Europe PMC's official structured full-text XML endpoint. It does not scrape HTML, download arbitrary PDFs, follow publisher links, or bypass access controls. Provider responses are untrusted and bounded before parsing or LLM use.
+
+EvidenceExtraction, Evidence, and EvidenceEvaluation remain run-scoped. Study and SourceMaterial may be shared across runs, but each extraction points to one exact source snapshot. ResearchReportClaim citation identity is still reconstructed from persisted same-run Evidence and Study rows; the model never supplies authoritative identifiers.

@@ -24,6 +24,9 @@ internal sealed class EvidenceExtractionConfiguration : IEntityTypeConfiguration
             .HasColumnName("study_id")
             .IsRequired();
 
+        builder.Property(extraction => extraction.SourceMaterialId)
+            .HasColumnName("source_material_id");
+
         builder.Property(extraction => extraction.Status)
             .HasColumnName("status")
             .HasConversion<string>()
@@ -77,8 +80,13 @@ internal sealed class EvidenceExtractionConfiguration : IEntityTypeConfiguration
             .HasForeignKey(extraction => extraction.StudyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(extraction => new { extraction.ResearchRunId, extraction.StudyId, extraction.PromptVersion })
-            .HasDatabaseName("ux_evidence_extractions_research_run_id_study_id_prompt_version")
+        builder.HasOne<SourceMaterial>()
+            .WithMany()
+            .HasForeignKey(extraction => extraction.SourceMaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(extraction => new { extraction.ResearchRunId, extraction.StudyId, extraction.SourceMaterialId, extraction.PromptVersion })
+            .HasDatabaseName("ux_evidence_extractions_run_study_source_material_prompt_version")
             .IsUnique();
 
         builder.HasIndex(extraction => new { extraction.ResearchRunId, extraction.Status })
@@ -86,5 +94,8 @@ internal sealed class EvidenceExtractionConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(extraction => extraction.StudyId)
             .HasDatabaseName("ix_evidence_extractions_study_id");
+
+        builder.HasIndex(extraction => extraction.SourceMaterialId)
+            .HasDatabaseName("ix_evidence_extractions_source_material_id");
     }
 }

@@ -172,7 +172,8 @@ public sealed partial class FullFakePipelineTests
                     ["Database:ApplyMigrationsOnStartup"] = "false",
                     ["AI:Provider"] = "OpenAI",
                     ["AI:TimeoutSeconds"] = "30",
-                    ["AI:MaxOutputTokens"] = "2000"
+                    ["AI:MaxOutputTokens"] = "2000",
+                    ["EuropePmcFullText:Enabled"] = "false"
                 });
             });
 

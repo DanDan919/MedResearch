@@ -27,6 +27,9 @@ public sealed class ResearchReport
         int searchQueryCount,
         int studiesWithNoExtractableEvidence,
         int studiesWithInsufficientEvaluationSource,
+        int structuredFullTextStudyCount,
+        int abstractOnlyStudyCount,
+        int noSourceMaterialStudyCount,
         bool potentialConflictDetected,
         bool evidenceTruncated,
         bool usesAbstractLevelEvidenceOnly,
@@ -68,6 +71,9 @@ public sealed class ResearchReport
         ValidateNonNegative(searchQueryCount, nameof(searchQueryCount));
         ValidateNonNegative(studiesWithNoExtractableEvidence, nameof(studiesWithNoExtractableEvidence));
         ValidateNonNegative(studiesWithInsufficientEvaluationSource, nameof(studiesWithInsufficientEvaluationSource));
+        ValidateNonNegative(structuredFullTextStudyCount, nameof(structuredFullTextStudyCount));
+        ValidateNonNegative(abstractOnlyStudyCount, nameof(abstractOnlyStudyCount));
+        ValidateNonNegative(noSourceMaterialStudyCount, nameof(noSourceMaterialStudyCount));
 
         Id = id;
         ResearchRunId = researchRunId;
@@ -93,6 +99,9 @@ public sealed class ResearchReport
         SearchQueryCount = searchQueryCount;
         StudiesWithNoExtractableEvidence = studiesWithNoExtractableEvidence;
         StudiesWithInsufficientEvaluationSource = studiesWithInsufficientEvaluationSource;
+        StructuredFullTextStudyCount = structuredFullTextStudyCount;
+        AbstractOnlyStudyCount = abstractOnlyStudyCount;
+        NoSourceMaterialStudyCount = noSourceMaterialStudyCount;
         PotentialConflictDetected = potentialConflictDetected;
         EvidenceTruncated = evidenceTruncated;
         UsesAbstractLevelEvidenceOnly = usesAbstractLevelEvidenceOnly;
@@ -147,6 +156,12 @@ public sealed class ResearchReport
     public int StudiesWithNoExtractableEvidence { get; }
 
     public int StudiesWithInsufficientEvaluationSource { get; }
+
+    public int StructuredFullTextStudyCount { get; }
+
+    public int AbstractOnlyStudyCount { get; }
+
+    public int NoSourceMaterialStudyCount { get; }
 
     public bool PotentialConflictDetected { get; }
 

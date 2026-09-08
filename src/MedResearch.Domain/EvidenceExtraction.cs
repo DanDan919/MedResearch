@@ -6,6 +6,7 @@ public sealed class EvidenceExtraction
         Guid id,
         Guid researchRunId,
         Guid studyId,
+        Guid? sourceMaterialId,
         EvidenceExtractionStatus status,
         EvidenceExtractionSkipReason? skipReason,
         EvidenceSourceScope sourceScope,
@@ -46,6 +47,11 @@ public sealed class EvidenceExtraction
             throw new ArgumentException("Completed evidence extractions cannot have a skip reason.", nameof(skipReason));
         }
 
+        if (status == EvidenceExtractionStatus.Completed && sourceMaterialId is null)
+        {
+            throw new ArgumentException("Completed evidence extractions require source material.", nameof(sourceMaterialId));
+        }
+
         if (evidenceCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(evidenceCount), "Evidence count cannot be negative.");
@@ -54,6 +60,7 @@ public sealed class EvidenceExtraction
         Id = id;
         ResearchRunId = researchRunId;
         StudyId = studyId;
+        SourceMaterialId = sourceMaterialId;
         Status = status;
         SkipReason = skipReason;
         SourceScope = sourceScope;
@@ -70,6 +77,8 @@ public sealed class EvidenceExtraction
     public Guid ResearchRunId { get; }
 
     public Guid StudyId { get; }
+
+    public Guid? SourceMaterialId { get; }
 
     public EvidenceExtractionStatus Status { get; }
 

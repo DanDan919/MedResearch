@@ -28,7 +28,10 @@ public sealed record SynthesisCorpusStatistics(
     int IncludedEvidenceFindingCount,
     int SearchQueryCount,
     int StudiesWithNoExtractableEvidence,
-    int StudiesWithInsufficientEvaluationSource);
+    int StudiesWithInsufficientEvaluationSource,
+    int StructuredFullTextStudyCount,
+    int AbstractOnlyStudyCount,
+    int NoSourceMaterialStudyCount);
 
 public sealed record SynthesisSourceCoverage(
     IReadOnlyCollection<string> SearchedSources,
@@ -65,6 +68,7 @@ public sealed record SynthesisEvidenceContext(
     Guid EvidenceId,
     Guid ResearchRunId,
     Guid StudyId,
+    Guid EvidenceExtractionId,
     string Outcome,
     string ResultSummary,
     string SupportingText,
@@ -124,7 +128,8 @@ public sealed record SynthesisCorpusSnapshot(
     IReadOnlyCollection<SynthesisEvidenceContext> Evidence,
     IReadOnlyCollection<SynthesisEvaluationContext> Evaluations,
     IReadOnlyCollection<SynthesisSearchSnapshot> Searches,
-    IReadOnlyCollection<SynthesisExtractionSnapshot> Extractions);
+    IReadOnlyCollection<SynthesisExtractionSnapshot> Extractions,
+    IReadOnlyCollection<SynthesisSourceMaterialSnapshot> SourceMaterials);
 
 public sealed record SynthesisStudySnapshot(
     Guid StudyId,
@@ -156,5 +161,6 @@ public sealed record SynthesisExtractionSnapshot(
     EvidenceExtractionStatus Status,
     EvidenceExtractionSkipReason? SkipReason,
     EvidenceSourceScope SourceScope,
+    Guid? SourceMaterialId,
     int EvidenceCount,
     bool GroundingValidated);

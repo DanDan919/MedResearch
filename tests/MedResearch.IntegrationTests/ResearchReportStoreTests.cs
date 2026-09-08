@@ -90,6 +90,46 @@ public sealed class ResearchReportStoreTests
     }
 
     [SkippableFact]
+    public async Task EvidenceCorpus_ReloadsFullClaimToSourceMaterialLineage()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchSynthesisStore(context);
+            await store.PersistReportAsync(CreateCompletedResult(seed.RunId, seed.EvidenceIds), CancellationToken.None);
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        var trace = await (
+            from report in verification.ResearchReports.AsNoTracking()
+            join claim in verification.ResearchReportClaims.AsNoTracking()
+                on report.Id equals claim.ResearchReportId
+            join link in verification.ResearchReportClaimEvidence.AsNoTracking()
+                on claim.Id equals link.ResearchReportClaimId
+            join evidence in verification.Evidence.AsNoTracking()
+                on link.EvidenceId equals evidence.Id
+            join extraction in verification.EvidenceExtractions.AsNoTracking()
+                on evidence.EvidenceExtractionId equals extraction.Id
+            join source in verification.SourceMaterials.AsNoTracking()
+                on extraction.SourceMaterialId equals source.Id
+            join study in verification.Studies.AsNoTracking()
+                on evidence.StudyId equals study.Id
+            where report.ResearchRunId == seed.RunId
+            select new { report, claim, evidence, extraction, source, study })
+            .SingleAsync();
+
+        Assert.Equal(seed.RunId, trace.report.ResearchRunId);
+        Assert.Equal(seed.EvidenceIds[0], trace.evidence.Id);
+        Assert.Equal(trace.evidence.EvidenceExtractionId, trace.extraction.Id);
+        Assert.Equal(trace.extraction.SourceMaterialId, trace.source.Id);
+        Assert.Equal(trace.evidence.StudyId, trace.source.StudyId);
+        Assert.Equal(trace.evidence.StudyId, trace.study.Id);
+        Assert.Equal(SourceMaterial.ComputeContentHash("A trial reported improved recall in 120 adults."), trace.source.ContentHash);
+        Assert.Equal(1, trace.source.ContentVersion);
+        Assert.Equal("12345678", trace.study.Pmid);
+    }
     public async Task PersistReportAsync_PreservesInsufficientEvidenceReportWithoutClaims()
     {
         SkipIfPostgreSqlUnavailable();
@@ -210,7 +250,8 @@ public sealed class ResearchReportStoreTests
         var pmid = RandomPmid();
         var study = new Study(Guid.NewGuid(), "Sleep and recall report", "A trial reported improved recall in 120 adults.", doi, pmid, "Journal", new DateOnly(2026, 1, 1), "PubMed");
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, study.Id, "PubMed", study.Pmid, DateTimeOffset.UtcNow);
-        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, study.Id, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, evidenceCount, true);
+        var sourceMaterial = SourceMaterial.Create(study.Id, SourceMaterialType.Abstract, "PubMed", study.Pmid, "SearchMetadataAbstract", study.Abstract!, 1, DateTimeOffset.UtcNow, null, null, null, SourceMaterialAccessStatus.Unknown, false, ["Abstract"]);
+        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, study.Id, sourceMaterial.Id, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, evidenceCount, true);
 
         context.ResearchQuestions.Add(question);
         context.ResearchRuns.Add(run);
@@ -244,7 +285,8 @@ public sealed class ResearchReportStoreTests
         var run = new ResearchRun(question.Id, question.CreatedAt);
         var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 0, 1);
         var discovery = new ResearchStudyDiscovery(Guid.NewGuid(), run.Id, search.Id, studyId, "PubMed", "12345678", DateTimeOffset.UtcNow);
-        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, studyId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, 1, true);
+        var sourceMaterialId = await context.SourceMaterials.Where(sourceMaterial => sourceMaterial.StudyId == studyId && sourceMaterial.IsCurrent).Select(sourceMaterial => sourceMaterial.Id).FirstAsync(CancellationToken.None);
+        var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, studyId, sourceMaterialId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, 1, true);
         var evidence = new Evidence(Guid.NewGuid(), run.Id, studyId, extraction.Id, "recall", "Recall improved after sleep.", "reported improved recall in 120 adults", EvidenceDirection.Positive, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, true, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
 
         context.ResearchQuestions.Add(question);
@@ -264,7 +306,7 @@ public sealed class ResearchReportStoreTests
 
     private static ResearchSynthesisResult CreateCompletedResult(Guid runId, IReadOnlyCollection<Guid> evidenceIds)
     {
-        var statistics = new SynthesisCorpusStatistics(1, 1, 1, evidenceIds.Count, 1, evidenceIds.Count, 1, 0, 1);
+        var statistics = new SynthesisCorpusStatistics(1, 1, 1, evidenceIds.Count, 1, evidenceIds.Count, 1, 0, 1, 0, 1, 0);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
         AcceptedResearchReportClaim[] claims = evidenceIds.Count > 1
             ? [
@@ -278,7 +320,7 @@ public sealed class ResearchReportStoreTests
 
     private static ResearchSynthesisResult CreateInsufficientResult(Guid runId)
     {
-        var statistics = new SynthesisCorpusStatistics(1, 0, 0, 0, 0, 0, 1, 1, 0);
+        var statistics = new SynthesisCorpusStatistics(1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
         return new ResearchSynthesisResult(runId, ResearchReportStatus.InsufficientEvidence, ResearchReportInsufficientEvidenceReason.NoValidatedEvidence, "No evidence.", "No validated evidence.", "No conflicts assessed.", "Abstract-level evidence only.", "No conclusion.", SynthesisConfidence.InsufficientEvidence, null, null, ResearchSynthesisPrompt.Version, DateTimeOffset.UtcNow, statistics, coverage, ["No validated evidence."], []);
     }

@@ -5,6 +5,7 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
@@ -16,6 +17,8 @@ using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.Planning.Persistence;
 using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Research.Processing;
+using MedResearch.Infrastructure.SourceMaterials.EuropePmc;
+using MedResearch.Infrastructure.SourceMaterials.Persistence;
 using MedResearch.Infrastructure.Synthesis.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -43,6 +46,7 @@ public static class ServiceCollectionExtensions
             new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
+        services.AddScoped<ISourceMaterialStore, EfSourceMaterialStore>();
         services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
         services.AddScoped<IEvidenceEvaluationStore, EfEvidenceEvaluationStore>();
         services.AddScoped<EfResearchSynthesisStore>();
@@ -96,6 +100,23 @@ public static class ServiceCollectionExtensions
                 provider.GetRequiredService<EuropePmcScientificLiteratureSource>());
         }
 
+        var sourceAcquisitionOptions = CreateSourceAcquisitionOptions(configuration);
+        services.AddSingleton(sourceAcquisitionOptions);
+
+        var europePmcFullTextOptions = CreateEuropePmcFullTextOptions(configuration);
+        services.AddSingleton(Options.Create(europePmcFullTextOptions));
+        services.AddSingleton<EuropePmcFullTextXmlParser>();
+        services.AddHttpClient<EuropePmcFullTextSourceMaterialProvider>(client =>
+        {
+            client.BaseAddress = new Uri(europePmcOptions.BaseUrl, UriKind.Absolute);
+            client.Timeout = europePmcFullTextOptions.Timeout;
+        });
+        if (europePmcFullTextOptions.Enabled)
+        {
+            services.AddScoped<ISourceMaterialProvider>(provider =>
+                provider.GetRequiredService<EuropePmcFullTextSourceMaterialProvider>());
+        }
+
         var evidenceExtractionOptions = CreateEvidenceExtractionOptions(configuration);
         services.AddSingleton(evidenceExtractionOptions);
 
@@ -124,6 +145,55 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+
+    private static SourceAcquisitionOptions CreateSourceAcquisitionOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(SourceAcquisitionOptions.SectionName);
+        var enabled = true;
+        var preferStructuredFullText = true;
+        if (bool.TryParse(section["Enabled"], out var configuredEnabled))
+        {
+            enabled = configuredEnabled;
+        }
+
+        if (bool.TryParse(section["PreferStructuredFullText"], out var configuredPreference))
+        {
+            preferStructuredFullText = configuredPreference;
+        }
+
+        var options = new SourceAcquisitionOptions
+        {
+            Enabled = enabled,
+            MaxStudiesPerRun = ReadPositiveInt(section["MaxStudiesPerRun"], 10, "SourceAcquisition:MaxStudiesPerRun"),
+            MaxContentCharacters = ReadPositiveInt(section["MaxContentCharacters"], 30000, "SourceAcquisition:MaxContentCharacters"),
+            PreferStructuredFullText = preferStructuredFullText
+        };
+
+        options.Validate();
+        return options;
+    }
+
+    private static EuropePmcFullTextOptions CreateEuropePmcFullTextOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(EuropePmcFullTextOptions.SectionName);
+        var enabled = true;
+        if (bool.TryParse(section["Enabled"], out var configuredEnabled))
+        {
+            enabled = configuredEnabled;
+        }
+
+        var options = new EuropePmcFullTextOptions
+        {
+            Enabled = enabled,
+            MaxContentCharacters = ReadPositiveInt(section["MaxContentCharacters"], 30000, "EuropePmcFullText:MaxContentCharacters"),
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "EuropePmcFullText:TimeoutSeconds"),
+            MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "EuropePmcFullText:MaxRetryAttempts"),
+            RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "EuropePmcFullText:RetryBaseDelayMilliseconds")
+        };
+
+        options.Validate();
+        return options;
+    }
     private static EvidenceExtractionOptions CreateEvidenceExtractionOptions(IConfiguration configuration)
     {
         var section = configuration.GetSection(EvidenceExtractionOptions.SectionName);

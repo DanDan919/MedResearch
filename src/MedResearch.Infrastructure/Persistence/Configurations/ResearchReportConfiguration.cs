@@ -90,6 +90,9 @@ internal sealed class ResearchReportConfiguration : IEntityTypeConfiguration<Res
         builder.Property(report => report.SearchQueryCount).HasColumnName("search_query_count").IsRequired();
         builder.Property(report => report.StudiesWithNoExtractableEvidence).HasColumnName("studies_with_no_extractable_evidence").IsRequired();
         builder.Property(report => report.StudiesWithInsufficientEvaluationSource).HasColumnName("studies_with_insufficient_evaluation_source").IsRequired();
+        builder.Property(report => report.StructuredFullTextStudyCount).HasColumnName("structured_full_text_study_count").IsRequired();
+        builder.Property(report => report.AbstractOnlyStudyCount).HasColumnName("abstract_only_study_count").IsRequired();
+        builder.Property(report => report.NoSourceMaterialStudyCount).HasColumnName("no_source_material_study_count").IsRequired();
         builder.Property(report => report.PotentialConflictDetected).HasColumnName("potential_conflict_detected").IsRequired();
         builder.Property(report => report.EvidenceTruncated).HasColumnName("evidence_truncated").IsRequired();
         builder.Property(report => report.UsesAbstractLevelEvidenceOnly).HasColumnName("uses_abstract_level_evidence_only").IsRequired();

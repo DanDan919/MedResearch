@@ -42,7 +42,7 @@ public sealed class EvidenceExtractionDraftValidator
         EvidenceExtractionStudyContext context,
         EvidenceExtractionDraft draft)
     {
-        if (string.IsNullOrWhiteSpace(context.Abstract))
+        if (string.IsNullOrWhiteSpace(context.SourceContent))
         {
             throw new EvidenceExtractionValidationException("Cannot validate evidence extraction without source text.");
         }
@@ -62,7 +62,7 @@ public sealed class EvidenceExtractionDraftValidator
             var resultSummary = NormalizeRequired(finding.ResultSummary, "Evidence result summary is required.", 800);
             var supportingText = NormalizeRequired(finding.SupportingText, "Evidence supporting text is required.", 1_000);
 
-            if (!_groundingValidator.TryValidate(context.Abstract, supportingText, out var groundingError))
+            if (!_groundingValidator.TryValidate(context.SourceContent, supportingText, out var groundingError))
             {
                 throw new EvidenceGroundingValidationException(groundingError);
             }
@@ -92,12 +92,12 @@ public sealed class EvidenceExtractionDraftValidator
                 NormalizeOptional(finding.ExposureOrIntervention, 300),
                 NormalizeOptional(finding.Comparator, 300),
                 studyDesign,
-                KeepGroundedInt(context.Abstract, finding.SampleSize),
+                KeepGroundedInt(context.SourceContent, finding.SampleSize),
                 NormalizeOptional(finding.EffectMeasure, 100),
-                KeepGroundedDecimal(context.Abstract, finding.EffectValue),
-                KeepGroundedDecimal(context.Abstract, finding.ConfidenceIntervalLower),
-                KeepGroundedDecimal(context.Abstract, finding.ConfidenceIntervalUpper),
-                KeepGroundedDecimal(context.Abstract, finding.PValue)));
+                KeepGroundedDecimal(context.SourceContent, finding.EffectValue),
+                KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalLower),
+                KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalUpper),
+                KeepGroundedDecimal(context.SourceContent, finding.PValue)));
         }
 
         return accepted;
