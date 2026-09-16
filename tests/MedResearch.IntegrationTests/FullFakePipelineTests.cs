@@ -414,23 +414,7 @@ public sealed partial class FullFakePipelineTests
                     ["randomized controlled trial"],
                     ["structured sleep recall adults randomized trial"],
                     []),
-                nameof(EvidenceExtractionDraft) => new EvidenceExtractionDraft([
-                    new EvidenceFindingDraft(
-                        "recall",
-                        "Sleep improved recall in adults compared with wakefulness.",
-                        "In this randomized controlled trial, sleep improved recall in 120 adults compared with wakefulness.",
-                        "Positive",
-                        "adults",
-                        "sleep",
-                        "wakefulness",
-                        "randomized controlled trial",
-                        120,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null)
-                ]),
+                nameof(EvidenceExtractionDraft) => CreateExtractionDraft(request),
                 nameof(EvidenceEvaluationDraft) => CreateEvaluationDraft(request),
                 nameof(ResearchReportDraft) => CreateReportDraft(request),
                 _ => throw new InvalidOperationException($"Unexpected fake LLM request type {typeof(T).FullName}.")
