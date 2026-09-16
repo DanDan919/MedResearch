@@ -295,7 +295,7 @@ public sealed partial class FullFakePipelineTests
 
     private sealed class FakeScientificLiteratureSource : IScientificLiteratureSource
     {
-        public const string FullTextAbstract = "Structured full text article reports depression severity benefit.";
+        public const string FullTextAbstract = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.";
         public const string AbstractOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.40 with 95% CI 1.05 to 1.90.";
         public const string IncompatibleText = "In this randomized controlled trial, treatment response improved in 120 adults compared with placebo; risk ratio 1.30 with 95% CI 1.00 to 1.70.";
 
