@@ -209,3 +209,12 @@ The source-material layer is now persisted and used as the authoritative extract
 - The corpus computes descriptive source-coverage metrics and conservative normalized outcome conflicts. These metrics are not quality weights and are not statistical synthesis.
 - Europe PMC full text uses the official fullTextXML endpoint only. Unavailable full text falls back to an abstract; provider failure is logged distinctly; neither condition invents Evidence or automatically fails a run.
 - Normal CI remains external-service independent. Live Europe PMC full-text and live provider smoke tests remain explicit opt-in projects outside the solution.
+
+## Quantitative Evidence Eligibility
+
+- Added `QuantitativeEvidenceAssessor` in Application as a deterministic read-model builder over validated EvidenceCorpus.
+- Added explicit effect-measure classification and eligibility reason codes for future quantitative synthesis input checks.
+- Added source-reported `ConfidenceLevel` and `ReportedStandardError` to Evidence persistence through migration `20260916032923_AddEvidenceQuantitativeStatistics`.
+- Quantitative readiness can derive log ratio effects, CI/SE-based variance, and Fisher z correlations in C# only; the LLM is not used as a calculator.
+- CompatibleEvidenceGroup is a readiness grouping, not a pooled result. It tracks unique Study count and refuses to treat multiple Evidence from one Study as independent.
+- Narrative ResearchReport synthesis remains unchanged and does not claim meta-analysis.

@@ -257,3 +257,12 @@ The live smoke test requests one result through the Europe PMC REST search endpo
 SourceAcquisition:MaxStudiesPerRun, SourceAcquisition:MaxContentCharacters, and SourceAcquisition:PreferStructuredFullText bound acquisition. EuropePmcFullText controls the opt-in structured full-text adapter, including timeout, retry, and character limits. A full-text provider failure is logged as operational acquisition failure; unavailable full text falls back to an abstract when one exists and does not fail the research run.
 
 The normal solution tests are deterministic and do not call OpenAI, PubMed, Europe PMC, or live full-text endpoints. Optional live smoke projects are outside MedResearch.slnx and require explicit environment variables.
+## Quantitative Evidence Eligibility
+
+Milestone 15 adds a deterministic quantitative-readiness boundary after EvidenceCorpus construction and before any future statistical synthesis. `QuantitativeEvidenceAssessor` consumes a validated run-scoped EvidenceCorpus and produces `QuantitativeEvidenceReadiness`, per-Evidence assessments, and conservative `CompatibleEvidenceGroup` records. This is an Application read model, not a persisted meta-analysis result.
+
+The layer classifies reported effect-measure labels into explicit types such as odds ratio, risk ratio, hazard ratio, mean difference, standardized mean difference, correlation, and risk difference. It preserves the source-reported `EffectMeasure`, `EffectValue`, confidence interval bounds, p-value, confidence level, and reported standard error separately from deterministic normalized values. The LLM may extract reported statistics from grounded SourceMaterial, but C# code performs all transformations such as `ln(OR)`, confidence-interval-to-SE derivation, variance calculation, and Fisher z for correlations.
+
+Eligibility is conservative. P-values alone do not create effect sizes. Confidence intervals do not create standard errors unless the confidence level is explicitly reported. OR/RR/HR values and their CI bounds must be positive before log transformation. Missing population, comparator, or study-design keys prevent automatic grouping. Multiple Evidence items from one Study are not counted as independent studies. Source truncation is retained as limitation metadata and is not automatic ineligibility when the reported statistic is fully grounded.
+
+This milestone still does not implement pooled estimates, fixed/random effects, heterogeneity statistics, forest plots, vote counting, or claims that a meta-analysis was performed.

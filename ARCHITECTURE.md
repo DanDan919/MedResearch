@@ -428,3 +428,24 @@ The compose API service enables config-gated startup migrations with `Database__
 Source acquisition is limited to provider-reported metadata abstracts and Europe PMC's official structured full-text XML endpoint. It does not scrape HTML, download arbitrary PDFs, follow publisher links, or bypass access controls. Provider responses are untrusted and bounded before parsing or LLM use.
 
 EvidenceExtraction, Evidence, and EvidenceEvaluation remain run-scoped. Study and SourceMaterial may be shared across runs, but each extraction points to one exact source snapshot. ResearchReportClaim citation identity is still reconstructed from persisted same-run Evidence and Study rows; the model never supplies authoritative identifiers.
+## Quantitative Evidence Eligibility
+
+After EvidenceCorpus validation, Application can build a deterministic quantitative-readiness read model:
+
+```text
+EvidenceCorpus
+  -> QuantitativeEvidenceAssessor
+  -> QuantitativeEvidenceAssessment[]
+  -> CompatibleEvidenceGroup[]
+  -> future statistical synthesis engine
+```
+
+`QuantitativeEvidenceAssessor` has no EF Core, HTTP, PubMed, Europe PMC, OpenAI, or ASP.NET dependency. It operates in memory over the already validated current-run corpus. It classifies reported effect-measure text into explicit `EffectMeasureType` values, derives conservative outcome/population/comparator/study-design compatibility keys, validates measure-specific numeric constraints, and produces explicit `QuantitativeIneligibilityReason` values when Evidence cannot be used as a future quantitative input.
+
+The supported deterministic normalizations are deliberately limited:
+
+- OR/RR/HR: require positive effect and positive CI bounds when CI is used; normalize to log scale; derive SE only from reported SE or explicit-level CI.
+- Mean difference, standardized mean difference, and risk difference: keep the reported scale; require reported SE or explicit-level CI for uncertainty.
+- Correlation: require `-1 < r < 1` and `SampleSize > 3`; normalize with Fisher z and derive SE from sample size.
+
+The layer does not convert between effect-measure families, semantically harmonize outcomes, infer population/comparator equivalence, assume 95% CI, treat p-value as an effect magnitude, or average incompatible values. Compatible groups expose `UniqueStudyCount` and mark dependent multiple Evidence from one Study as not ready for future meta-analysis input.

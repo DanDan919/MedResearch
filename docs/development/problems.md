@@ -183,3 +183,12 @@ Area: Documentation drift after source acquisition
 Problem: README and architecture text still described extraction as abstract-only after SourceMaterial and structured full-text acquisition existed.
 Decision / fix: Updated README, ARCHITECTURE.md, current-state, technical debt, and the Russian milestone log to describe actual source selection, immutability, fallback, corpus validation, and the no-scraping boundary.
 Verification: dotnet build, dotnet test, and EF model validation are part of the milestone verification.
+
+Date: 2026-09-16
+Area: Quantitative evidence boundary
+Problem: EvidenceCorpus could expose numeric Evidence fields, but the architecture did not distinguish numeric, comparable, independent, and poolable evidence.
+Observed behavior: Existing synthesis correctly avoided meta-analysis, but there was no deterministic readiness layer proving why OR/RR/MD/correlation values must not be averaged together.
+Root cause: Earlier milestones focused on traceability, source material, and narrative synthesis before quantitative eligibility semantics existed.
+Decision / fix: Added `QuantitativeEvidenceAssessor`, explicit effect-measure classification, eligibility reason codes, deterministic C# normalization, Study-independence checks, and tests that reject p-value-only, missing confidence level, invalid ratio, duplicate-study, and incompatible-measure scenarios.
+Verification: Application tests cover quantitative eligibility and local full suite passes with Docker-backed tests skipped because Docker Desktop is unavailable.
+Remaining concerns: Formal meta-analysis, semantic outcome harmonization, cohort overlap, and unsupported effect families remain future work.

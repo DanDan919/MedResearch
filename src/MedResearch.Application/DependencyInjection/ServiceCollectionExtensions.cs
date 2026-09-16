@@ -4,6 +4,7 @@ using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEvidenceEvaluator, EvidenceEvaluator>();
         services.AddScoped<ISynthesisContextBuilder, SynthesisContextBuilder>();
         services.AddScoped<IEvidenceCorpusBuilder, EvidenceCorpusBuilder>();
+        services.AddScoped<IQuantitativeEvidenceAssessor, QuantitativeEvidenceAssessor>();
         services.AddScoped<ResearchReportDraftValidator>();
         services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
         services.AddScoped<GetResearchReportUseCase>();

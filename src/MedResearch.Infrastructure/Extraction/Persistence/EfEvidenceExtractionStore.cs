@@ -222,7 +222,9 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
                 finding.EffectValue,
                 finding.ConfidenceIntervalLower,
                 finding.ConfidenceIntervalUpper,
-                finding.PValue));
+                finding.PValue,
+                finding.ConfidenceLevel,
+                finding.ReportedStandardError));
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

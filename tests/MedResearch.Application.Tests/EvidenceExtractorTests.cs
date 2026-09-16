@@ -183,6 +183,68 @@ public sealed class EvidenceExtractorTests
         Assert.Null(finding.PValue);
     }
 
+    [Fact]
+    public async Task ExtractAsync_PreservesGroundedConfidenceLevelAndReportedStandardError()
+    {
+        var llm = new FakeStructuredLlmClient(new EvidenceExtractionDraft([
+            new EvidenceFindingDraft(
+                "depression severity",
+                "The odds ratio was 1.75.",
+                "The odds ratio was 1.75 with a 95% confidence interval and SE 0.12.",
+                "Positive",
+                "adults",
+                "intervention",
+                "placebo",
+                "randomized controlled trial",
+                120,
+                "odds ratio",
+                1.75m,
+                null,
+                null,
+                null,
+                0.95m,
+                0.12m)
+        ]));
+        var extractor = CreateExtractor(llm);
+
+        var result = await extractor.ExtractAsync(CreateContext("The odds ratio was 1.75 with a 95% confidence interval and SE 0.12."), CancellationToken.None);
+
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(0.95m, finding.ConfidenceLevel);
+        Assert.Equal(0.12m, finding.ReportedStandardError);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_DropsUngroundedReportedStandardError()
+    {
+        var llm = new FakeStructuredLlmClient(new EvidenceExtractionDraft([
+            new EvidenceFindingDraft(
+                "depression severity",
+                "The odds ratio was 1.75.",
+                "The odds ratio was 1.75 with a 95% confidence interval.",
+                "Positive",
+                "adults",
+                "intervention",
+                "placebo",
+                "randomized controlled trial",
+                120,
+                "odds ratio",
+                1.75m,
+                null,
+                null,
+                null,
+                0.95m,
+                0.12m)
+        ]));
+        var extractor = CreateExtractor(llm);
+
+        var result = await extractor.ExtractAsync(CreateContext("The odds ratio was 1.75 with a 95% confidence interval."), CancellationToken.None);
+
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(0.95m, finding.ConfidenceLevel);
+        Assert.Null(finding.ReportedStandardError);
+    }
+
     private static EvidenceExtractor CreateExtractor(IStructuredLlmClient llm)
     {
         return new EvidenceExtractor(

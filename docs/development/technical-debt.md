@@ -36,3 +36,10 @@
 - Europe PMC full-text availability/failure diagnostics are currently operational logs, not a first-class persisted acquisition-attempt table.
 - The current Evidence numeric fields can store one reported effect value and optional interval/p-value, but they do not encode variance/standard error or a compatible effect-measure taxonomy sufficient for meta-analysis.
 - No statistical meta-analysis or raw EffectValue averaging is implemented; future quantitative synthesis needs explicit eligibility, normalization, and model semantics.
+
+## Quantitative Evidence Eligibility
+
+- Quantitative readiness is now explicit, but formal meta-analysis remains future work. There is still no pooled effect estimate, heterogeneity statistic, forest plot, semantic outcome harmonization, or cohort-overlap detection.
+- Compatibility keys are intentionally conservative exact-normalized strings. Semantically equivalent outcomes, populations, or comparators expressed differently may remain separate until a validated harmonization method exists.
+- Confidence intervals without an explicit confidence level remain quantitatively ineligible for SE derivation; the system does not assume 95%.
+- Regression coefficients, raw proportions, event counts, and group-level continuous statistics are not yet normalized into future quantitative synthesis inputs.

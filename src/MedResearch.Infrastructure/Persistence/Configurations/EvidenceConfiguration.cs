@@ -99,6 +99,14 @@ internal sealed class EvidenceConfiguration : IEntityTypeConfiguration<Evidence>
             .HasColumnName("confidence_interval_upper")
             .HasColumnType("numeric(18,6)");
 
+        builder.Property(evidence => evidence.ConfidenceLevel)
+            .HasColumnName("confidence_level")
+            .HasColumnType("numeric(5,4)");
+
+        builder.Property(evidence => evidence.ReportedStandardError)
+            .HasColumnName("reported_standard_error")
+            .HasColumnType("numeric(18,6)");
+
         builder.Property(evidence => evidence.PValue)
             .HasColumnName("p_value")
             .HasColumnType("numeric(18,6)");

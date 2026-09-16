@@ -125,7 +125,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 evidence.EffectValue,
                 evidence.ConfidenceIntervalLower,
                 evidence.ConfidenceIntervalUpper,
-                evidence.PValue))
+                evidence.PValue,
+                evidence.ConfidenceLevel,
+                evidence.ReportedStandardError))
             .ToArrayAsync(cancellationToken);
         var evaluations = await _dbContext.EvidenceEvaluations
             .AsNoTracking()

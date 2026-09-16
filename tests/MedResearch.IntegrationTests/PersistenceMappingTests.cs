@@ -77,7 +77,7 @@ public sealed class PersistenceMappingTests
         var study = new Study(
             Guid.NewGuid(),
             "Sleep and memory consolidation in adults",
-            "Recall improved after sleep in 120 adults.",
+            "Recall improved after sleep in 120 adults with odds ratio 1.75, 95% CI 1.20 to 2.55, SE 0.12.",
             "10.1234/example.doi",
             "12345678",
             "Journal of Neuroscience Examples",
@@ -119,7 +119,7 @@ public sealed class PersistenceMappingTests
             extraction.Id,
             "recall",
             "Recall improved after sleep.",
-            "Recall improved after sleep in 120 adults.",
+            "Recall improved after sleep in 120 adults with odds ratio 1.75, 95% CI 1.20 to 2.55, SE 0.12.",
             EvidenceDirection.Positive,
             EvidenceSourceScope.Abstract,
             extraction.ExtractedAt,
@@ -129,11 +129,13 @@ public sealed class PersistenceMappingTests
             null,
             null,
             120,
+            "odds ratio",
+            1.75m,
+            1.20m,
+            2.55m,
             null,
-            null,
-            null,
-            null,
-            null);
+            0.95m,
+            0.12m);
 
         context.ResearchQuestions.Add(question);
         context.ResearchRuns.Add(run);
@@ -150,8 +152,14 @@ public sealed class PersistenceMappingTests
         Assert.Equal(run.Id, savedEvidence.ResearchRunId);
         Assert.Equal(study.Id, savedEvidence.StudyId);
         Assert.Equal(extraction.Id, savedEvidence.EvidenceExtractionId);
-        Assert.Equal("Recall improved after sleep in 120 adults.", savedEvidence.SupportingText);
+        Assert.Equal("Recall improved after sleep in 120 adults with odds ratio 1.75, 95% CI 1.20 to 2.55, SE 0.12.", savedEvidence.SupportingText);
         Assert.Equal(120, savedEvidence.SampleSize);
+        Assert.Equal("odds ratio", savedEvidence.EffectMeasure);
+        Assert.Equal(1.75m, savedEvidence.EffectValue);
+        Assert.Equal(1.20m, savedEvidence.ConfidenceIntervalLower);
+        Assert.Equal(2.55m, savedEvidence.ConfidenceIntervalUpper);
+        Assert.Equal(0.95m, savedEvidence.ConfidenceLevel);
+        Assert.Equal(0.12m, savedEvidence.ReportedStandardError);
         Assert.True(savedEvidence.GroundingValidated);
         Assert.Equal(EvidenceExtractionStatus.Completed, savedExtraction.Status);
         Assert.Equal(study.Title, savedStudy.Title);

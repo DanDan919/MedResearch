@@ -9,6 +9,8 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Quantitative;
+using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
@@ -90,6 +92,7 @@ public sealed partial class FullFakePipelineTests
             Assert.True(await db.ResearchPlans.AnyAsync(plan => plan.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.LiteratureSearches.AnyAsync(search => search.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.Studies.AnyAsync(study => study.Pmid == "99123456" && study.Doi == "10.1000/medresearch-e2e-sleep-recall", CancellationToken.None));
+            Assert.Equal(3, await db.Studies.CountAsync(study => study.Title.StartsWith("Fake"), CancellationToken.None));
             Assert.True(await db.ResearchStudyDiscoveries.AnyAsync(discovery => discovery.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.EvidenceExtractions.AnyAsync(extraction => extraction.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.Evidence.AnyAsync(evidence => evidence.ResearchRunId == created.ResearchRunId && evidence.GroundingValidated, CancellationToken.None));
@@ -124,12 +127,30 @@ public sealed partial class FullFakePipelineTests
         var returnedCitation = Assert.Single(returnedClaim.Citations);
         Assert.Equal("99123456", returnedCitation.Pmid);
         Assert.Equal("10.1000/medresearch-e2e-sleep-recall", returnedCitation.Doi);
-        Assert.Equal("Fake randomized sleep recall trial", returnedCitation.Title);
-        Assert.Contains("sleep improved recall", returnedCitation.SupportingText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Fake structured full text odds ratio trial", returnedCitation.Title);
+        Assert.Contains("depression severity improved", returnedCitation.SupportingText, StringComparison.OrdinalIgnoreCase);
 
-        Assert.Equal(
-            [typeof(ResearchPlanDraft), typeof(EvidenceExtractionDraft), typeof(EvidenceEvaluationDraft), typeof(ResearchReportDraft)],
-            fakeLlm.RequestedTypes);
+        Assert.Equal(1, fakeLlm.RequestedTypes.Count(type => type == typeof(ResearchPlanDraft)));
+        Assert.Equal(3, fakeLlm.RequestedTypes.Count(type => type == typeof(EvidenceExtractionDraft)));
+        Assert.Equal(3, fakeLlm.RequestedTypes.Count(type => type == typeof(EvidenceEvaluationDraft)));
+        Assert.Equal(1, fakeLlm.RequestedTypes.Count(type => type == typeof(ResearchReportDraft)));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var corpus = await scope.ServiceProvider.GetRequiredService<IEvidenceCorpusBuilder>()
+                .BuildAsync(created.ResearchRunId, CancellationToken.None);
+            var readiness = scope.ServiceProvider.GetRequiredService<IQuantitativeEvidenceAssessor>()
+                .Assess(corpus);
+
+            Assert.Equal(3, readiness.Assessments.Count);
+            var severityGroup = Assert.Single(readiness.CompatibleGroups, group => group.OutcomeGroupKey == "depression severity");
+            Assert.Equal(EffectMeasureType.OddsRatio, severityGroup.EffectMeasureType);
+            Assert.Equal(2, severityGroup.EvidenceCount);
+            Assert.Equal(2, severityGroup.UniqueStudyCount);
+            Assert.True(severityGroup.ReadyForFutureMetaAnalysisInput);
+            Assert.DoesNotContain(readiness.CompatibleGroups, group => group.OutcomeGroupKey == "treatment response" && group.EvidenceCount > 1);
+            Assert.Contains(corpus.SourceMaterials, source => source.Type == SourceMaterialType.StructuredFullText);
+        }
+
         Assert.Equal(1, fakeLiterature.RequestCount);
     }
 
@@ -182,6 +203,7 @@ public sealed partial class FullFakePipelineTests
                 services.RemoveAll<IHostedService>();
                 services.RemoveAll<IStructuredLlmClient>();
                 services.RemoveAll<IScientificLiteratureSource>();
+                services.RemoveAll<ISourceMaterialProvider>();
                 services.RemoveAll<DbContextOptions<MedResearchDbContext>>();
                 services.RemoveAll<MedResearchDbContext>();
                 services.RemoveAll<IDbContextFactory<MedResearchDbContext>>();
@@ -203,6 +225,7 @@ public sealed partial class FullFakePipelineTests
 
                 services.AddSingleton<IStructuredLlmClient>(_fakeLlm);
                 services.AddSingleton<IScientificLiteratureSource>(_fakeLiterature);
+                services.AddSingleton<ISourceMaterialProvider, FakeStructuredFullTextProvider>();
             });
         }
     }
@@ -272,7 +295,9 @@ public sealed partial class FullFakePipelineTests
 
     private sealed class FakeScientificLiteratureSource : IScientificLiteratureSource
     {
-        private const string AbstractText = "In this randomized controlled trial, sleep improved recall in 120 adults compared with wakefulness.";
+        public const string FullTextAbstract = "Structured full text article reports depression severity benefit.";
+        public const string AbstractOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.40 with 95% CI 1.05 to 1.90.";
+        public const string IncompatibleText = "In this randomized controlled trial, treatment response improved in 120 adults compared with placebo; risk ratio 1.30 with 95% CI 1.00 to 1.70.";
 
         public string SourceName => "PubMed";
 
@@ -284,26 +309,90 @@ public sealed partial class FullFakePipelineTests
             RequestCount++;
             Assert.Contains("sleep", request.Query, StringComparison.OrdinalIgnoreCase);
 
-            var candidate = new ScientificStudyCandidate(
-                "99123456",
-                null,
-                "10.1000/medresearch-e2e-sleep-recall",
-                "Fake randomized sleep recall trial",
-                AbstractText,
-                "Journal of Deterministic Tests",
-                new DateOnly(2026, 1, 15),
-                2026,
-                1,
-                15,
-                ["Randomized Controlled Trial"],
-                ["Ada Lovelace"],
-                "99123456",
-                SourceName);
+            var candidates = new[]
+            {
+                new ScientificStudyCandidate(
+                    "99123456",
+                    "PMC99123456",
+                    "10.1000/medresearch-e2e-sleep-recall",
+                    "Fake structured full text odds ratio trial",
+                    FullTextAbstract,
+                    "Journal of Deterministic Tests",
+                    new DateOnly(2026, 1, 15),
+                    2026,
+                    1,
+                    15,
+                    ["Randomized Controlled Trial"],
+                    ["Ada Lovelace"],
+                    "99123456",
+                    SourceName),
+                new ScientificStudyCandidate(
+                    "99123457",
+                    null,
+                    "10.1000/medresearch-e2e-abstract-or",
+                    "Fake abstract odds ratio trial",
+                    AbstractOddsRatioText,
+                    "Journal of Deterministic Tests",
+                    new DateOnly(2026, 1, 16),
+                    2026,
+                    1,
+                    16,
+                    ["Randomized Controlled Trial"],
+                    ["Grace Hopper"],
+                    "99123457",
+                    SourceName),
+                new ScientificStudyCandidate(
+                    "99123458",
+                    null,
+                    "10.1000/medresearch-e2e-incompatible",
+                    "Fake incompatible risk ratio trial",
+                    IncompatibleText,
+                    "Journal of Deterministic Tests",
+                    new DateOnly(2026, 1, 17),
+                    2026,
+                    1,
+                    17,
+                    ["Randomized Controlled Trial"],
+                    ["Katherine Johnson"],
+                    "99123458",
+                    SourceName)
+            };
 
-            return Task.FromResult(new ScientificSearchResult(SourceName, DateTimeOffset.UtcNow, 1, [candidate]));
+            return Task.FromResult(new ScientificSearchResult(SourceName, DateTimeOffset.UtcNow, candidates.Length, candidates));
         }
     }
 
+    private sealed class FakeStructuredFullTextProvider : ISourceMaterialProvider
+    {
+        public string ProviderName => "FakeFullText";
+
+        public Task<SourceMaterialCandidate?> TryAcquireAsync(
+            SourceMaterialStudyContext study,
+            int maxContentCharacters,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (study.Pmid != "99123456")
+            {
+                return Task.FromResult<SourceMaterialCandidate?>(null);
+            }
+
+            const string content = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.";
+            return Task.FromResult<SourceMaterialCandidate?>(new SourceMaterialCandidate(
+                SourceMaterialType.StructuredFullText,
+                ProviderName,
+                study.Pmcid,
+                "FakeStructuredFullText",
+                content,
+                DateTimeOffset.UtcNow,
+                null,
+                "CC0 test fixture",
+                null,
+                SourceMaterialAccessStatus.OpenAccess,
+                false,
+                ["Results"]));
+        }
+    }
     private sealed class FakeStructuredLlmClient : IStructuredLlmClient
     {
         public List<Type> RequestedTypes { get; } = [];
@@ -352,6 +441,80 @@ public sealed partial class FullFakePipelineTests
                 new StructuredLlmProviderMetadata("FakeLLM", "fake-model", null, DateTimeOffset.UtcNow)));
         }
 
+        private static EvidenceExtractionDraft CreateExtractionDraft(StructuredLlmRequest request)
+        {
+            if (request.UserPrompt.Contains("Fake structured full text odds ratio trial", StringComparison.Ordinal))
+            {
+                return new EvidenceExtractionDraft([
+                    new EvidenceFindingDraft(
+                        "depression severity",
+                        "Depression severity improved with structured sleep compared with placebo.",
+                        "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.",
+                        "Positive",
+                        "adults with depressive symptoms",
+                        "structured sleep",
+                        "placebo",
+                        "randomized controlled trial",
+                        120,
+                        "odds ratio",
+                        1.75m,
+                        1.20m,
+                        2.55m,
+                        null,
+                        0.95m,
+                        null)
+                ]);
+            }
+
+            if (request.UserPrompt.Contains("Fake abstract odds ratio trial", StringComparison.Ordinal))
+            {
+                return new EvidenceExtractionDraft([
+                    new EvidenceFindingDraft(
+                        "depression severity",
+                        "Depression severity improved with structured sleep compared with placebo.",
+                        FakeScientificLiteratureSource.AbstractOddsRatioText,
+                        "Positive",
+                        "adults with depressive symptoms",
+                        "structured sleep",
+                        "placebo",
+                        "randomized controlled trial",
+                        120,
+                        "OR",
+                        1.40m,
+                        1.05m,
+                        1.90m,
+                        null,
+                        0.95m,
+                        null)
+                ]);
+            }
+
+            if (request.UserPrompt.Contains("Fake incompatible risk ratio trial", StringComparison.Ordinal))
+            {
+                return new EvidenceExtractionDraft([
+                    new EvidenceFindingDraft(
+                        "treatment response",
+                        "Treatment response improved with structured sleep compared with placebo.",
+                        FakeScientificLiteratureSource.IncompatibleText,
+                        "Positive",
+                        "adults with depressive symptoms",
+                        "structured sleep",
+                        "placebo",
+                        "randomized controlled trial",
+                        120,
+                        "risk ratio",
+                        1.30m,
+                        1.00m,
+                        1.70m,
+                        null,
+                        0.95m,
+                        null)
+                ]);
+            }
+
+            throw new InvalidOperationException("Unexpected fake extraction prompt.");
+        }
+
         private static EvidenceEvaluationDraft CreateEvaluationDraft(StructuredLlmRequest request)
         {
             var researchRunId = RequiredMatch(request.UserPrompt, "researchRunId: ([0-9a-fA-F-]{36})");
@@ -371,7 +534,7 @@ public sealed partial class FullFakePipelineTests
                 "Unknown",
                 "Direct",
                 "Moderate",
-                "The supplied abstract reports randomized allocation, 120 adults, and a wakefulness comparator, but abstract-level source detail limits blinding, allocation concealment, and attrition assessment.",
+                "The supplied source reports randomized allocation, 120 adults, and a placebo comparator, but source detail still limits blinding, allocation concealment, and attrition assessment.",
                 [],
                 []);
         }
@@ -383,16 +546,16 @@ public sealed partial class FullFakePipelineTests
             return new ResearchReportDraft(
                 "Completed",
                 null,
-                "One fake source-grounded study reported improved recall after sleep.",
-                "The included evidence says sleep improved recall in 120 adults compared with wakefulness.",
+                "Three fake source-grounded studies reported quantitative outcomes; synthesis remains narrative.",
+                "The included evidence reports depression severity and treatment response findings from fake studies.",
                 "No conflicting evidence was present in the supplied corpus.",
                 "The evidence is abstract-level and intentionally fake for deterministic orchestration testing.",
-                "Within this fake test corpus, structured sleep is positively associated with recall.",
+                "Within this fake test corpus, structured sleep is positively associated with the reported outcomes.",
                 "Limited",
                 [new ResearchReportClaimDraft(
                     "Conclusion",
                     "Positive",
-                    "The supplied fake study supports improved recall after sleep compared with wakefulness.",
+                    "The supplied fake study supports improved depression severity after structured sleep compared with placebo.",
                     [evidenceId])]);
         }
 

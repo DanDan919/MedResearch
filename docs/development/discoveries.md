@@ -16,3 +16,9 @@
 - Current Europe PMC Articles REST API documentation confirms production REST base `https://www.ebi.ac.uk/europepmc/webservices/rest/`, search endpoint `/search`, `query` parameter, `format=json`, result types `idlist`, `lite`, and `core`, and cursor pagination through `pageSize`, `cursorMark`, and `nextCursorMark`.
 - Europe PMC `core` search results expose source/id provider identity plus publication metadata such as PMID, PMCID, DOI, title, abstract text, authors, journal fields, publication dates, and publication types. This is enough for the current abstract-level search pipeline without a per-record detail request.
 - Europe PMC does not use a PubMed-style `api_key` for normal Articles REST search. MedResearch keeps Europe PMC request pacing as a conservative local configuration rather than treating it as an authenticated quota.
+
+## 2026-09-16
+
+- Quantitative readiness requires more than a reported number. MedResearch now treats source-reported statistics, normalized statistics, and future pooled estimates as separate concepts.
+- A confidence interval is not enough to derive a standard error unless the confidence level is explicitly reported; normal CI conventions are not assumed.
+- Multiple Evidence items from one Study may be useful descriptively, but they are not independent study contributions for future quantitative synthesis.

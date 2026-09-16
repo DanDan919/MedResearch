@@ -52,7 +52,9 @@ public sealed record AcceptedEvidenceFinding(
     decimal? EffectValue,
     decimal? ConfidenceIntervalLower,
     decimal? ConfidenceIntervalUpper,
-    decimal? PValue);
+    decimal? PValue,
+    decimal? ConfidenceLevel = null,
+    decimal? ReportedStandardError = null);
 
 public sealed record EvidenceExtractionResult(
     Guid ResearchRunId,

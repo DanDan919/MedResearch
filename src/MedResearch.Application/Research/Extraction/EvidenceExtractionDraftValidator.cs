@@ -97,7 +97,9 @@ public sealed class EvidenceExtractionDraftValidator
                 KeepGroundedDecimal(context.SourceContent, finding.EffectValue),
                 KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalLower),
                 KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalUpper),
-                KeepGroundedDecimal(context.SourceContent, finding.PValue)));
+                KeepGroundedDecimal(context.SourceContent, finding.PValue),
+                KeepGroundedConfidenceLevel(context.SourceContent, finding.ConfidenceLevel),
+                KeepGroundedDecimal(context.SourceContent, finding.ReportedStandardError)));
         }
 
         return accepted;
@@ -123,6 +125,27 @@ public sealed class EvidenceExtractionDraftValidator
         return value.HasValue && _numericGroundingValidator.IsGrounded(sourceText, value.Value)
             ? value
             : null;
+    }
+
+    private decimal? KeepGroundedConfidenceLevel(string sourceText, decimal? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        if (value is <= 0m or >= 1m)
+        {
+            return null;
+        }
+
+        if (_numericGroundingValidator.IsGrounded(sourceText, value.Value)
+            || _numericGroundingValidator.IsGrounded(sourceText, value.Value * 100m))
+        {
+            return value;
+        }
+
+        return null;
     }
 
     private decimal? KeepGroundedDecimal(string sourceText, decimal? value)

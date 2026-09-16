@@ -84,7 +84,9 @@ public sealed record SynthesisEvidenceContext(
     decimal? EffectValue,
     decimal? ConfidenceIntervalLower,
     decimal? ConfidenceIntervalUpper,
-    decimal? PValue);
+    decimal? PValue,
+    decimal? ConfidenceLevel = null,
+    decimal? ReportedStandardError = null);
 
 public sealed record SynthesisEvaluationContext(
     Guid EvaluationId,

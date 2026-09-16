@@ -23,7 +23,9 @@ public sealed class Evidence
         decimal? effectValue,
         decimal? confidenceIntervalLower,
         decimal? confidenceIntervalUpper,
-        decimal? pValue)
+        decimal? pValue,
+        decimal? confidenceLevel = null,
+        decimal? reportedStandardError = null)
     {
         if (id == Guid.Empty)
         {
@@ -70,6 +72,16 @@ public sealed class Evidence
             throw new ArgumentOutOfRangeException(nameof(pValue), "P-value must be between 0 and 1 when present.");
         }
 
+        if (confidenceLevel is <= 0m or >= 1m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(confidenceLevel), "Confidence level must be between 0 and 1 when present.");
+        }
+
+        if (reportedStandardError is <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(reportedStandardError), "Reported standard error must be positive when present.");
+        }
+
         Id = id;
         ResearchRunId = researchRunId;
         StudyId = studyId;
@@ -91,6 +103,8 @@ public sealed class Evidence
         ConfidenceIntervalLower = confidenceIntervalLower;
         ConfidenceIntervalUpper = confidenceIntervalUpper;
         PValue = pValue;
+        ConfidenceLevel = confidenceLevel;
+        ReportedStandardError = reportedStandardError;
     }
 
     public Guid Id { get; }
@@ -134,6 +148,10 @@ public sealed class Evidence
     public decimal? ConfidenceIntervalUpper { get; }
 
     public decimal? PValue { get; }
+
+    public decimal? ConfidenceLevel { get; }
+
+    public decimal? ReportedStandardError { get; }
 
     private static string NormalizeRequired(string value, string parameterName)
     {
