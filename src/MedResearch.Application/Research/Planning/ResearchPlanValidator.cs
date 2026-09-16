@@ -34,7 +34,8 @@ public static class ResearchPlanValidator
         string authoritativeQuestion,
         ResearchPlanDraft draft,
         StructuredLlmProviderMetadata metadata,
-        string promptVersion)
+        string promptVersion,
+        int maxSearchQueries = MaximumSearchQueryCount)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(authoritativeQuestion);
 
@@ -46,7 +47,7 @@ public static class ResearchPlanValidator
             throw new ResearchPlanValidationException("Planner output changed the original research question.");
         }
 
-        var searchQueries = ValidateSearchQueries(draft.SearchQueries);
+        var searchQueries = ValidateSearchQueries(draft.SearchQueries, maxSearchQueries);
         var preferredStudyTypes = ValidatePreferredStudyTypes(draft.PreferredStudyTypes);
 
         return new ResearchPlan(
@@ -67,16 +68,20 @@ public static class ResearchPlanValidator
             metadata.GeneratedAt);
     }
 
-    private static string[] ValidateSearchQueries(IReadOnlyCollection<string>? queries)
+    private static string[] ValidateSearchQueries(IReadOnlyCollection<string>? queries, int maxSearchQueries)
     {
+        if (maxSearchQueries is < 1 or > MaximumSearchQueryCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxSearchQueries), $"Maximum search queries must be between 1 and {MaximumSearchQueryCount}.");
+        }
         if (queries is null || queries.Count == 0)
         {
             throw new ResearchPlanValidationException("Planner output did not include any search queries.");
         }
 
-        if (queries.Count > MaximumSearchQueryCount)
+        if (queries.Count > maxSearchQueries)
         {
-            throw new ResearchPlanValidationException($"Planner output included more than {MaximumSearchQueryCount} search queries.");
+            throw new ResearchPlanValidationException($"Planner output included more than {maxSearchQueries} search queries.");
         }
 
         var normalized = new List<string>();

@@ -34,6 +34,7 @@ services:
       AI__ApiKey: ${OPENAI_API_KEY:-}
       AI__TimeoutSeconds: "30"
       AI__MaxOutputTokens: "2000"
+      ResearchPlanning__MaxSearchQueries: ${RESEARCH_PLANNING_MAX_SEARCH_QUERIES:-5}
       EvidenceExtraction__MaxStudiesPerRun: ${EVIDENCE_EXTRACTION_MAX_STUDIES_PER_RUN:-10}
       EvidenceEvaluation__MaxStudiesPerRun: ${EVIDENCE_EVALUATION_MAX_STUDIES_PER_RUN:-10}
       Synthesis__MaxStudies: ${SYNTHESIS_MAX_STUDIES:-10}

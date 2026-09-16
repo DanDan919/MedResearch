@@ -192,3 +192,12 @@ Root cause: Earlier milestones focused on traceability, source material, and nar
 Decision / fix: Added `QuantitativeEvidenceAssessor`, explicit effect-measure classification, eligibility reason codes, deterministic C# normalization, Study-independence checks, and tests that reject p-value-only, missing confidence level, invalid ratio, duplicate-study, and incompatible-measure scenarios.
 Verification: Application tests cover quantitative eligibility and local full suite passes with Docker-backed tests skipped because Docker Desktop is unavailable.
 Remaining concerns: Formal meta-analysis, semantic outcome harmonization, cohort overlap, and unsupported effect families remain future work.
+
+Date: 2026-09-16
+Area: Live validation bounds
+Problem: The planner maximum was hard-coded at five search queries, so a bounded live E2E validation run could still fan out to up to ten source executions when both PubMed and Europe PMC were enabled.
+Observed behavior: Earlier limits existed for provider results, source acquisition, extraction, evaluation, and synthesis, but not for the number of accepted planner search queries by environment.
+Root cause: The original planner validator intentionally used one static maximum because normal deterministic tests did not need a smaller runtime bound.
+Decision / fix: Added `ResearchPlanning:MaxSearchQueries` with a default of 5 and live harness override of 2. The prompt schema, prompt text, and validator all use the configured bound.
+Verification: Application tests cover rejection above a configured limit and schema `maxItems` generation. Full local/CI verification is tracked in the milestone report.
+Remaining concerns: This bounds source fan-out; it does not make live provider availability deterministic.

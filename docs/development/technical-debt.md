@@ -43,3 +43,9 @@
 - Compatibility keys are intentionally conservative exact-normalized strings. Semantically equivalent outcomes, populations, or comparators expressed differently may remain separate until a validated harmonization method exists.
 - Confidence intervals without an explicit confidence level remain quantitatively ineligible for SE derivation; the system does not assume 95%.
 - Regression coefficients, raw proportions, event counts, and group-level continuous statistics are not yet normalized into future quantitative synthesis inputs.
+
+## Live Validation
+
+- The live E2E harness exists but was not executed in this environment because no live OpenAI key and isolated PostgreSQL runtime were configured. It should be run only against a disposable database with explicit `MEDRESEARCH_LIVE_E2E_DATABASE_ACK=isolated`.
+- Live E2E success will validate current external-provider availability for one bounded question, not scientific completeness or general provider uptime.
+- OpenAI structured generation still has no bounded retry policy; live failures from transient OpenAI/API/network issues use the existing safe failure path.

@@ -22,3 +22,8 @@
 - Quantitative readiness requires more than a reported number. MedResearch now treats source-reported statistics, normalized statistics, and future pooled estimates as separate concepts.
 - A confidence interval is not enough to derive a standard error unless the confidence level is explicitly reported; normal CI conventions are not assumed.
 - Multiple Evidence items from one Study may be useful descriptively, but they are not independent study contributions for future quantitative synthesis.
+
+## 2026-09-16 M16
+
+- A real live E2E check needs a separate explicit gate because it combines paid OpenAI calls, live scientific providers, and a writable PostgreSQL database. Keeping it outside `MedResearch.slnx` preserves deterministic normal tests.
+- Planning needed a configurable query-count bound so live validation can cap provider fan-out without relying on the LLM to voluntarily return only two queries.

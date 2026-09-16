@@ -53,6 +53,26 @@ public sealed class ResearchPlannerTests
     }
 
     [Fact]
+    public async Task GenerateAndPersistPlanAsync_RejectsSearchQueriesAboveConfiguredLimit()
+    {
+        var store = new RecordingResearchPlanStore();
+        var planner = CreatePlanner(new FakeStructuredLlmClient(CreateValidDraft() with { SearchQueries = ["q1", "q2", "q3"] }), store, new ResearchPlanningOptions { MaxSearchQueries = 2 });
+
+        await Assert.ThrowsAsync<ResearchPlanValidationException>(() =>
+            planner.GenerateAndPersistPlanAsync(ResearchRunId, ResearchQuestionId, Question, CancellationToken.None));
+
+        Assert.Null(store.SavedPlan);
+    }
+
+    [Fact]
+    public void ResearchPlannerPrompt_CreateOutputSchema_UsesConfiguredSearchQueryLimit()
+    {
+        var schema = ResearchPlannerPrompt.CreateOutputSchema(2).JsonSchema;
+
+        Assert.Contains("\"maxItems\":2", schema, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GenerateAndPersistPlanAsync_RejectsBlankSearchQuery()
     {
         await AssertInvalidAsync(CreateValidDraft() with { SearchQueries = ["valid query", " "] });
@@ -141,9 +161,9 @@ public sealed class ResearchPlannerTests
         Assert.Null(store.SavedPlan);
     }
 
-    private static ResearchPlanner CreatePlanner(FakeStructuredLlmClient provider, RecordingResearchPlanStore store)
+    private static ResearchPlanner CreatePlanner(FakeStructuredLlmClient provider, RecordingResearchPlanStore store, ResearchPlanningOptions? options = null)
     {
-        return new ResearchPlanner(provider, store, NullLogger<ResearchPlanner>.Instance);
+        return new ResearchPlanner(provider, store, NullLogger<ResearchPlanner>.Instance, options);
     }
 
     private static ResearchPlanDraft CreateValidDraft()

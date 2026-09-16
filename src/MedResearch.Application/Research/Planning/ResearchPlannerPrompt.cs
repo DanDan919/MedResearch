@@ -7,10 +7,19 @@ public static class ResearchPlannerPrompt
 {
     public const string Version = "research-planner-v1";
 
-    public static StructuredOutputSchema OutputSchema { get; } = new(
-        "research_plan",
-        JsonSerializer.Serialize(new
+    public static StructuredOutputSchema OutputSchema { get; } = CreateOutputSchema(ResearchPlanValidator.MaximumSearchQueryCount);
+
+    public static StructuredOutputSchema CreateOutputSchema(int maxSearchQueries)
+    {
+        if (maxSearchQueries is < 1 or > ResearchPlanValidator.MaximumSearchQueryCount)
         {
+            throw new ArgumentOutOfRangeException(nameof(maxSearchQueries), $"Maximum search queries must be between 1 and {ResearchPlanValidator.MaximumSearchQueryCount}.");
+        }
+
+        return new StructuredOutputSchema(
+            "research_plan",
+            JsonSerializer.Serialize(new
+            {
             type = "object",
             additionalProperties = false,
             required = new[]
@@ -32,14 +41,19 @@ public static class ResearchPlannerPrompt
                 comparator = NullableString("Comparator when inferable, otherwise null."),
                 outcomes = StringArray("Outcome concepts to search for; empty array when absent."),
                 preferredStudyTypes = StringArray("Preferred study designs using the allowed labels in the prompt; empty array when absent."),
-                searchQueries = SearchQueryArray("One to five conservative scientific database search queries. Do not include PMID, DOI, or invented titles."),
+                searchQueries = SearchQueryArray($"One to {maxSearchQueries} conservative scientific database search queries. Do not include PMID, DOI, or invented titles.", maxSearchQueries),
                 exclusionHints = StringArray("Concepts that may be excluded later; empty array when absent.")
             }
-        }));
+            }));
+    }
 
-    public static ResearchPlannerPromptText Create(string researchQuestion)
+    public static ResearchPlannerPromptText Create(string researchQuestion, int maxSearchQueries = ResearchPlanValidator.MaximumSearchQueryCount)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(researchQuestion);
+        if (maxSearchQueries is < 1 or > ResearchPlanValidator.MaximumSearchQueryCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxSearchQueries), $"Maximum search queries must be between 1 and {ResearchPlanValidator.MaximumSearchQueryCount}.");
+        }
 
         return new ResearchPlannerPromptText(
             """
@@ -56,7 +70,7 @@ public static class ResearchPlannerPrompt
             Submitted research question:
             {researchQuestion}
 
-            Copy the submitted research question exactly into originalQuestion. Generate one to five bounded search queries suitable for PubMed-style scientific retrieval.
+            Copy the submitted research question exactly into originalQuestion. Generate one to {maxSearchQueries} bounded search queries suitable for PubMed-style scientific retrieval.
             """);
     }
 
@@ -75,9 +89,9 @@ public static class ResearchPlannerPrompt
         return ArraySchema(description, 10, 500);
     }
 
-    private static object SearchQueryArray(string description)
+    private static object SearchQueryArray(string description, int maxItems)
     {
-        return ArraySchema(description, 5, 300);
+        return ArraySchema(description, maxItems, 300);
     }
 
     private static object ArraySchema(string description, int maxItems, int maxLength)

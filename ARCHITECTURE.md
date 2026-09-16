@@ -449,3 +449,11 @@ The supported deterministic normalizations are deliberately limited:
 - Correlation: require `-1 < r < 1` and `SampleSize > 3`; normalize with Fisher z and derive SE from sample size.
 
 The layer does not convert between effect-measure families, semantically harmonize outcomes, infer population/comparator equivalence, assume 95% CI, treat p-value as an effect magnitude, or average incompatible values. Compatible groups expose `UniqueStudyCount` and mark dependent multiple Evidence from one Study as not ready for future meta-analysis input.
+
+## Live Scientific E2E Validation Boundary
+
+Live scientific validation is an explicit operational test boundary, not part of normal automated tests. The optional `tests/MedResearch.LiveE2EValidationTests` project exercises the real API composition root, hosted background worker, PostgreSQL persistence, OpenAI structured generation, PubMed, Europe PMC search, Europe PMC full-text acquisition where available, evidence extraction/evaluation, EvidenceCorpus, quantitative readiness, synthesis, and report endpoint.
+
+The live harness does not duplicate stage logic. It submits a normal `POST /api/research` request and observes the normal worker-owned ResearchRun lifecycle. It requires `MEDRESEARCH_RUN_LIVE_E2E=true`, an explicitly acknowledged isolated PostgreSQL database, configured OpenAI model/API key, and PubMed contact email. Normal CI remains deterministic and external-service independent.
+
+The live validation configuration deliberately bounds retrieval and processing volume. `ResearchPlanning:MaxSearchQueries` defaults to the existing maximum of 5 but can be reduced to 2 for live validation. Source result caps, source acquisition, extraction, evaluation, and synthesis bounds are also reduced in the harness. These bounds validate architecture against real data without turning the test into an exhaustive review.

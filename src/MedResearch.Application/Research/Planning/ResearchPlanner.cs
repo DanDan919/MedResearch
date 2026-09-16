@@ -9,15 +9,19 @@ public sealed class ResearchPlanner : IResearchPlanner
     private readonly IStructuredLlmClient _structuredLlmClient;
     private readonly IResearchPlanStore _researchPlanStore;
     private readonly ILogger<ResearchPlanner> _logger;
+    private readonly ResearchPlanningOptions _options;
 
     public ResearchPlanner(
         IStructuredLlmClient structuredLlmClient,
         IResearchPlanStore researchPlanStore,
-        ILogger<ResearchPlanner> logger)
+        ILogger<ResearchPlanner> logger,
+        ResearchPlanningOptions? options = null)
     {
         _structuredLlmClient = structuredLlmClient;
         _researchPlanStore = researchPlanStore;
         _logger = logger;
+        _options = options ?? new ResearchPlanningOptions();
+        _options.Validate();
     }
 
     public async Task<ResearchPlan> GenerateAndPersistPlanAsync(
@@ -28,7 +32,8 @@ public sealed class ResearchPlanner : IResearchPlanner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(researchQuestion);
 
-        var prompt = ResearchPlannerPrompt.Create(researchQuestion);
+        var maxSearchQueries = _options.BoundedMaxSearchQueries;
+        var prompt = ResearchPlannerPrompt.Create(researchQuestion, maxSearchQueries);
         var startedAt = DateTimeOffset.UtcNow;
 
         _logger.LogInformation(
@@ -43,7 +48,7 @@ public sealed class ResearchPlanner : IResearchPlanner
                     ResearchPlannerPrompt.Version,
                     prompt.SystemPrompt,
                     prompt.UserPrompt,
-                    ResearchPlannerPrompt.OutputSchema),
+                    ResearchPlannerPrompt.CreateOutputSchema(maxSearchQueries)),
                 cancellationToken);
 
             var acceptedPlan = ResearchPlanValidator.CreateValidatedPlan(
@@ -53,7 +58,8 @@ public sealed class ResearchPlanner : IResearchPlanner
                 researchQuestion,
                 generationResult.Value,
                 generationResult.Metadata,
-                ResearchPlannerPrompt.Version);
+                ResearchPlannerPrompt.Version,
+                maxSearchQueries);
 
             await _researchPlanStore.SaveResearchPlanAsync(acceptedPlan, cancellationToken);
 

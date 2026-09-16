@@ -218,3 +218,10 @@ The source-material layer is now persisted and used as the authoritative extract
 - Quantitative readiness can derive log ratio effects, CI/SE-based variance, and Fisher z correlations in C# only; the LLM is not used as a calculator.
 - CompatibleEvidenceGroup is a readiness grouping, not a pooled result. It tracks unique Study count and refuses to treat multiple Evidence from one Study as independent.
 - Narrative ResearchReport synthesis remains unchanged and does not claim meta-analysis.
+
+## Milestone 16 Live Validation Harness
+
+- Added `ResearchPlanning:MaxSearchQueries` as a normal configuration setting. The default remains 5, matching the existing planner maximum; live validation can reduce it to 2 without changing production code paths.
+- Added `tests/MedResearch.LiveE2EValidationTests` outside `MedResearch.slnx`. It is skipped unless `MEDRESEARCH_RUN_LIVE_E2E=true` and required live configuration is present.
+- The live E2E harness uses `WebApplicationFactory<Program>` and production DI/hosted services. It verifies `/health/ready`, submits `POST /api/research`, waits for the worker to complete the ResearchRun, and reads the report endpoint.
+- Normal CI and normal local solution tests remain deterministic and do not call live OpenAI, PubMed, Europe PMC, or full-text endpoints.

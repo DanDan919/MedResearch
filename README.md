@@ -266,3 +266,21 @@ The layer classifies reported effect-measure labels into explicit types such as 
 Eligibility is conservative. P-values alone do not create effect sizes. Confidence intervals do not create standard errors unless the confidence level is explicitly reported. OR/RR/HR values and their CI bounds must be positive before log transformation. Missing population, comparator, or study-design keys prevent automatic grouping. Multiple Evidence items from one Study are not counted as independent studies. Source truncation is retained as limitation metadata and is not automatic ineligibility when the reported statistic is fully grounded.
 
 This milestone still does not implement pooled estimates, fixed/random effects, heterogeneity statistics, forest plots, vote counting, or claims that a meta-analysis was performed.
+
+### Optional Live Scientific E2E Validation
+
+Milestone 16 adds an optional live end-to-end validation project outside `MedResearch.slnx`. Normal `dotnet test` and GitHub Actions do not run it and do not call OpenAI, PubMed, Europe PMC, or Europe PMC full-text endpoints. To run it explicitly, provide a disposable PostgreSQL database and live provider configuration:
+
+```bash
+MEDRESEARCH_RUN_LIVE_E2E=true
+MEDRESEARCH_LIVE_E2E_DATABASE_ACK=isolated
+MEDRESEARCH_LIVE_E2E_CONNECTION_STRING="Host=...;Database=medresearch_live_e2e;Username=...;Password=..."
+OPENAI_MODEL=<configured-model>
+OPENAI_API_KEY=<secret>
+PUBMED_EMAIL=<contact-email>
+dotnet test tests/MedResearch.LiveE2EValidationTests/MedResearch.LiveE2EValidationTests.csproj
+```
+
+The harness uses `WebApplicationFactory<Program>` with production DI and hosted worker processing. It posts one bounded research question to `/api/research`, waits for the normal worker pipeline, and reads `/api/research/{researchRunId}/report`. It applies migrations to the explicitly acknowledged isolated database and overrides runtime bounds to keep validation small: `ResearchPlanning:MaxSearchQueries=2`, scientific source results capped at 5 per query, source acquisition/extraction/evaluation capped at 5 studies, and synthesis capped at 5 studies / 20 findings / 8 claims.
+
+`ResearchPlanning:MaxSearchQueries` is configurable for bounded validation and defaults to 5, preserving the original planner maximum. The live E2E harness intentionally does not run without an OpenAI key and does not print the key or store it in persistence.

@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<CreateResearchUseCase>();
         services.AddScoped<GetResearchUseCase>();
+        services.AddSingleton<ResearchPlanningOptions>();
         services.AddScoped<IResearchPlanner, ResearchPlanner>();
         services.AddScoped<IScientificLiteratureSearchCoordinator, ScientificLiteratureSearchCoordinator>();
         services.AddScoped<ISourceMaterialAcquirer, SourceMaterialAcquirer>();

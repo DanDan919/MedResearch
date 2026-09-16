@@ -45,6 +45,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearchRunQueue>(provider =>
             new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
+
+        var researchPlanningOptions = CreateResearchPlanningOptions(configuration);
+        services.AddSingleton(researchPlanningOptions);
         services.AddScoped<IScientificSearchResultStore, EfScientificSearchResultStore>();
         services.AddScoped<ISourceMaterialStore, EfSourceMaterialStore>();
         services.AddScoped<IEvidenceExtractionStore, EfEvidenceExtractionStore>();
@@ -146,6 +149,17 @@ public static class ServiceCollectionExtensions
     }
 
 
+    private static ResearchPlanningOptions CreateResearchPlanningOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(ResearchPlanningOptions.SectionName);
+        var options = new ResearchPlanningOptions
+        {
+            MaxSearchQueries = ReadPositiveInt(section["MaxSearchQueries"], ResearchPlanningOptions.MaximumAllowedSearchQueries, "ResearchPlanning:MaxSearchQueries")
+        };
+
+        options.Validate();
+        return options;
+    }
     private static SourceAcquisitionOptions CreateSourceAcquisitionOptions(IConfiguration configuration)
     {
         var section = configuration.GetSection(SourceAcquisitionOptions.SectionName);
