@@ -1,3 +1,4 @@
+using System.Globalization;
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Extraction;
@@ -5,6 +6,7 @@ using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Planning;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.Ai.OpenAI;
@@ -129,6 +131,9 @@ public static class ServiceCollectionExtensions
         var synthesisOptions = CreateSynthesisOptions(configuration);
         services.AddSingleton(synthesisOptions);
 
+        var quantitativeSynthesisOptions = CreateQuantitativeSynthesisOptions(configuration);
+        services.AddSingleton(quantitativeSynthesisOptions);
+
         var processingOptions = CreateResearchProcessingOptions(configuration);
         services.AddSingleton(Options.Create(processingOptions));
 
@@ -238,6 +243,19 @@ public static class ServiceCollectionExtensions
             MaxEvidenceFindings = ReadPositiveInt(section["MaxEvidenceFindings"], 40, "Synthesis:MaxEvidenceFindings"),
             MaxClaims = ReadPositiveInt(section["MaxClaims"], 12, "Synthesis:MaxClaims")
         };
+    }
+
+    private static QuantitativeSynthesisOptions CreateQuantitativeSynthesisOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(QuantitativeSynthesisOptions.SectionName);
+        var options = new QuantitativeSynthesisOptions
+        {
+            OutputConfidenceLevel = ReadPositiveDecimal(section["OutputConfidenceLevel"], 0.95m, "QuantitativeSynthesis:OutputConfidenceLevel"),
+            MinimumUniqueStudies = ReadPositiveInt(section["MinimumUniqueStudies"], 2, "QuantitativeSynthesis:MinimumUniqueStudies")
+        };
+
+        options.Validate();
+        return options;
     }
 
     private static ResearchProcessingOptions CreateResearchProcessingOptions(IConfiguration configuration)
@@ -373,6 +391,26 @@ public static class ServiceCollectionExtensions
     {
         options.UseNpgsql(connectionString, npgsqlOptions =>
             npgsqlOptions.MigrationsAssembly(typeof(MedResearchDbContext).Assembly.FullName));
+    }
+
+    private static decimal ReadPositiveDecimal(string? value, decimal defaultValue, string configurationKey)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be a decimal number.");
+        }
+
+        if (parsed <= 0)
+        {
+            throw new InvalidOperationException($"Configuration value {configurationKey} must be positive.");
+        }
+
+        return parsed;
     }
 
     private static int ReadPositiveInt(string? value, int defaultValue, string configurationKey)

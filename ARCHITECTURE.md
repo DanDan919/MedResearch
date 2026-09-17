@@ -204,7 +204,7 @@ Flow: ResearchRun -> distinct discovered Studies -> current SourceMaterial metad
 
 The builder validates the authoritative ResearchRun id, unique Study snapshots, Evidence run/study scope, Extraction source lineage, grounded completed extraction status, Evaluation EvidenceIds, and search provenance. It computes coverage metrics and conservative normalized outcome groups while retaining positive/negative disagreement as conflict. Multiple discovery paths therefore remain provenance, not duplicate Study snapshots.
 
-Synthesis is narrative evidence synthesis. The current system does not average raw EffectValue values, vote-count studies, or label a report as statistical meta-analysis. Future quantitative synthesis must first establish compatible outcome/effect-measure/variance/sample-size eligibility and a defined statistical model.
+Synthesis is narrative evidence synthesis, but the Application layer now also builds a narrow deterministic fixed-effect inverse-variance quantitative synthesis read model for M15-compatible OR/RR/HR evidence groups. The system does not average raw EffectValue values, vote-count studies, or let the LLM calculate pooled estimates. Random-effects models, heterogeneity statistics, forest plots, and formal meta-analysis reporting remain out of scope.
 ## Evidence Synthesis
 
 Application performs evidence synthesis through `ResearchSynthesizer`, which reuses `IStructuredLlmClient` for strict structured output and validates model drafts before persistence.
@@ -223,7 +223,7 @@ ResearchRun corpus
 
 The synthesizer input boundary is limited to the authoritative current question, accepted plan context when present, search provenance, selected current-run studies, validated Evidence findings, EvidenceEvaluation records, outcome-direction summaries, and deterministic limitations. It does not receive unrelated runs, unrelated studies, credentials, logs, raw provider payloads, or full text that MedResearch has not persisted.
 
-The prompt version is `research-synthesizer-v1`. The prompt requires supplied-material-only behavior, traceable EvidenceId citations for every substantive claim, preservation of conflicts, explicit limitations, and no invented PMIDs, DOIs, studies, statistics, diagnoses, treatments, formal GRADE/RoB claims, pooled effects, or meta-analysis.
+The prompt version is `research-synthesizer-v1`. The prompt requires supplied-material-only behavior, traceable EvidenceId citations for every substantive claim, preservation of conflicts, explicit limitations, and no invented PMIDs, DOIs, studies, statistics, diagnoses, treatments, or formal GRADE/RoB claims. If deterministic quantitative syntheses are supplied by Application code, the LLM may describe those supplied values but must not calculate or alter pooled effects.
 
 Validation is deterministic after model output:
 
@@ -415,7 +415,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - No live OpenAI smoke test is configured or run by default.
 - No PDF/HTML scraping, publisher crawling, RAG, or vector search exists; bounded Europe PMC structured full text is supported.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
-- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, and meta-analysis are not implemented.
+- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, random-effects meta-analysis, heterogeneity statistics, and forest plots are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - PubMed and Europe PMC rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
@@ -450,6 +450,18 @@ The supported deterministic normalizations are deliberately limited:
 
 The layer does not convert between effect-measure families, semantically harmonize outcomes, infer population/comparator equivalence, assume 95% CI, treat p-value as an effect magnitude, or average incompatible values. Compatible groups expose `UniqueStudyCount` and mark dependent multiple Evidence from one Study as not ready for future meta-analysis input.
 
+
+## Quantitative Statistical Synthesis V1
+
+`FixedEffectQuantitativeStatisticalSynthesizer` consumes `QuantitativeEvidenceReadiness` and produces a transient `QuantitativeSynthesisReadiness` read model. It is Application-only: no EF Core, HTTP, LLM, API, PubMed, Europe PMC, or Domain dependency is introduced.
+
+V1 supports only compatible ratio-measure groups: odds ratio, risk ratio, and hazard ratio. Each contribution must already be M15-eligible with a normalized log-scale effect, positive finite variance, and one independent Study contribution. The synthesizer computes generic inverse-variance fixed-effect weights, pooled log effect, variance `1 / sum(weight)`, standard error, two-sided configured confidence interval, and exponentiated reported-scale effect and interval.
+
+The default configuration is `QuantitativeSynthesis:OutputConfidenceLevel=0.95` and `QuantitativeSynthesis:MinimumUniqueStudies=2`. Invalid confidence levels outside `(0, 1)` and minimum unique study counts below 2 fail validation. The result is exposed inside `SynthesisContext.QuantitativeSyntheses` before the narrative synthesis LLM call; the LLM may describe supplied deterministic values but must not compute or alter pooled estimates.
+
+The read model is not persisted in V1. Reproducibility comes from persisted Evidence, EvidenceExtraction, SourceMaterial, Study, and EvidenceEvaluation lineage plus deterministic algorithm version `fixed-effect-inverse-variance-v1`. Persisting a quantitative result snapshot can be revisited when reports/API surfaces need durable machine-readable pooled estimates.
+
+This is a common/fixed-effect model assumption over compatible current-run evidence. It does not test homogeneity, estimate tau-squared, produce I-squared/Q, resolve cohort overlap, harmonize outcomes semantically, pool p-values, or support MD/SMD/correlation families yet.
 ## Live Scientific E2E Validation Boundary
 
 Live scientific validation is an explicit operational test boundary, not part of normal automated tests. The optional `tests/MedResearch.LiveE2EValidationTests` project exercises the real API composition root, hosted background worker, PostgreSQL persistence, OpenAI structured generation, PubMed, Europe PMC search, Europe PMC full-text acquisition where available, evidence extraction/evaluation, EvidenceCorpus, quantitative readiness, synthesis, and report endpoint.

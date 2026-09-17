@@ -57,7 +57,7 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 
 35. EvidenceCorpus is run-scoped and must reject cross-run Evidence or incoherent Evidence -> EvidenceExtraction -> SourceMaterial -> Study lineage before synthesis.
 
-36. Structured full text is a source-coverage scope, not a universal methodological quality score; do not average raw effect values across incompatible studies.37. Quantitative eligibility is not meta-analysis; do not add pooled estimates, heterogeneity statistics, forest plots, or claims of statistical synthesis without an explicit future statistical model.
+36. Structured full text is a source-coverage scope, not a universal methodological quality score; do not average raw effect values across incompatible studies.37. Quantitative synthesis may only use an explicit deterministic statistical model over eligible compatible evidence; never average raw effect values or let an LLM calculate pooled estimates.
 38. LLM output may extract reported statistics from grounded SourceMaterial, but deterministic Application code must perform authoritative statistical normalization.
 39. Missing CI confidence level, population, comparator, or study-design compatibility must remain explicit rather than being guessed for a more complete-looking quantitative result.
 40. Live validation that calls OpenAI, PubMed, Europe PMC, or structured full-text endpoints must remain explicit opt-in, outside normal solution tests/CI, and must use an acknowledged isolated database.

@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Domain;
 
 namespace MedResearch.Application.Research.Synthesis;
@@ -110,6 +111,34 @@ public sealed record SynthesisEvaluationContext(
     int UnknownDomainCount,
     int InsufficientSourceDomainCount);
 
+public sealed record SynthesisQuantitativeContributionContext(
+    Guid EvidenceId,
+    Guid StudyId,
+    double AnalysisScaleEffect,
+    double AnalysisScaleVariance,
+    double Weight,
+    double NormalizedWeight);
+
+public sealed record SynthesisQuantitativeResultContext(
+    string GroupKey,
+    string OutcomeGroupKey,
+    string PopulationCompatibilityKey,
+    string ComparatorCompatibilityKey,
+    string StudyDesignCompatibilityKey,
+    EffectMeasureType EffectMeasureType,
+    QuantitativeSynthesisMethod Method,
+    string AlgorithmVersion,
+    decimal OutputConfidenceLevel,
+    double AnalysisScaleEffect,
+    double AnalysisScaleStandardError,
+    double AnalysisScaleConfidenceIntervalLower,
+    double AnalysisScaleConfidenceIntervalUpper,
+    double ReportedScaleEffect,
+    double ReportedScaleConfidenceIntervalLower,
+    double ReportedScaleConfidenceIntervalUpper,
+    int EvidenceCount,
+    int UniqueStudyCount,
+    IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions);
 public sealed record SynthesisContext(
     Guid ResearchRunId,
     Guid ResearchQuestionId,
@@ -119,7 +148,33 @@ public sealed record SynthesisContext(
     SynthesisSourceCoverage SourceCoverage,
     IReadOnlyCollection<SynthesisStudyContext> Studies,
     IReadOnlyCollection<SynthesisOutcomeDirectionSummary> OutcomeDirectionSummaries,
-    IReadOnlyCollection<string> DeterministicLimitations);
+    IReadOnlyCollection<string> DeterministicLimitations,
+    IReadOnlyCollection<SynthesisQuantitativeResultContext> QuantitativeSyntheses)
+{
+    public SynthesisContext(
+        Guid researchRunId,
+        Guid researchQuestionId,
+        string researchQuestion,
+        SynthesisPlanContext? plan,
+        SynthesisCorpusStatistics statistics,
+        SynthesisSourceCoverage sourceCoverage,
+        IReadOnlyCollection<SynthesisStudyContext> studies,
+        IReadOnlyCollection<SynthesisOutcomeDirectionSummary> outcomeDirectionSummaries,
+        IReadOnlyCollection<string> deterministicLimitations)
+        : this(
+            researchRunId,
+            researchQuestionId,
+            researchQuestion,
+            plan,
+            statistics,
+            sourceCoverage,
+            studies,
+            outcomeDirectionSummaries,
+            deterministicLimitations,
+            [])
+    {
+    }
+}
 
 public sealed record SynthesisCorpusSnapshot(
     Guid ResearchRunId,

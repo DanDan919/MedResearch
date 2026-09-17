@@ -1,3 +1,4 @@
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -6,6 +7,8 @@ namespace MedResearch.Application.Research.Synthesis;
 public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
 {
     private readonly IEvidenceCorpusBuilder _evidenceCorpusBuilder;
+    private readonly IQuantitativeEvidenceAssessor _quantitativeEvidenceAssessor;
+    private readonly IQuantitativeStatisticalSynthesizer _quantitativeStatisticalSynthesizer;
     private readonly SynthesisOptions _options;
     private readonly ILogger<SynthesisContextBuilder> _logger;
 
@@ -13,9 +16,13 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         ISynthesisCorpusStore corpusStore,
         SynthesisOptions options,
         ILogger<SynthesisContextBuilder> logger,
-        IEvidenceCorpusBuilder? evidenceCorpusBuilder = null)
+        IEvidenceCorpusBuilder? evidenceCorpusBuilder = null,
+        IQuantitativeEvidenceAssessor? quantitativeEvidenceAssessor = null,
+        IQuantitativeStatisticalSynthesizer? quantitativeStatisticalSynthesizer = null)
     {
         _evidenceCorpusBuilder = evidenceCorpusBuilder ?? new EvidenceCorpusBuilder(corpusStore);
+        _quantitativeEvidenceAssessor = quantitativeEvidenceAssessor ?? new QuantitativeEvidenceAssessor();
+        _quantitativeStatisticalSynthesizer = quantitativeStatisticalSynthesizer ?? new FixedEffectQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions());
         _options = options;
         _logger = logger;
     }
@@ -146,7 +153,14 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             evidenceTruncated,
             potentialConflictDetected,
             snapshot.Searches.Count);
-        var limitations = BuildLimitations(coverage, statistics, outcomeSummaries, evidenceTruncated);
+        var limitations = BuildLimitations(coverage, statistics, outcomeSummaries, evidenceTruncated).ToList();
+        var quantitativeReadiness = _quantitativeEvidenceAssessor.Assess(corpus with { Evidence = selectedEvidence });
+        var quantitativeSynthesis = _quantitativeStatisticalSynthesizer.Synthesize(quantitativeReadiness);
+        var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
+        if (quantitativeSyntheses.Count > 0)
+        {
+            limitations.Add("Fixed-effect inverse-variance pooled estimates are deterministic descriptive synthesis over compatible current-run evidence; heterogeneity and random-effects analyses are not implemented.");
+        }
 
         var context = new SynthesisContext(
             snapshot.ResearchRunId,
@@ -157,18 +171,66 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             coverage,
             studies,
             outcomeSummaries,
-            limitations);
+            limitations.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            quantitativeSyntheses);
 
         _logger.LogInformation(
-            "SynthesisContextBuilt. ResearchRunId: {ResearchRunId}; StudyCount: {StudyCount}; EvidenceCount: {EvidenceCount}; EvaluationCount: {EvaluationCount}; ConflictCount: {ConflictCount}; EvidenceTruncated: {EvidenceTruncated}",
+            "SynthesisContextBuilt. ResearchRunId: {ResearchRunId}; StudyCount: {StudyCount}; EvidenceCount: {EvidenceCount}; EvaluationCount: {EvaluationCount}; ConflictCount: {ConflictCount}; EvidenceTruncated: {EvidenceTruncated}; QuantitativeSynthesisCount: {QuantitativeSynthesisCount}",
             context.ResearchRunId,
             context.Statistics.IncludedStudyCount,
             context.Statistics.IncludedEvidenceFindingCount,
             context.Statistics.EvaluatedStudyCount,
             context.OutcomeDirectionSummaries.Count(summary => summary.ConflictStatus == SynthesisConflictStatus.Present),
-            context.SourceCoverage.EvidenceTruncated);
+            context.SourceCoverage.EvidenceTruncated,
+            context.QuantitativeSyntheses.Count);
 
         return context;
+    }
+
+
+    private static IReadOnlyCollection<SynthesisQuantitativeResultContext> MapQuantitativeSyntheses(QuantitativeSynthesisReadiness synthesis)
+    {
+        return synthesis.Results
+            .Where(result => result.Status == QuantitativeSynthesisStatus.Synthesized)
+            .Where(result => result.AnalysisScaleEffect.HasValue
+                && result.AnalysisScaleStandardError.HasValue
+                && result.AnalysisScaleConfidenceIntervalLower.HasValue
+                && result.AnalysisScaleConfidenceIntervalUpper.HasValue
+                && result.ReportedScaleEffect.HasValue
+                && result.ReportedScaleConfidenceIntervalLower.HasValue
+                && result.ReportedScaleConfidenceIntervalUpper.HasValue)
+            .OrderBy(result => result.GroupKey, StringComparer.Ordinal)
+            .Select(result => new SynthesisQuantitativeResultContext(
+                result.GroupKey,
+                result.OutcomeGroupKey,
+                result.PopulationCompatibilityKey,
+                result.ComparatorCompatibilityKey,
+                result.StudyDesignCompatibilityKey,
+                result.EffectMeasureType,
+                result.Method,
+                result.AlgorithmVersion,
+                result.OutputConfidenceLevel,
+                result.AnalysisScaleEffect!.Value,
+                result.AnalysisScaleStandardError!.Value,
+                result.AnalysisScaleConfidenceIntervalLower!.Value,
+                result.AnalysisScaleConfidenceIntervalUpper!.Value,
+                result.ReportedScaleEffect!.Value,
+                result.ReportedScaleConfidenceIntervalLower!.Value,
+                result.ReportedScaleConfidenceIntervalUpper!.Value,
+                result.EvidenceCount,
+                result.UniqueStudyCount,
+                result.Contributions
+                    .OrderBy(contribution => contribution.StudyId)
+                    .ThenBy(contribution => contribution.EvidenceId)
+                    .Select(contribution => new SynthesisQuantitativeContributionContext(
+                        contribution.EvidenceId,
+                        contribution.StudyId,
+                        contribution.AnalysisScaleEffect,
+                        contribution.AnalysisScaleVariance,
+                        contribution.Weight,
+                        contribution.NormalizedWeight))
+                    .ToArray()))
+            .ToArray();
     }
 
     private static IReadOnlyCollection<SynthesisOutcomeDirectionSummary> BuildOutcomeSummaries(IReadOnlyCollection<SynthesisEvidenceContext> evidence)

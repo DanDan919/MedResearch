@@ -134,6 +134,9 @@ public sealed partial class FullFakePipelineTests
         Assert.Equal(3, fakeLlm.RequestedTypes.Count(type => type == typeof(EvidenceExtractionDraft)));
         Assert.Equal(3, fakeLlm.RequestedTypes.Count(type => type == typeof(EvidenceEvaluationDraft)));
         Assert.Equal(1, fakeLlm.RequestedTypes.Count(type => type == typeof(ResearchReportDraft)));
+        Assert.NotNull(fakeLlm.ResearchSynthesisUserPrompt);
+        Assert.Contains("Deterministic quantitative syntheses", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Method: FixedEffectInverseVariance", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         using (var scope = factory.Services.CreateScope())
         {
             var corpus = await scope.ServiceProvider.GetRequiredService<IEvidenceCorpusBuilder>()
@@ -148,6 +151,12 @@ public sealed partial class FullFakePipelineTests
             Assert.Equal(2, severityGroup.UniqueStudyCount);
             Assert.True(severityGroup.ReadyForFutureMetaAnalysisInput);
             Assert.DoesNotContain(readiness.CompatibleGroups, group => group.OutcomeGroupKey == "treatment response" && group.EvidenceCount > 1);
+            var quantitativeSynthesis = scope.ServiceProvider.GetRequiredService<IQuantitativeStatisticalSynthesizer>()
+                .Synthesize(readiness);
+            var pooled = Assert.Single(quantitativeSynthesis.Results, result => result.Status == QuantitativeSynthesisStatus.Synthesized);
+            Assert.Equal(QuantitativeSynthesisMethod.FixedEffectInverseVariance, pooled.Method);
+            Assert.Equal(EffectMeasureType.OddsRatio, pooled.EffectMeasureType);
+            Assert.True(pooled.ReportedScaleEffect is > 1.40d and < 1.75d);
             Assert.Contains(corpus.SourceMaterials, source => source.Type == SourceMaterialType.StructuredFullText);
         }
 
@@ -397,12 +406,18 @@ public sealed partial class FullFakePipelineTests
     {
         public List<Type> RequestedTypes { get; } = [];
 
+        public string? ResearchSynthesisUserPrompt { get; private set; }
+
         public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(
             StructuredLlmRequest request,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RequestedTypes.Add(typeof(T));
+            if (typeof(T) == typeof(ResearchReportDraft))
+            {
+                ResearchSynthesisUserPrompt = request.UserPrompt;
+            }
             object value = typeof(T).Name switch
             {
                 nameof(ResearchPlanDraft) => new ResearchPlanDraft(

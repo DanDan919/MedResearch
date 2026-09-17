@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Ai;
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -107,6 +108,30 @@ public sealed class SynthesisContextBuilderTests
         Assert.Equal(firstStudy, context.Studies.First().StudyId);
     }
 
+
+    [Fact]
+    public async Task BuildAsync_IncludesFixedEffectQuantitativeSynthesisForCompatibleRatioEvidence()
+    {
+        var runId = Guid.NewGuid();
+        var firstStudy = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var secondStudy = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var evidence = new[]
+        {
+            CreateEvidence(runId, firstStudy, Guid.Parse("11111111-1111-1111-1111-111111111111"), EvidenceDirection.Positive, "depression severity", "odds ratio", 2m, reportedStandardError: 0.2m),
+            CreateEvidence(runId, secondStudy, Guid.Parse("22222222-2222-2222-2222-222222222222"), EvidenceDirection.Positive, "depression severity", "OR", 8m, reportedStandardError: 0.2m)
+        };
+
+        var context = await CreateBuilder(CreateSnapshot(runId, evidence)).BuildAsync(runId, CancellationToken.None);
+
+        var synthesis = Assert.Single(context.QuantitativeSyntheses);
+        Assert.Equal(QuantitativeSynthesisMethod.FixedEffectInverseVariance, synthesis.Method);
+        Assert.Equal(EffectMeasureType.OddsRatio, synthesis.EffectMeasureType);
+        Assert.Equal(2, synthesis.UniqueStudyCount);
+        Assert.Equal(Math.Log(4d), synthesis.AnalysisScaleEffect, 10);
+        Assert.Equal(4d, synthesis.ReportedScaleEffect, 10);
+        Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("Fixed-effect inverse-variance", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static SynthesisContextBuilder CreateBuilder(SynthesisCorpusSnapshot snapshot, SynthesisOptions? options = null)
     {
         return new SynthesisContextBuilder(new StaticSynthesisCorpusStore(snapshot), options ?? new SynthesisOptions(), NullLogger<SynthesisContextBuilder>.Instance);
@@ -188,9 +213,20 @@ public sealed class SynthesisContextBuilderTests
             sourceMaterials);
     }
 
-    private static SynthesisEvidenceContext CreateEvidence(Guid runId, Guid studyId, Guid evidenceId, EvidenceDirection direction, string outcome = "recall")
+    private static SynthesisEvidenceContext CreateEvidence(
+        Guid runId,
+        Guid studyId,
+        Guid evidenceId,
+        EvidenceDirection direction,
+        string outcome = "recall",
+        string? effectMeasure = null,
+        decimal? effectValue = null,
+        decimal? confidenceIntervalLower = null,
+        decimal? confidenceIntervalUpper = null,
+        decimal? confidenceLevel = null,
+        decimal? reportedStandardError = null)
     {
-        return new SynthesisEvidenceContext(evidenceId, runId, studyId, Guid.NewGuid(), outcome, "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null);
+        return new SynthesisEvidenceContext(evidenceId, runId, studyId, Guid.NewGuid(), outcome, "Reported result.", "reported result", direction, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, "adults", "sleep", "wakefulness", "controlled trial", 120, effectMeasure, effectValue, confidenceIntervalLower, confidenceIntervalUpper, null, confidenceLevel, reportedStandardError);
     }
 
     private sealed class StaticSynthesisCorpusStore : ISynthesisCorpusStore

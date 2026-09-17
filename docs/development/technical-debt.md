@@ -10,7 +10,7 @@
 - Evidence evaluation has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported methodological claims currently move the run through the existing safe failure path.
 - Evidence evaluation is an internal categorical assessment only. It is not a validated GRADE, RoB 2, ROBINS-I, AMSTAR-2, NOS, or other formal study-quality framework.
 - Evidence synthesis has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported claims currently move the run through the existing safe failure path.
-- Evidence synthesis is qualitative only. It does not perform meta-analysis, pooled effect estimation, vote counting, formal evidence certainty grading, semantic outcome harmonization, cohort-overlap detection, or systematic-review/primary-study citation-overlap detection.
+- Evidence synthesis now receives a narrow deterministic fixed-effect inverse-variance pooled result for eligible compatible OR/RR/HR groups, but it does not persist quantitative result snapshots or implement random effects, heterogeneity statistics, forest plots, vote counting, formal evidence certainty grading, semantic outcome harmonization, cohort-overlap detection, or systematic-review/primary-study citation-overlap detection.
 - Evidence synthesis currently uses exact normalized outcome names for conflict summaries. This avoids unsafe semantic merging but can miss related outcomes expressed with different wording.
 - PubMed and Europe PMC request pacing is conservative and local to one process. There is no distributed rate limiter across multiple API instances.
 - PubMed History Server retrieval is deferred while retrieval remains bounded to small direct PMID batches.
@@ -34,12 +34,12 @@
 - EvidenceCorpus is an application read model over persisted rows rather than a versioned database snapshot. Reproducibility depends on immutable SourceMaterial and extraction references; a future audit/export requirement may justify persisting a corpus manifest.
 - SourceMaterial current-version uniqueness is protected by application/advisory-lock behavior and PostgreSQL identity indexes, but the schema does not yet express a partial unique current-version index for every logical source key.
 - Europe PMC full-text availability/failure diagnostics are currently operational logs, not a first-class persisted acquisition-attempt table.
-- The current Evidence numeric fields can store one reported effect value and optional interval/p-value, but they do not encode variance/standard error or a compatible effect-measure taxonomy sufficient for meta-analysis.
-- No statistical meta-analysis or raw EffectValue averaging is implemented; future quantitative synthesis needs explicit eligibility, normalization, and model semantics.
+- Evidence numeric fields plus M15 readiness can support the first OR/RR/HR fixed-effect model, but they still do not encode richer arm-level data, multiple effect estimates per finding, or a broad taxonomy sufficient for wider meta-analysis families.
+- Statistical synthesis is limited to M17 fixed-effect inverse-variance OR/RR/HR groups over M15-compatible evidence. Broader effect families, random effects, heterogeneity, forest plots, and persisted quantitative result snapshots remain future work. Raw EffectValue averaging remains forbidden.
 
 ## Quantitative Evidence Eligibility
 
-- Quantitative readiness is now explicit, but formal meta-analysis remains future work. There is still no pooled effect estimate, heterogeneity statistic, forest plot, semantic outcome harmonization, or cohort-overlap detection.
+- Quantitative readiness is explicit and a first fixed-effect pooled ratio estimate exists, but formal broad meta-analysis remains future work. There is still no random-effects model, heterogeneity statistic, forest plot, semantic outcome harmonization, persisted quantitative result artifact, or cohort-overlap detection.
 - Compatibility keys are intentionally conservative exact-normalized strings. Semantically equivalent outcomes, populations, or comparators expressed differently may remain separate until a validated harmonization method exists.
 - Confidence intervals without an explicit confidence level remain quantitatively ineligible for SE derivation; the system does not assume 95%.
 - Regression coefficients, raw proportions, event counts, and group-level continuous statistics are not yet normalized into future quantitative synthesis inputs.

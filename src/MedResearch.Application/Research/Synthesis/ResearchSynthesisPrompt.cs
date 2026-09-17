@@ -69,7 +69,7 @@ public static class ResearchSynthesisPrompt
             Every substantive scientific claim must cite one or more supplied EvidenceId values. Do not cite StudyId, PMID, or DOI as model-generated authority.
             Preserve conflicting evidence. Do not force a single winning direction because one side has more studies.
             Do not vote-count studies into certainty. Direction counts are descriptive context only, not statistical weights.
-            Do not perform meta-analysis or pool odds ratios, risk ratios, mean differences, correlations, p-values, confidence intervals, or effect sizes.
+            Do not calculate your own meta-analysis, pooled effect, heterogeneity statistic, p-value, confidence interval, or effect size. If deterministic quantitative syntheses are supplied, preserve their values and limitations exactly.
             Distinguish source-supported methodological concerns from Unknown, InsufficientSource, and NotApplicable evaluation states.
             Do not claim formal GRADE, Cochrane RoB, ROBINS-I, AMSTAR-2, NOS, diagnosis, treatment recommendation, or prescription.
             Use calibrated language and return only the strict structured object requested by the schema.
@@ -109,6 +109,9 @@ public static class ResearchSynthesisPrompt
 
             Outcome direction summaries:
             {JoinOutcomes(context.OutcomeDirectionSummaries)}
+
+            Deterministic quantitative syntheses computed by MedResearch application code:
+            {JoinQuantitativeSyntheses(context.QuantitativeSyntheses)}
 
             Deterministic limitations that must be respected:
             {Join(context.DeterministicLimitations)}
@@ -154,6 +157,18 @@ public static class ResearchSynthesisPrompt
         return outcomes.Count == 0
             ? "[]"
             : string.Join("\n", outcomes.Select(outcome => $"Outcome: {outcome.Outcome}; Positive: {outcome.PositiveCount}; Negative: {outcome.NegativeCount}; NoClearEffect: {outcome.NoClearEffectCount}; Mixed: {outcome.MixedCount}; NotReported: {outcome.NotReportedCount}; ConflictStatus: {outcome.ConflictStatus}"));
+    }
+
+
+    private static string JoinQuantitativeSyntheses(IReadOnlyCollection<SynthesisQuantitativeResultContext> syntheses)
+    {
+        if (syntheses.Count == 0)
+        {
+            return "[]";
+        }
+
+        return string.Join("\n", syntheses.Select(synthesis =>
+            $"GroupKey: {synthesis.GroupKey}; Outcome: {synthesis.OutcomeGroupKey}; EffectMeasure: {synthesis.EffectMeasureType}; Method: {synthesis.Method}; AlgorithmVersion: {synthesis.AlgorithmVersion}; ConfidenceLevel: {synthesis.OutputConfidenceLevel.ToString(CultureInfo.InvariantCulture)}; AnalysisScaleEffect: {synthesis.AnalysisScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleSE: {synthesis.AnalysisScaleStandardError.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleCI: {synthesis.AnalysisScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.AnalysisScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleEffect: {synthesis.ReportedScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleCI: {synthesis.ReportedScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.ReportedScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; UniqueStudyCount: {synthesis.UniqueStudyCount}; EvidenceCount: {synthesis.EvidenceCount}; EvidenceIds: {Join(synthesis.Contributions.Select(contribution => contribution.EvidenceId.ToString()).ToArray())}"));
     }
 
     private static string JoinStudies(IReadOnlyCollection<SynthesisStudyContext> studies)

@@ -27,3 +27,9 @@
 
 - A real live E2E check needs a separate explicit gate because it combines paid OpenAI calls, live scientific providers, and a writable PostgreSQL database. Keeping it outside `MedResearch.slnx` preserves deterministic normal tests.
 - Planning needed a configurable query-count bound so live validation can cap provider fan-out without relying on the LLM to voluntarily return only two queries.
+
+## 2026-09-17 M17
+
+- Cochrane Handbook guidance supports generic inverse-variance synthesis using intervention effects and standard errors, and ratio measures such as OR/RR/HR should be analyzed on the log scale before back-transformation.
+- The term fixed-effect/common-effect describes a model assumption for the pooled estimate; it does not prove homogeneity. Heterogeneity statistics and random-effects modeling must remain explicit future work rather than implied by a pooled V1 result.
+- M17 keeps pooled quantitative synthesis as a deterministic Application read model because persisted Evidence/SourceMaterial lineage plus algorithm version is enough for reproducibility at this stage.

@@ -35,6 +35,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISynthesisContextBuilder, SynthesisContextBuilder>();
         services.AddScoped<IEvidenceCorpusBuilder, EvidenceCorpusBuilder>();
         services.AddScoped<IQuantitativeEvidenceAssessor, QuantitativeEvidenceAssessor>();
+        var quantitativeSynthesisOptions = new QuantitativeSynthesisOptions();
+        quantitativeSynthesisOptions.Validate();
+        services.AddSingleton(quantitativeSynthesisOptions);
+        services.AddScoped<IQuantitativeStatisticalSynthesizer, FixedEffectQuantitativeStatisticalSynthesizer>();
         services.AddScoped<ResearchReportDraftValidator>();
         services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
         services.AddScoped<GetResearchReportUseCase>();

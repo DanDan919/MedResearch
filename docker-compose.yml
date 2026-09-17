@@ -40,6 +40,8 @@ services:
       Synthesis__MaxStudies: ${SYNTHESIS_MAX_STUDIES:-10}
       Synthesis__MaxEvidenceFindings: ${SYNTHESIS_MAX_EVIDENCE_FINDINGS:-40}
       Synthesis__MaxClaims: ${SYNTHESIS_MAX_CLAIMS:-12}
+      QuantitativeSynthesis__OutputConfidenceLevel: ${QUANTITATIVE_SYNTHESIS_OUTPUT_CONFIDENCE_LEVEL:-0.95}
+      QuantitativeSynthesis__MinimumUniqueStudies: ${QUANTITATIVE_SYNTHESIS_MINIMUM_UNIQUE_STUDIES:-2}
       PubMed__Enabled: ${PUBMED_ENABLED:-true}
       PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
       PubMed__MaxResultsPerQuery: ${PUBMED_MAX_RESULTS_PER_QUERY:-10}

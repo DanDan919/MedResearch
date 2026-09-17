@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-09-08
+Date: 2026-09-17
 
 ## Exists Now
 
@@ -91,7 +91,7 @@ Date: 2026-09-08
   - Every persisted completed-report claim must cite supplied EvidenceIds from the same ResearchRun.
   - Citation authority comes from persisted Evidence and Study rows; model-supplied PMID, DOI, and StudyId are rejected.
   - No validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.
-  - Synthesis is qualitative only: no meta-analysis, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation.
+  - Persisted ResearchReport synthesis remains narrative and traceable; deterministic fixed-effect pooled ratio results may be supplied as bounded context, but no random-effects meta-analysis, heterogeneity statistic, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
 - Application persistence boundaries:
   - `IResearchStore` for HTTP create/read use cases.
   - `IResearchRunQueue` for worker claim/progress/failure operations.
@@ -181,7 +181,7 @@ Keep hardening trust boundaries, retry behavior, provider diagnostics, and ident
 - Full-text extraction.
 - Formal study quality frameworks such as GRADE, RoB 2, ROBINS-I, AMSTAR-2, or NOS.
 - Full-text evidence synthesis.
-- Formal meta-analysis or pooled effect estimation.
+- Random-effects meta-analysis, heterogeneity statistics, forest plots, p-value pooling, and broad pooled-effect families beyond fixed-effect inverse-variance OR/RR/HR V1.
 - Semantic outcome harmonization.
 - Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
@@ -217,7 +217,7 @@ The source-material layer is now persisted and used as the authoritative extract
 - Added source-reported `ConfidenceLevel` and `ReportedStandardError` to Evidence persistence through migration `20260916032923_AddEvidenceQuantitativeStatistics`.
 - Quantitative readiness can derive log ratio effects, CI/SE-based variance, and Fisher z correlations in C# only; the LLM is not used as a calculator.
 - CompatibleEvidenceGroup is a readiness grouping, not a pooled result. It tracks unique Study count and refuses to treat multiple Evidence from one Study as independent.
-- Narrative ResearchReport synthesis remains unchanged and does not claim meta-analysis.
+- Narrative ResearchReport persistence remains unchanged; deterministic fixed-effect pooled ratio results are supplied as synthesis context, not as a persisted report table or broad meta-analysis claim.
 
 ## Milestone 16 Live Validation Harness
 
@@ -225,3 +225,13 @@ The source-material layer is now persisted and used as the authoritative extract
 - Added `tests/MedResearch.LiveE2EValidationTests` outside `MedResearch.slnx`. It is skipped unless `MEDRESEARCH_RUN_LIVE_E2E=true` and required live configuration is present.
 - The live E2E harness uses `WebApplicationFactory<Program>` and production DI/hosted services. It verifies `/health/ready`, submits `POST /api/research`, waits for the worker to complete the ResearchRun, and reads the report endpoint.
 - Normal CI and normal local solution tests remain deterministic and do not call live OpenAI, PubMed, Europe PMC, or full-text endpoints.
+
+## Fixed-Effect Quantitative Synthesis V1
+
+- Added `FixedEffectQuantitativeStatisticalSynthesizer` in Application as a deterministic read model over M15 `CompatibleEvidenceGroup` output.
+- V1 supports only OR/RR/HR compatible groups with independent Study contributions, finite normalized log effects, and finite positive variance.
+- The model computes generic inverse-variance fixed-effect weights, pooled log effect, variance, standard error, configured two-sided confidence interval, and exponentiated reported-scale result.
+- Output is transient and exposed through `SynthesisContext.QuantitativeSyntheses`; no database migration or persisted quantitative report table was added.
+- The narrative synthesis prompt may receive deterministic pooled results but is forbidden from calculating or altering pooled estimates itself.
+- Defaults: `QuantitativeSynthesis:OutputConfidenceLevel=0.95`, `QuantitativeSynthesis:MinimumUniqueStudies=2`.
+- Still not implemented: random effects, heterogeneity statistics, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
