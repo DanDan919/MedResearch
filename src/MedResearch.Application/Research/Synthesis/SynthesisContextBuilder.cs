@@ -159,7 +159,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
         {
-            limitations.Add("Fixed-effect inverse-variance pooled estimates and heterogeneity diagnostics are deterministic descriptive synthesis over compatible current-run evidence; random-effects analysis and causal heterogeneity explanations are not implemented.");
+            limitations.Add("Fixed-effect inverse-variance pooled estimates, heterogeneity diagnostics, and REML tau-squared estimates are deterministic descriptive synthesis over compatible current-run evidence; random-effects weights, random-effects pooled estimates, and causal heterogeneity explanations are not implemented.");
         }
 
         var context = new SynthesisContext(
@@ -227,6 +227,17 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
                         result.HeterogeneityDiagnostics.ISquared,
                         result.HeterogeneityDiagnostics.StudyCount,
                         result.HeterogeneityDiagnostics.AlgorithmVersion),
+                result.BetweenStudyVariance is null
+                    ? null
+                    : new SynthesisBetweenStudyVarianceContext(
+                        result.BetweenStudyVariance.TauSquared,
+                        result.BetweenStudyVariance.Estimator,
+                        result.BetweenStudyVariance.Status,
+                        result.BetweenStudyVariance.AlgorithmVersion,
+                        result.BetweenStudyVariance.StudyCount,
+                        result.BetweenStudyVariance.Converged,
+                        result.BetweenStudyVariance.IterationCount,
+                        result.BetweenStudyVariance.FailureReason),
                 result.Contributions
                     .OrderBy(contribution => contribution.StudyId)
                     .ThenBy(contribution => contribution.EvidenceId)

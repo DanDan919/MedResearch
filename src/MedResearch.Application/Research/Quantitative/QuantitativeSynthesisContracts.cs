@@ -11,6 +11,27 @@ public enum QuantitativeSynthesisMethod
     FixedEffectInverseVariance = 0
 }
 
+public enum BetweenStudyVarianceEstimator
+{
+    RestrictedMaximumLikelihood = 0
+}
+
+public enum BetweenStudyVarianceEstimateStatus
+{
+    Estimated = 0,
+    NotEstimated = 1
+}
+
+public enum BetweenStudyVarianceFailureReason
+{
+    None = 0,
+    InsufficientIndependentStudies = 1,
+    InvalidInput = 2,
+    NonFiniteCalculation = 3,
+    FailedToBracket = 4,
+    MaxIterationsExceeded = 5
+}
+
 public enum QuantitativeSynthesisRejectionReason
 {
     GroupNotReadyForMetaAnalysisInput = 0,
@@ -83,6 +104,7 @@ public sealed record QuantitativeSynthesisResult(
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
     QuantitativeHeterogeneityDiagnostics? HeterogeneityDiagnostics,
+    BetweenStudyVarianceEstimate? BetweenStudyVariance,
     IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
     IReadOnlyCollection<QuantitativeSynthesisRejectionReason> RejectionReasons);
 
@@ -92,6 +114,16 @@ public sealed record QuantitativeHeterogeneityDiagnostics(
     double ISquared,
     int StudyCount,
     string AlgorithmVersion);
+
+public sealed record BetweenStudyVarianceEstimate(
+    double? TauSquared,
+    BetweenStudyVarianceEstimator Estimator,
+    BetweenStudyVarianceEstimateStatus Status,
+    string AlgorithmVersion,
+    int StudyCount,
+    bool Converged,
+    int IterationCount,
+    BetweenStudyVarianceFailureReason? FailureReason);
 
 public sealed record QuantitativeSynthesisContribution(
     Guid EvidenceId,

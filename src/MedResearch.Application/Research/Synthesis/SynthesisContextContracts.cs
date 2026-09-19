@@ -126,6 +126,16 @@ public sealed record SynthesisQuantitativeHeterogeneityDiagnosticsContext(
     int StudyCount,
     string AlgorithmVersion);
 
+public sealed record SynthesisBetweenStudyVarianceContext(
+    double? TauSquared,
+    BetweenStudyVarianceEstimator Estimator,
+    BetweenStudyVarianceEstimateStatus Status,
+    string AlgorithmVersion,
+    int StudyCount,
+    bool Converged,
+    int IterationCount,
+    BetweenStudyVarianceFailureReason? FailureReason);
+
 public sealed record SynthesisQuantitativeResultContext(
     string GroupKey,
     string OutcomeGroupKey,
@@ -146,6 +156,7 @@ public sealed record SynthesisQuantitativeResultContext(
     int EvidenceCount,
     int UniqueStudyCount,
     SynthesisQuantitativeHeterogeneityDiagnosticsContext? HeterogeneityDiagnostics,
+    SynthesisBetweenStudyVarianceContext? BetweenStudyVariance,
     IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions);
 public sealed record SynthesisContext(
     Guid ResearchRunId,

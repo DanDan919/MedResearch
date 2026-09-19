@@ -65,3 +65,4 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 41. Heterogeneity diagnostics must use the exact same independent Study contributions, analysis-scale effects, and inverse-variance weights as the deterministic fixed-effect synthesis they describe.
 42. Cochran's Q and I-squared are statistical diagnostics only; do not present them as quality scores, causal explanations, or automatic random-effects model selectors.
 43. I-squared must be bounded at zero and must not be interpreted as proof that true effects are identical when it equals zero.
+44. REML tau-squared is between-study variance foundation data only; do not use it to imply random-effects weights, random-effects pooled estimates, HKSJ intervals, prediction intervals, or replacement of existing Q-derived I-squared unless those methods are explicitly implemented.

@@ -31,7 +31,7 @@
 ## 2026-09-17 M17
 
 - Cochrane Handbook guidance supports generic inverse-variance synthesis using intervention effects and standard errors, and ratio measures such as OR/RR/HR should be analyzed on the log scale before back-transformation.
-- The term fixed-effect/common-effect describes a model assumption for the pooled estimate; it does not prove homogeneity. Random-effects modeling, tau-squared estimation, and richer heterogeneity interpretation must remain explicit future work rather than implied by a pooled V1 result.
+- The term fixed-effect/common-effect describes a model assumption for the pooled estimate; it does not prove homogeneity. Random-effects modeling and richer heterogeneity interpretation must remain explicit future work rather than implied by a pooled V1 result; M19 later addressed tau-squared estimation only as foundation data.
 - M17 keeps pooled quantitative synthesis as a deterministic Application read model because persisted Evidence/SourceMaterial lineage plus algorithm version is enough for reproducibility at this stage.
 ## Milestone 18 Discoveries
 
@@ -39,3 +39,9 @@
 - I-squared is best represented internally as a proportion (`0..1`) to avoid ambiguity between `0.5` and `50%`. Presentation can convert later if needed.
 - `Q <= df` and `Q == 0` need explicit handling; otherwise a direct `(Q - df) / Q` implementation can produce negative I-squared or divide by zero.
 - Keeping diagnostics transient alongside M17 avoids adding persistence before the product has a stable quantitative report/API representation.
+## Milestone 19 Discoveries
+
+- Cochrane Handbook guidance describes tau-squared as the between-study variance and notes REML as the current RevMan default estimator, but M19 must not imply that a random-effects pooled estimate exists.
+- REML tau-squared estimation can be added as pure deterministic Application code over the same M17 contribution set; persistence is unnecessary while quantitative outputs remain transient read models.
+- A boundary estimate of tau² = 0 is different from numerical non-convergence. MedResearch now represents non-estimation explicitly instead of silently returning zero.
+- The `metafor` BCG example is a useful independent reference dataset: `escalc(measure="RR")` followed by `rma(yi, vi, method="REML")` reports tau² approximately 0.3132.

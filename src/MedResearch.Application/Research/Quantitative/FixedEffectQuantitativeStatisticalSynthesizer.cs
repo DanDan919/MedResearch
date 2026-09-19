@@ -106,6 +106,8 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             return CreateRejected(researchRunId, group, contributions, reasons);
         }
 
+        var betweenStudyVariance = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate(contributions);
+
         var reportedEffect = Math.Exp(pooledEffect);
         var reportedLower = Math.Exp(lower);
         var reportedUpper = Math.Exp(upper);
@@ -139,6 +141,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             reportedLower,
             reportedUpper,
             heterogeneityDiagnostics,
+            betweenStudyVariance,
             contributions,
             []);
     }
@@ -252,6 +255,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             _options.OutputConfidenceLevel,
             group.EvidenceCount,
             group.UniqueStudyCount,
+            null,
             null,
             null,
             null,

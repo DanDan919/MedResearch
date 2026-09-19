@@ -69,7 +69,7 @@ public static class ResearchSynthesisPrompt
             Every substantive scientific claim must cite one or more supplied EvidenceId values. Do not cite StudyId, PMID, or DOI as model-generated authority.
             Preserve conflicting evidence. Do not force a single winning direction because one side has more studies.
             Do not vote-count studies into certainty. Direction counts are descriptive context only, not statistical weights.
-            Do not calculate your own meta-analysis, pooled effect, heterogeneity statistic, p-value, confidence interval, or effect size. If deterministic quantitative syntheses are supplied, preserve their values and limitations exactly.
+            Do not calculate your own meta-analysis, pooled effect, heterogeneity statistic, between-study variance, tau-squared, p-value, confidence interval, random-effects weight, random-effects pooled estimate, or effect size. If deterministic quantitative syntheses are supplied, preserve their values and limitations exactly.
             Distinguish source-supported methodological concerns from Unknown, InsufficientSource, and NotApplicable evaluation states.
             Do not claim formal GRADE, Cochrane RoB, ROBINS-I, AMSTAR-2, NOS, diagnosis, treatment recommendation, or prescription.
             Use calibrated language and return only the strict structured object requested by the schema.
@@ -168,7 +168,7 @@ public static class ResearchSynthesisPrompt
         }
 
         return string.Join("\n", syntheses.Select(synthesis =>
-            $"GroupKey: {synthesis.GroupKey}; Outcome: {synthesis.OutcomeGroupKey}; EffectMeasure: {synthesis.EffectMeasureType}; Method: {synthesis.Method}; AlgorithmVersion: {synthesis.AlgorithmVersion}; ConfidenceLevel: {synthesis.OutputConfidenceLevel.ToString(CultureInfo.InvariantCulture)}; AnalysisScaleEffect: {synthesis.AnalysisScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleSE: {synthesis.AnalysisScaleStandardError.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleCI: {synthesis.AnalysisScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.AnalysisScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleEffect: {synthesis.ReportedScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleCI: {synthesis.ReportedScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.ReportedScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; Heterogeneity: {FormatHeterogeneity(synthesis.HeterogeneityDiagnostics)}; UniqueStudyCount: {synthesis.UniqueStudyCount}; EvidenceCount: {synthesis.EvidenceCount}; EvidenceIds: {Join(synthesis.Contributions.Select(contribution => contribution.EvidenceId.ToString()).ToArray())}"));
+            $"GroupKey: {synthesis.GroupKey}; Outcome: {synthesis.OutcomeGroupKey}; EffectMeasure: {synthesis.EffectMeasureType}; Method: {synthesis.Method}; AlgorithmVersion: {synthesis.AlgorithmVersion}; ConfidenceLevel: {synthesis.OutputConfidenceLevel.ToString(CultureInfo.InvariantCulture)}; AnalysisScaleEffect: {synthesis.AnalysisScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleSE: {synthesis.AnalysisScaleStandardError.ToString("G17", CultureInfo.InvariantCulture)}; AnalysisScaleCI: {synthesis.AnalysisScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.AnalysisScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleEffect: {synthesis.ReportedScaleEffect.ToString("G17", CultureInfo.InvariantCulture)}; ReportedScaleCI: {synthesis.ReportedScaleConfidenceIntervalLower.ToString("G17", CultureInfo.InvariantCulture)} to {synthesis.ReportedScaleConfidenceIntervalUpper.ToString("G17", CultureInfo.InvariantCulture)}; Heterogeneity: {FormatHeterogeneity(synthesis.HeterogeneityDiagnostics)}; BetweenStudyVariance: {FormatBetweenStudyVariance(synthesis.BetweenStudyVariance)}; UniqueStudyCount: {synthesis.UniqueStudyCount}; EvidenceCount: {synthesis.EvidenceCount}; EvidenceIds: {Join(synthesis.Contributions.Select(contribution => contribution.EvidenceId.ToString()).ToArray())}"));
     }
 
 
@@ -180,6 +180,20 @@ public static class ResearchSynthesisPrompt
         }
 
         return $"AlgorithmVersion: {diagnostics.AlgorithmVersion}; CochransQ: {diagnostics.CochransQ.ToString("G17", CultureInfo.InvariantCulture)}; DegreesOfFreedom: {diagnostics.DegreesOfFreedom}; ISquared: {diagnostics.ISquared.ToString("G17", CultureInfo.InvariantCulture)}; StudyCount: {diagnostics.StudyCount}";
+    }
+
+    private static string FormatBetweenStudyVariance(SynthesisBetweenStudyVarianceContext? estimate)
+    {
+        if (estimate is null)
+        {
+            return "null";
+        }
+
+        var tauSquared = estimate.TauSquared.HasValue
+            ? estimate.TauSquared.Value.ToString("G17", CultureInfo.InvariantCulture)
+            : "null";
+        var failureReason = estimate.FailureReason?.ToString() ?? "null";
+        return $"AlgorithmVersion: {estimate.AlgorithmVersion}; Estimator: {estimate.Estimator}; Status: {estimate.Status}; TauSquared: {tauSquared}; StudyCount: {estimate.StudyCount}; Converged: {estimate.Converged}; IterationCount: {estimate.IterationCount}; FailureReason: {failureReason}";
     }
     private static string JoinStudies(IReadOnlyCollection<SynthesisStudyContext> studies)
     {

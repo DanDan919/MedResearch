@@ -139,6 +139,8 @@ public sealed partial class FullFakePipelineTests
         Assert.Contains("Method: FixedEffectInverseVariance", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CochransQ", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ISquared", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("TauSquared", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RestrictedMaximumLikelihood", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         using (var scope = factory.Services.CreateScope())
         {
             var corpus = await scope.ServiceProvider.GetRequiredService<IEvidenceCorpusBuilder>()
@@ -167,6 +169,12 @@ public sealed partial class FullFakePipelineTests
             var independentlyCalculatedQ = pooled.Contributions.Sum(contribution => contribution.Weight * Math.Pow(contribution.AnalysisScaleEffect - pooled.AnalysisScaleEffect!.Value, 2d));
             Assert.Equal(independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.CochransQ, 12);
             Assert.Equal((independentlyCalculatedQ - 2d) / independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.ISquared, 12);
+            Assert.NotNull(pooled.BetweenStudyVariance);
+            Assert.Equal(BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood, pooled.BetweenStudyVariance!.Estimator);
+            Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, pooled.BetweenStudyVariance.Status);
+            Assert.True(pooled.BetweenStudyVariance.Converged);
+            Assert.True(pooled.BetweenStudyVariance.TauSquared is >= 0d);
+            Assert.True(double.IsFinite(pooled.BetweenStudyVariance.TauSquared!.Value));
             var independentlyCalculatedPooledEffect = pooled.Contributions.Sum(contribution => contribution.Weight * contribution.AnalysisScaleEffect) / pooled.Contributions.Sum(contribution => contribution.Weight);
             Assert.Equal(Math.Exp(independentlyCalculatedPooledEffect), pooled.ReportedScaleEffect!.Value, 12);
             Assert.True(pooled.ReportedScaleEffect is > 1.60d and < 1.80d);

@@ -279,6 +279,125 @@ public sealed class QuantitativeStatisticalSynthesizerTests
 
         Assert.Throws<InvalidOperationException>(() => HeterogeneityDiagnosticsCalculator.Calculate(contributions, 1.5d));
     }
+
+    [Fact]
+    public void Synthesize_AddsRestrictedMaximumLikelihoodTauSquaredForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(
+            runId,
+            CreateBcgRiskRatioReferenceAssessments(runId),
+            EffectMeasureType.RiskRatio);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, result.Status);
+        Assert.Equal(QuantitativeSynthesisMethod.FixedEffectInverseVariance, result.Method);
+        Assert.NotNull(result.BetweenStudyVariance);
+        var estimate = result.BetweenStudyVariance!;
+        Assert.Equal(BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood, estimate.Estimator);
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, estimate.Status);
+        Assert.Equal(RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion, estimate.AlgorithmVersion);
+        Assert.True(estimate.Converged);
+        Assert.Null(estimate.FailureReason);
+        Assert.Equal(13, estimate.StudyCount);
+        Assert.InRange(estimate.IterationCount, 1, 220);
+        Assert.NotNull(estimate.TauSquared);
+        Assert.Equal(0.3132d, estimate.TauSquared!.Value, 5e-5);
+    }
+
+    [Fact]
+    public void Estimate_ReturnsZeroTauSquaredForIdenticalEffects()
+    {
+        var estimate = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Math.Log(2d), 25d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Math.Log(2d), 10d),
+            CreateContribution(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Math.Log(2d), 4d)
+        ]);
+
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, estimate.Status);
+        Assert.True(estimate.Converged);
+        Assert.Equal(0, estimate.IterationCount);
+        Assert.Equal(0d, estimate.TauSquared!.Value, 12);
+    }
+
+    [Fact]
+    public void Estimate_ReturnsZeroTauSquaredAtLowDispersionBoundary()
+    {
+        var estimate = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0d, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 0.1d, 1d),
+            CreateContribution(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), 0.2d, 1d)
+        ]);
+
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, estimate.Status);
+        Assert.Equal(0d, estimate.TauSquared!.Value, 12);
+        Assert.True(estimate.Converged);
+    }
+
+    [Fact]
+    public void Estimate_RejectsNonFiniteInputsWithoutFabricatingZero()
+    {
+        var estimate = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 1d, 1d),
+            new QuantitativeSynthesisContribution(
+                Guid.NewGuid(),
+                Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                double.NaN,
+                1d,
+                1d,
+                1d,
+                0d)
+        ]);
+
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.NotEstimated, estimate.Status);
+        Assert.False(estimate.Converged);
+        Assert.Null(estimate.TauSquared);
+        Assert.Equal(BetweenStudyVarianceFailureReason.InvalidInput, estimate.FailureReason);
+    }
+
+    [Fact]
+    public void Estimate_IsOrderIndependentForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var contributions = CreateBcgRiskRatioReferenceAssessments(runId)
+            .Select(assessment => new QuantitativeSynthesisContribution(
+                assessment.EvidenceId,
+                assessment.StudyId,
+                assessment.EvidenceExtractionId,
+                assessment.SourceMaterialId,
+                assessment.NormalizedEffect!.Value,
+                assessment.Variance!.Value,
+                assessment.StandardError!.Value,
+                1d / assessment.Variance.Value,
+                0d))
+            .ToArray();
+
+        var first = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate(contributions);
+        var second = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate(contributions.Reverse().ToArray());
+
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, first.Status);
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, second.Status);
+        Assert.Equal(first.TauSquared!.Value, second.TauSquared!.Value, 12);
+    }
+
+    [Fact]
+    public void Estimate_HandlesExtremeFiniteEffectsAndVariances()
+    {
+        var estimate = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), -2d, 10000d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 0d, 5d),
+            CreateContribution(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), 3d, 0.1d)
+        ]);
+
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, estimate.Status);
+        Assert.True(estimate.Converged);
+        Assert.NotNull(estimate.TauSquared);
+        Assert.True(double.IsFinite(estimate.TauSquared.Value));
+        Assert.True(estimate.TauSquared.Value >= 0d);
+    }
     private static FixedEffectQuantitativeStatisticalSynthesizer CreateSynthesizer(QuantitativeSynthesisOptions? options = null)
     {
         return new FixedEffectQuantitativeStatisticalSynthesizer(options ?? new QuantitativeSynthesisOptions());
@@ -297,6 +416,42 @@ public sealed class QuantitativeStatisticalSynthesizerTests
             Math.Sqrt(1d / weight),
             weight,
             0d);
+    }
+
+    private static QuantitativeEvidenceAssessment[] CreateBcgRiskRatioReferenceAssessments(Guid runId)
+    {
+        // Reference: Viechtbauer metafor dat.bcg example, escalc(measure="RR") followed by rma(yi, vi, method="REML") reports tau^2 = 0.3132.
+        var rows = new[]
+        {
+            (Tpos: 4d, Tneg: 119d, Cpos: 11d, Cneg: 128d),
+            (Tpos: 6d, Tneg: 300d, Cpos: 29d, Cneg: 274d),
+            (Tpos: 3d, Tneg: 228d, Cpos: 11d, Cneg: 209d),
+            (Tpos: 62d, Tneg: 13536d, Cpos: 248d, Cneg: 12619d),
+            (Tpos: 33d, Tneg: 5036d, Cpos: 47d, Cneg: 5761d),
+            (Tpos: 180d, Tneg: 1361d, Cpos: 372d, Cneg: 1079d),
+            (Tpos: 8d, Tneg: 2537d, Cpos: 10d, Cneg: 619d),
+            (Tpos: 505d, Tneg: 87886d, Cpos: 499d, Cneg: 87892d),
+            (Tpos: 29d, Tneg: 7470d, Cpos: 45d, Cneg: 7232d),
+            (Tpos: 17d, Tneg: 1699d, Cpos: 65d, Cneg: 1600d),
+            (Tpos: 186d, Tneg: 50448d, Cpos: 141d, Cneg: 27197d),
+            (Tpos: 5d, Tneg: 2493d, Cpos: 3d, Cneg: 2338d),
+            (Tpos: 27d, Tneg: 16886d, Cpos: 29d, Cneg: 17825d)
+        };
+
+        return rows.Select((row, index) =>
+        {
+            var treatmentTotal = row.Tpos + row.Tneg;
+            var controlTotal = row.Cpos + row.Cneg;
+            var yi = Math.Log((row.Tpos / treatmentTotal) / (row.Cpos / controlTotal));
+            var vi = 1d / row.Tpos - 1d / treatmentTotal + 1d / row.Cpos - 1d / controlTotal;
+            return CreateAssessment(
+                runId,
+                Guid.Parse($"00000000-0000-0000-0000-{index + 1:000000000000}"),
+                Guid.Parse($"10000000-0000-0000-0000-{index + 1:000000000000}"),
+                yi,
+                vi,
+                EffectMeasureType.RiskRatio);
+        }).ToArray();
     }
     private static QuantitativeEvidenceReadiness CreateReadiness(
         Guid runId,
@@ -348,7 +503,7 @@ public sealed class QuantitativeStatisticalSynthesizerTests
             "adults",
             "placebo",
             "randomized controlled trial",
-            effectMeasureType == EffectMeasureType.MeanDifference ? "mean difference" : "odds ratio",
+            effectMeasureType switch { EffectMeasureType.MeanDifference => "mean difference", EffectMeasureType.RiskRatio => "risk ratio", EffectMeasureType.HazardRatio => "hazard ratio", _ => "odds ratio" },
             effectMeasureType,
             QuantitativeEligibility.Eligible,
             (decimal)Math.Exp(analysisScaleEffect),

@@ -135,10 +135,18 @@ public sealed class SynthesisContextBuilderTests
         Assert.Equal(expectedQ, synthesis.HeterogeneityDiagnostics!.CochransQ, 10);
         Assert.Equal(1, synthesis.HeterogeneityDiagnostics.DegreesOfFreedom);
         Assert.Equal((expectedQ - 1d) / expectedQ, synthesis.HeterogeneityDiagnostics.ISquared, 10);
+        Assert.NotNull(synthesis.BetweenStudyVariance);
+        Assert.Equal(BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood, synthesis.BetweenStudyVariance!.Estimator);
+        Assert.Equal(BetweenStudyVarianceEstimateStatus.Estimated, synthesis.BetweenStudyVariance.Status);
+        Assert.True(synthesis.BetweenStudyVariance.TauSquared is >= 0d);
+        Assert.True(synthesis.BetweenStudyVariance.Converged);
         var prompt = ResearchSynthesisPrompt.Create(context);
         Assert.Contains("CochransQ", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ISquared", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("TauSquared", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RestrictedMaximumLikelihood", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("Fixed-effect inverse-variance", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("REML tau-squared", StringComparison.OrdinalIgnoreCase));
     }
 
     private static SynthesisContextBuilder CreateBuilder(SynthesisCorpusSnapshot snapshot, SynthesisOptions? options = null)
