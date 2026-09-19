@@ -167,7 +167,9 @@ public sealed partial class FullFakePipelineTests
             var independentlyCalculatedQ = pooled.Contributions.Sum(contribution => contribution.Weight * Math.Pow(contribution.AnalysisScaleEffect - pooled.AnalysisScaleEffect!.Value, 2d));
             Assert.Equal(independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.CochransQ, 12);
             Assert.Equal((independentlyCalculatedQ - 2d) / independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.ISquared, 12);
-            Assert.True(pooled.ReportedScaleEffect is > 1.70d and < 3.20d);
+            var independentlyCalculatedPooledEffect = pooled.Contributions.Sum(contribution => contribution.Weight * contribution.AnalysisScaleEffect) / pooled.Contributions.Sum(contribution => contribution.Weight);
+            Assert.Equal(Math.Exp(independentlyCalculatedPooledEffect), pooled.ReportedScaleEffect!.Value, 12);
+            Assert.True(pooled.ReportedScaleEffect is > 1.60d and < 1.80d);
             Assert.Contains(corpus.SourceMaterials, source => source.Type == SourceMaterialType.StructuredFullText);
         }
 
