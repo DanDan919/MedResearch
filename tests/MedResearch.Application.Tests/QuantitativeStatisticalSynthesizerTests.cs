@@ -143,11 +143,161 @@ public sealed class QuantitativeStatisticalSynthesizerTests
         Assert.Throws<InvalidOperationException>(() => options.Validate());
     }
 
+
+    [Fact]
+    public void Synthesize_AddsCochranQDegreesOfFreedomAndISquaredForSameContributionSet()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 2d, 1d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), 4d, 1d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(2d, result.AnalysisScaleEffect!.Value, 12);
+        Assert.Equal(1d / 3d, result.AnalysisScaleVariance!.Value, 12);
+        Assert.NotNull(result.HeterogeneityDiagnostics);
+        var diagnostics = result.HeterogeneityDiagnostics!;
+        Assert.Equal(HeterogeneityDiagnosticsCalculator.AlgorithmVersion, diagnostics.AlgorithmVersion);
+        Assert.Equal(8d, diagnostics.CochransQ, 12);
+        Assert.Equal(2, diagnostics.DegreesOfFreedom);
+        Assert.Equal(0.75d, diagnostics.ISquared, 12);
+        Assert.Equal(3, diagnostics.StudyCount);
+    }
+
+    [Fact]
+    public void Synthesize_CalculatesHeterogeneityOnAnalysisScaleNotRawRatioScale()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 2d, 1d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), 4d, 1d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(8d, result.HeterogeneityDiagnostics!.CochransQ, 12);
+        var rawRatioMean = (1d + Math.Exp(2d) + Math.Exp(4d)) / 3d;
+        var rawRatioQ = Math.Pow(1d - rawRatioMean, 2d)
+            + Math.Pow(Math.Exp(2d) - rawRatioMean, 2d)
+            + Math.Pow(Math.Exp(4d) - rawRatioMean, 2d);
+        Assert.NotEqual(rawRatioQ, result.HeterogeneityDiagnostics.CochransQ);
+    }
+
+    [Fact]
+    public void Synthesize_BoundsISquaredAtZeroWhenQIsLessThanOrEqualToDegreesOfFreedom()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 1d, 1d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), 2d, 1d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(2d, result.HeterogeneityDiagnostics!.CochransQ, 12);
+        Assert.Equal(2, result.HeterogeneityDiagnostics.DegreesOfFreedom);
+        Assert.Equal(0d, result.HeterogeneityDiagnostics.ISquared, 12);
+    }
+
+    [Fact]
+    public void Synthesize_HandlesZeroQWithoutDivisionByZero()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), Math.Log(2d), 0.04d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), Math.Log(2d), 0.04d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(0d, result.HeterogeneityDiagnostics!.CochransQ, 12);
+        Assert.Equal(1, result.HeterogeneityDiagnostics.DegreesOfFreedom);
+        Assert.Equal(0d, result.HeterogeneityDiagnostics.ISquared, 12);
+        Assert.False(double.IsNaN(result.HeterogeneityDiagnostics.ISquared));
+        Assert.False(double.IsInfinity(result.HeterogeneityDiagnostics.ISquared));
+    }
+
+    [Fact]
+    public void Synthesize_UsesKMinusOneDegreesOfFreedomForTwoStudies()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 4d, 1d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(8d, result.HeterogeneityDiagnostics!.CochransQ, 12);
+        Assert.Equal(1, result.HeterogeneityDiagnostics.DegreesOfFreedom);
+        Assert.Equal(0.875d, result.HeterogeneityDiagnostics.ISquared, 12);
+    }
+
+    [Fact]
+    public void Synthesize_HeterogeneityDiagnosticsAreOrderIndependent()
+    {
+        var runId = Guid.NewGuid();
+        var assessments = new[]
+        {
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 2d, 1d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), 4d, 1d)
+        };
+
+        var first = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments)).Results);
+        var second = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments.Reverse().ToArray())).Results);
+
+        Assert.Equal(first.AnalysisScaleEffect, second.AnalysisScaleEffect);
+        Assert.Equal(first.HeterogeneityDiagnostics, second.HeterogeneityDiagnostics);
+    }
+
+    [Fact]
+    public void Calculate_RejectsNonFiniteInputs()
+    {
+        var contributions = new[]
+        {
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 1d, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), double.NaN, 1d)
+        };
+
+        Assert.Throws<InvalidOperationException>(() => HeterogeneityDiagnosticsCalculator.Calculate(contributions, 1d));
+    }
+
+    [Fact]
+    public void Calculate_RejectsNonPositiveWeights()
+    {
+        var contributions = new[]
+        {
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 1d, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 2d, 0d)
+        };
+
+        Assert.Throws<InvalidOperationException>(() => HeterogeneityDiagnosticsCalculator.Calculate(contributions, 1.5d));
+    }
     private static FixedEffectQuantitativeStatisticalSynthesizer CreateSynthesizer(QuantitativeSynthesisOptions? options = null)
     {
         return new FixedEffectQuantitativeStatisticalSynthesizer(options ?? new QuantitativeSynthesisOptions());
     }
 
+
+    private static QuantitativeSynthesisContribution CreateContribution(Guid studyId, double analysisScaleEffect, double weight)
+    {
+        return new QuantitativeSynthesisContribution(
+            Guid.NewGuid(),
+            studyId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            analysisScaleEffect,
+            1d / weight,
+            Math.Sqrt(1d / weight),
+            weight,
+            0d);
+    }
     private static QuantitativeEvidenceReadiness CreateReadiness(
         Guid runId,
         IReadOnlyCollection<QuantitativeEvidenceAssessment> assessments,

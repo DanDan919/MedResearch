@@ -159,7 +159,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
         {
-            limitations.Add("Fixed-effect inverse-variance pooled estimates are deterministic descriptive synthesis over compatible current-run evidence; heterogeneity and random-effects analyses are not implemented.");
+            limitations.Add("Fixed-effect inverse-variance pooled estimates and heterogeneity diagnostics are deterministic descriptive synthesis over compatible current-run evidence; random-effects analysis and causal heterogeneity explanations are not implemented.");
         }
 
         var context = new SynthesisContext(
@@ -219,6 +219,14 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
                 result.ReportedScaleConfidenceIntervalUpper!.Value,
                 result.EvidenceCount,
                 result.UniqueStudyCount,
+                result.HeterogeneityDiagnostics is null
+                    ? null
+                    : new SynthesisQuantitativeHeterogeneityDiagnosticsContext(
+                        result.HeterogeneityDiagnostics.CochransQ,
+                        result.HeterogeneityDiagnostics.DegreesOfFreedom,
+                        result.HeterogeneityDiagnostics.ISquared,
+                        result.HeterogeneityDiagnostics.StudyCount,
+                        result.HeterogeneityDiagnostics.AlgorithmVersion),
                 result.Contributions
                     .OrderBy(contribution => contribution.StudyId)
                     .ThenBy(contribution => contribution.EvidenceId)

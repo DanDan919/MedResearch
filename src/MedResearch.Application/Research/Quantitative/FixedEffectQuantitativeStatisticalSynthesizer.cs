@@ -95,6 +95,17 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             return CreateRejected(researchRunId, group, contributions, reasons);
         }
 
+        QuantitativeHeterogeneityDiagnostics heterogeneityDiagnostics;
+        try
+        {
+            heterogeneityDiagnostics = HeterogeneityDiagnosticsCalculator.Calculate(contributions, pooledEffect);
+        }
+        catch (InvalidOperationException)
+        {
+            reasons.Add(QuantitativeSynthesisRejectionReason.NonFiniteHeterogeneityDiagnostics);
+            return CreateRejected(researchRunId, group, contributions, reasons);
+        }
+
         var reportedEffect = Math.Exp(pooledEffect);
         var reportedLower = Math.Exp(lower);
         var reportedUpper = Math.Exp(upper);
@@ -127,6 +138,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             reportedEffect,
             reportedLower,
             reportedUpper,
+            heterogeneityDiagnostics,
             contributions,
             []);
     }
@@ -240,6 +252,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             _options.OutputConfidenceLevel,
             group.EvidenceCount,
             group.UniqueStudyCount,
+            null,
             null,
             null,
             null,

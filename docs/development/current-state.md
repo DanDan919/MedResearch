@@ -91,7 +91,7 @@ Date: 2026-09-17
   - Every persisted completed-report claim must cite supplied EvidenceIds from the same ResearchRun.
   - Citation authority comes from persisted Evidence and Study rows; model-supplied PMID, DOI, and StudyId are rejected.
   - No validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.
-  - Persisted ResearchReport synthesis remains narrative and traceable; deterministic fixed-effect pooled ratio results may be supplied as bounded context, but no random-effects meta-analysis, heterogeneity statistic, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
+  - Persisted ResearchReport synthesis remains narrative and traceable; deterministic fixed-effect pooled ratio results may be supplied as bounded context, but no random-effects meta-analysis, tau-squared estimate, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
 - Application persistence boundaries:
   - `IResearchStore` for HTTP create/read use cases.
   - `IResearchRunQueue` for worker claim/progress/failure operations.
@@ -181,7 +181,7 @@ Keep hardening trust boundaries, retry behavior, provider diagnostics, and ident
 - Full-text extraction.
 - Formal study quality frameworks such as GRADE, RoB 2, ROBINS-I, AMSTAR-2, or NOS.
 - Full-text evidence synthesis.
-- Random-effects meta-analysis, heterogeneity statistics, forest plots, p-value pooling, and broad pooled-effect families beyond fixed-effect inverse-variance OR/RR/HR V1.
+- Random-effects meta-analysis, tau-squared estimation, forest plots, p-value pooling, and broad pooled-effect families beyond fixed-effect inverse-variance OR/RR/HR V1. Q/df/I-squared diagnostics exist for successful fixed-effect groups.
 - Semantic outcome harmonization.
 - Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
@@ -234,4 +234,11 @@ The source-material layer is now persisted and used as the authoritative extract
 - Output is transient and exposed through `SynthesisContext.QuantitativeSyntheses`; no database migration or persisted quantitative report table was added.
 - The narrative synthesis prompt may receive deterministic pooled results but is forbidden from calculating or altering pooled estimates itself.
 - Defaults: `QuantitativeSynthesis:OutputConfidenceLevel=0.95`, `QuantitativeSynthesis:MinimumUniqueStudies=2`.
-- Still not implemented: random effects, heterogeneity statistics, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
+- Still not implemented: random effects, tau-squared estimation, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
+## Fixed-Effect Heterogeneity Diagnostics V1
+
+Milestone 18 extends the transient quantitative synthesis read model with deterministic heterogeneity diagnostics for successful M17 fixed-effect groups. `HeterogeneityDiagnosticsCalculator` computes Cochran's Q, degrees of freedom, and I-squared using the same M17 contribution set, analysis-scale effects, pooled analysis-scale effect, and inverse-variance weights.
+
+The diagnostics are versioned as `cochran-q-i2-v1` and are projected into `SynthesisContext` and the synthesis prompt. They remain derived read-model data and are not persisted as Evidence, Study metadata, or a database table.
+
+Scope intentionally not implemented: tau-squared, random-effects weights, random-effects pooled estimates, prediction intervals, Q p-values, forest plots, funnel plots, publication-bias tests, subgroup analysis, and automatic model selection.

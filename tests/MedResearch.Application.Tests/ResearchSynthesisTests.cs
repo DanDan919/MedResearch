@@ -129,6 +129,15 @@ public sealed class SynthesisContextBuilderTests
         Assert.Equal(2, synthesis.UniqueStudyCount);
         Assert.Equal(Math.Log(4d), synthesis.AnalysisScaleEffect, 10);
         Assert.Equal(4d, synthesis.ReportedScaleEffect, 10);
+        Assert.NotNull(synthesis.HeterogeneityDiagnostics);
+        var expectedQ = 25d * Math.Pow(Math.Log(2d) - Math.Log(4d), 2d)
+            + 25d * Math.Pow(Math.Log(8d) - Math.Log(4d), 2d);
+        Assert.Equal(expectedQ, synthesis.HeterogeneityDiagnostics!.CochransQ, 10);
+        Assert.Equal(1, synthesis.HeterogeneityDiagnostics.DegreesOfFreedom);
+        Assert.Equal((expectedQ - 1d) / expectedQ, synthesis.HeterogeneityDiagnostics.ISquared, 10);
+        var prompt = ResearchSynthesisPrompt.Create(context);
+        Assert.Contains("CochransQ", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ISquared", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("Fixed-effect inverse-variance", StringComparison.OrdinalIgnoreCase));
     }
 

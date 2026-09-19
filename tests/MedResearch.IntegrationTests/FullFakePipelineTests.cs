@@ -137,6 +137,8 @@ public sealed partial class FullFakePipelineTests
         Assert.NotNull(fakeLlm.ResearchSynthesisUserPrompt);
         Assert.Contains("Deterministic quantitative syntheses", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Method: FixedEffectInverseVariance", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CochransQ", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ISquared", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         using (var scope = factory.Services.CreateScope())
         {
             var corpus = await scope.ServiceProvider.GetRequiredService<IEvidenceCorpusBuilder>()
@@ -147,8 +149,8 @@ public sealed partial class FullFakePipelineTests
             Assert.Equal(3, readiness.Assessments.Count);
             var severityGroup = Assert.Single(readiness.CompatibleGroups, group => group.OutcomeGroupKey == "depression severity");
             Assert.Equal(EffectMeasureType.OddsRatio, severityGroup.EffectMeasureType);
-            Assert.Equal(2, severityGroup.EvidenceCount);
-            Assert.Equal(2, severityGroup.UniqueStudyCount);
+            Assert.Equal(3, severityGroup.EvidenceCount);
+            Assert.Equal(3, severityGroup.UniqueStudyCount);
             Assert.True(severityGroup.ReadyForFutureMetaAnalysisInput);
             Assert.DoesNotContain(readiness.CompatibleGroups, group => group.OutcomeGroupKey == "treatment response" && group.EvidenceCount > 1);
             var quantitativeSynthesis = scope.ServiceProvider.GetRequiredService<IQuantitativeStatisticalSynthesizer>()
@@ -156,7 +158,16 @@ public sealed partial class FullFakePipelineTests
             var pooled = Assert.Single(quantitativeSynthesis.Results, result => result.Status == QuantitativeSynthesisStatus.Synthesized);
             Assert.Equal(QuantitativeSynthesisMethod.FixedEffectInverseVariance, pooled.Method);
             Assert.Equal(EffectMeasureType.OddsRatio, pooled.EffectMeasureType);
-            Assert.True(pooled.ReportedScaleEffect is > 1.40d and < 1.75d);
+            Assert.NotNull(pooled.HeterogeneityDiagnostics);
+            Assert.Equal(3, pooled.HeterogeneityDiagnostics!.StudyCount);
+            Assert.Equal(2, pooled.HeterogeneityDiagnostics.DegreesOfFreedom);
+            Assert.True(pooled.HeterogeneityDiagnostics.CochransQ > pooled.HeterogeneityDiagnostics.DegreesOfFreedom);
+            Assert.True(pooled.HeterogeneityDiagnostics.ISquared > 0d);
+            Assert.True(pooled.HeterogeneityDiagnostics.ISquared <= 1d);
+            var independentlyCalculatedQ = pooled.Contributions.Sum(contribution => contribution.Weight * Math.Pow(contribution.AnalysisScaleEffect - pooled.AnalysisScaleEffect!.Value, 2d));
+            Assert.Equal(independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.CochransQ, 12);
+            Assert.Equal((independentlyCalculatedQ - 2d) / independentlyCalculatedQ, pooled.HeterogeneityDiagnostics.ISquared, 12);
+            Assert.True(pooled.ReportedScaleEffect is > 1.70d and < 3.20d);
             Assert.Contains(corpus.SourceMaterials, source => source.Type == SourceMaterialType.StructuredFullText);
         }
 
@@ -306,7 +317,7 @@ public sealed partial class FullFakePipelineTests
     {
         public const string FullTextAbstract = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.";
         public const string AbstractOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.40 with 95% CI 1.05 to 1.90.";
-        public const string IncompatibleText = "In this randomized controlled trial, treatment response improved in 120 adults compared with placebo; risk ratio 1.30 with 95% CI 1.00 to 1.70.";
+        public const string ThirdOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 4.00 with 95% CI 2.00 to 8.00.";
 
         public string SourceName => "PubMed";
 
@@ -353,9 +364,9 @@ public sealed partial class FullFakePipelineTests
                 new ScientificStudyCandidate(
                     "99123458",
                     null,
-                    "10.1000/medresearch-e2e-incompatible",
-                    "Fake incompatible risk ratio trial",
-                    IncompatibleText,
+                    "10.1000/medresearch-e2e-third-or",
+                    "Fake third odds ratio trial",
+                    ThirdOddsRatioText,
                     "Journal of Deterministic Tests",
                     new DateOnly(2026, 1, 17),
                     2026,
@@ -488,23 +499,23 @@ public sealed partial class FullFakePipelineTests
                 ]);
             }
 
-            if (request.UserPrompt.Contains("Fake incompatible risk ratio trial", StringComparison.Ordinal))
+            if (request.UserPrompt.Contains("Fake third odds ratio trial", StringComparison.Ordinal))
             {
                 return new EvidenceExtractionDraft([
                     new EvidenceFindingDraft(
-                        "treatment response",
-                        "Treatment response improved with structured sleep compared with placebo.",
-                        "treatment response improved in 120 adults compared with placebo",
+                        "depression severity",
+                        "Depression severity improved with structured sleep compared with placebo.",
+                        "depression severity improved in 120 adults compared with placebo",
                         "Positive",
                         "adults with depressive symptoms",
                         "structured sleep",
                         "placebo",
                         "randomized controlled trial",
                         120,
-                        "risk ratio",
-                        1.30m,
-                        1.00m,
-                        1.70m,
+                        "odds ratio",
+                        4.00m,
+                        2.00m,
+                        8.00m,
                         null,
                         0.95m,
                         null)
@@ -546,7 +557,7 @@ public sealed partial class FullFakePipelineTests
                 "Completed",
                 null,
                 "Three fake source-grounded studies reported quantitative outcomes; synthesis remains narrative.",
-                "The included evidence reports depression severity and treatment response findings from fake studies.",
+                "The included evidence reports depression severity findings from fake studies.",
                 "No conflicting evidence was present in the supplied corpus.",
                 "The evidence is abstract-level and intentionally fake for deterministic orchestration testing.",
                 "Within this fake test corpus, structured sleep is positively associated with the reported outcomes.",

@@ -31,5 +31,11 @@
 ## 2026-09-17 M17
 
 - Cochrane Handbook guidance supports generic inverse-variance synthesis using intervention effects and standard errors, and ratio measures such as OR/RR/HR should be analyzed on the log scale before back-transformation.
-- The term fixed-effect/common-effect describes a model assumption for the pooled estimate; it does not prove homogeneity. Heterogeneity statistics and random-effects modeling must remain explicit future work rather than implied by a pooled V1 result.
+- The term fixed-effect/common-effect describes a model assumption for the pooled estimate; it does not prove homogeneity. Random-effects modeling, tau-squared estimation, and richer heterogeneity interpretation must remain explicit future work rather than implied by a pooled V1 result.
 - M17 keeps pooled quantitative synthesis as a deterministic Application read model because persisted Evidence/SourceMaterial lineage plus algorithm version is enough for reproducibility at this stage.
+## Milestone 18 Discoveries
+
+- Cochran's Q is only meaningful for MedResearch when it is calculated on the same analysis scale and with the same weights as the fixed-effect synthesis result it describes. For current OR/RR/HR support, that means log-scale effects and inverse-variance weights.
+- I-squared is best represented internally as a proportion (`0..1`) to avoid ambiguity between `0.5` and `50%`. Presentation can convert later if needed.
+- `Q <= df` and `Q == 0` need explicit handling; otherwise a direct `(Q - df) / Q` implementation can produce negative I-squared or divide by zero.
+- Keeping diagnostics transient alongside M17 avoids adding persistence before the product has a stable quantitative report/API representation.

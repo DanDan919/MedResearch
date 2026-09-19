@@ -25,7 +25,8 @@ public enum QuantitativeSynthesisRejectionReason
     NonFinitePooledEffect = 9,
     NonFiniteConfidenceInterval = 10,
     BackTransformationFailed = 11,
-    DuplicateEvidenceContribution = 12
+    DuplicateEvidenceContribution = 12,
+    NonFiniteHeterogeneityDiagnostics = 13
 }
 
 public sealed record QuantitativeSynthesisOptions
@@ -81,8 +82,16 @@ public sealed record QuantitativeSynthesisResult(
     double? ReportedScaleEffect,
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
+    QuantitativeHeterogeneityDiagnostics? HeterogeneityDiagnostics,
     IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
     IReadOnlyCollection<QuantitativeSynthesisRejectionReason> RejectionReasons);
+
+public sealed record QuantitativeHeterogeneityDiagnostics(
+    double CochransQ,
+    int DegreesOfFreedom,
+    double ISquared,
+    int StudyCount,
+    string AlgorithmVersion);
 
 public sealed record QuantitativeSynthesisContribution(
     Guid EvidenceId,

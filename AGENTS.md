@@ -61,3 +61,7 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 38. LLM output may extract reported statistics from grounded SourceMaterial, but deterministic Application code must perform authoritative statistical normalization.
 39. Missing CI confidence level, population, comparator, or study-design compatibility must remain explicit rather than being guessed for a more complete-looking quantitative result.
 40. Live validation that calls OpenAI, PubMed, Europe PMC, or structured full-text endpoints must remain explicit opt-in, outside normal solution tests/CI, and must use an acknowledged isolated database.
+
+41. Heterogeneity diagnostics must use the exact same independent Study contributions, analysis-scale effects, and inverse-variance weights as the deterministic fixed-effect synthesis they describe.
+42. Cochran's Q and I-squared are statistical diagnostics only; do not present them as quality scores, causal explanations, or automatic random-effects model selectors.
+43. I-squared must be bounded at zero and must not be interpreted as proof that true effects are identical when it equals zero.

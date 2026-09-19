@@ -204,7 +204,7 @@ Flow: ResearchRun -> distinct discovered Studies -> current SourceMaterial metad
 
 The builder validates the authoritative ResearchRun id, unique Study snapshots, Evidence run/study scope, Extraction source lineage, grounded completed extraction status, Evaluation EvidenceIds, and search provenance. It computes coverage metrics and conservative normalized outcome groups while retaining positive/negative disagreement as conflict. Multiple discovery paths therefore remain provenance, not duplicate Study snapshots.
 
-Synthesis is narrative evidence synthesis, but the Application layer now also builds a narrow deterministic fixed-effect inverse-variance quantitative synthesis read model for M15-compatible OR/RR/HR evidence groups. The system does not average raw EffectValue values, vote-count studies, or let the LLM calculate pooled estimates. Random-effects models, heterogeneity statistics, forest plots, and formal meta-analysis reporting remain out of scope.
+Synthesis is narrative evidence synthesis, but the Application layer now also builds a narrow deterministic fixed-effect inverse-variance quantitative synthesis read model for M15-compatible OR/RR/HR evidence groups. The system does not average raw EffectValue values, vote-count studies, or let the LLM calculate pooled estimates. Random-effects models, tau-squared estimation, forest plots, and formal meta-analysis reporting remain out of scope; Q/df/I-squared diagnostics are available as deterministic read-model metadata.
 ## Evidence Synthesis
 
 Application performs evidence synthesis through `ResearchSynthesizer`, which reuses `IStructuredLlmClient` for strict structured output and validates model drafts before persistence.
@@ -415,7 +415,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - No live OpenAI smoke test is configured or run by default.
 - No PDF/HTML scraping, publisher crawling, RAG, or vector search exists; bounded Europe PMC structured full text is supported.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
-- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, random-effects meta-analysis, heterogeneity statistics, and forest plots are not implemented.
+- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, random-effects meta-analysis, tau-squared estimation, and forest plots are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - PubMed and Europe PMC rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
@@ -461,7 +461,7 @@ The default configuration is `QuantitativeSynthesis:OutputConfidenceLevel=0.95` 
 
 The read model is not persisted in V1. Reproducibility comes from persisted Evidence, EvidenceExtraction, SourceMaterial, Study, and EvidenceEvaluation lineage plus deterministic algorithm version `fixed-effect-inverse-variance-v1`. Persisting a quantitative result snapshot can be revisited when reports/API surfaces need durable machine-readable pooled estimates.
 
-This is a common/fixed-effect model assumption over compatible current-run evidence. It does not test homogeneity, estimate tau-squared, produce I-squared/Q, resolve cohort overlap, harmonize outcomes semantically, pool p-values, or support MD/SMD/correlation families yet.
+This is a common/fixed-effect model assumption over compatible current-run evidence. It does not prove homogeneity, estimate tau-squared, resolve cohort overlap, harmonize outcomes semantically, pool p-values, or support MD/SMD/correlation families yet. Q/df/I-squared diagnostics are now computed separately over the same fixed-effect contribution set.
 ## Live Scientific E2E Validation Boundary
 
 Live scientific validation is an explicit operational test boundary, not part of normal automated tests. The optional `tests/MedResearch.LiveE2EValidationTests` project exercises the real API composition root, hosted background worker, PostgreSQL persistence, OpenAI structured generation, PubMed, Europe PMC search, Europe PMC full-text acquisition where available, evidence extraction/evaluation, EvidenceCorpus, quantitative readiness, synthesis, and report endpoint.
@@ -469,3 +469,15 @@ Live scientific validation is an explicit operational test boundary, not part of
 The live harness does not duplicate stage logic. It submits a normal `POST /api/research` request and observes the normal worker-owned ResearchRun lifecycle. It requires `MEDRESEARCH_RUN_LIVE_E2E=true`, an explicitly acknowledged isolated PostgreSQL database, configured OpenAI model/API key, and PubMed contact email. Normal CI remains deterministic and external-service independent.
 
 The live validation configuration deliberately bounds retrieval and processing volume. `ResearchPlanning:MaxSearchQueries` defaults to the existing maximum of 5 but can be reduced to 2 for live validation. Source result caps, source acquisition, extraction, evaluation, and synthesis bounds are also reduced in the harness. These bounds validate architecture against real data without turning the test into an exhaustive review.
+
+## Quantitative Heterogeneity Diagnostics V1
+
+After `FixedEffectQuantitativeStatisticalSynthesizer` produces a successful M17 result, `HeterogeneityDiagnosticsCalculator` derives `QuantitativeHeterogeneityDiagnostics` from the exact same contribution set. The calculation is pure Application code and has no dependency on EF Core, HTTP providers, OpenAI, PostgreSQL, or filesystem state.
+
+M18 diagnostics:
+
+- `CochransQ = sum(w_i * (theta_i - theta_pooled)^2)`;
+- `DegreesOfFreedom = k - 1` for the exact number of independent Study contributions;
+- `ISquared = 0` when `Q <= df` or `Q == 0`, otherwise `(Q - df) / Q` as a proportion.
+
+The diagnostics are projected into `SynthesisContext.QuantitativeSyntheses` and the narrative synthesis prompt. The prompt instructs the LLM not to calculate or replace pooled estimates, confidence intervals, Q, df, or I-squared. Q/I-squared are not Evidence, EvidenceEvaluation, SourceMaterial, quality scores, causal explanations, or model-selection triggers.

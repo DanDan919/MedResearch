@@ -119,6 +119,13 @@ public sealed record SynthesisQuantitativeContributionContext(
     double Weight,
     double NormalizedWeight);
 
+public sealed record SynthesisQuantitativeHeterogeneityDiagnosticsContext(
+    double CochransQ,
+    int DegreesOfFreedom,
+    double ISquared,
+    int StudyCount,
+    string AlgorithmVersion);
+
 public sealed record SynthesisQuantitativeResultContext(
     string GroupKey,
     string OutcomeGroupKey,
@@ -138,6 +145,7 @@ public sealed record SynthesisQuantitativeResultContext(
     double ReportedScaleConfidenceIntervalUpper,
     int EvidenceCount,
     int UniqueStudyCount,
+    SynthesisQuantitativeHeterogeneityDiagnosticsContext? HeterogeneityDiagnostics,
     IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions);
 public sealed record SynthesisContext(
     Guid ResearchRunId,
