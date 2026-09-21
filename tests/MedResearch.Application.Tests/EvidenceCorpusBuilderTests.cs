@@ -40,6 +40,38 @@ public sealed class EvidenceCorpusBuilderTests
     }
 
     [Fact]
+    public async Task BuildAsync_RejectsEvidenceWithoutGroundedExtractionLineage()
+    {
+        var runId = Guid.NewGuid();
+        var snapshot = CreateSnapshot(runId);
+        var evidence = snapshot.Evidence.Single() with { EvidenceExtractionId = Guid.NewGuid() };
+        var invalid = snapshot with { Evidence = [evidence] };
+
+        var builder = new EvidenceCorpusBuilder(new StaticStore(invalid));
+
+        var exception = await Assert.ThrowsAsync<ResearchSynthesisValidationException>(
+            () => builder.BuildAsync(runId, CancellationToken.None));
+
+        Assert.Contains("grounded completed extraction", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BuildAsync_RejectsSearchProvenanceFromAnotherResearchRun()
+    {
+        var runId = Guid.NewGuid();
+        var snapshot = CreateSnapshot(runId);
+        var search = snapshot.Searches.Single() with { ResearchRunId = Guid.NewGuid() };
+        var invalid = snapshot with { Searches = [search] };
+
+        var builder = new EvidenceCorpusBuilder(new StaticStore(invalid));
+
+        var exception = await Assert.ThrowsAsync<ResearchSynthesisValidationException>(
+            () => builder.BuildAsync(runId, CancellationToken.None));
+
+        Assert.Contains("Search provenance", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task BuildAsync_DeduplicatesStudyAndGroupsNormalizedConflictingOutcomes()
     {
         var runId = Guid.NewGuid();

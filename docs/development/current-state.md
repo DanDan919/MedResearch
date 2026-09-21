@@ -258,3 +258,15 @@ Milestone 19 extends successful transient quantitative synthesis results with `B
 - No migration or persisted quantitative-result table was added.
 - M17 fixed-effect pooled values and M18 Q/df/I-squared semantics remain unchanged.
 - Still not implemented: random-effects weights, random-effects pooled estimates, HKSJ, prediction intervals, Q-profile tau-squared intervals, automatic model selection, and tau-based I-squared replacement.
+## Milestone 21 Architecture Verification Audit
+
+Milestone 21 independently audited the post-M20 architecture claims before adding any new scientific capability. The audit found that the documented major boundaries still match the implementation: Study remains global, search/discovery provenance remains source/query-specific, Evidence/Evaluation/Report data remains ResearchRun-scoped, synthesis rejects model-supplied citation identifiers, and worker lease owner/version fencing is enforced in PostgreSQL queue writes.
+
+Changes from the audit were deliberately test-focused:
+
+- enabled an existing PostgreSQL insufficient-evidence report persistence test that lacked an xUnit attribute;
+- added stale-owner negative tests for lease renewal, failure marking, and release;
+- added EvidenceCorpusBuilder negative tests for broken extraction lineage and cross-run search provenance;
+- recorded the verification matrix in `docs/development/milestone-21-verification-ru.md`.
+
+No production behavior, schema, provider, quantitative semantics, or Docker configuration changed in this milestone.

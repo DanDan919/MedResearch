@@ -246,6 +246,40 @@ public sealed class ResearchRunQueueConcurrencyTests
     }
 
     [SkippableFact]
+    public async Task RenewLeaseAsync_StaleOwnerCannotExtendNewerLease()
+    {
+        SkipIfPostgreSqlUnavailable();
+        await ClearNonTerminalRunsAsync();
+
+        var runId = await SeedActiveRunAsync(ResearchRunStatus.Searching, "worker-a", DateTimeOffset.UtcNow.AddMinutes(-1), 1);
+
+        await using var staleContext = _fixture.CreateDbContext();
+        await using var reclaimContext = _fixture.CreateDbContext();
+        var staleQueue = new PostgreSqlResearchRunQueue(staleContext);
+        var reclaimQueue = new PostgreSqlResearchRunQueue(reclaimContext);
+        var staleClaim = new ClaimedResearchRun(
+            await staleContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None),
+            "Can a stale heartbeat extend a transferred lease?",
+            "worker-a",
+            1,
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            false);
+
+        var newerClaim = await reclaimQueue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, "worker-b", LeaseDuration, CancellationToken.None);
+        Assert.NotNull(newerClaim);
+        var newerExpiry = newerClaim.LeaseExpiresAt;
+
+        var renewed = await staleQueue.RenewLeaseAsync(staleClaim, DateTimeOffset.UtcNow.AddMinutes(1), LeaseDuration, CancellationToken.None);
+
+        Assert.False(renewed);
+        await using var verificationContext = _fixture.CreateDbContext();
+        var savedRun = await verificationContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None);
+        Assert.Equal("worker-b", savedRun.ProcessingLeaseOwner);
+        Assert.Equal(2, savedRun.ProcessingLeaseVersion);
+        Assert.Equal(newerExpiry, savedRun.ProcessingLeaseExpiresAt);
+    }
+
+    [SkippableFact]
     public async Task SaveProgressAsync_OldOwnerCannotOverwriteNewerLease()
     {
         SkipIfPostgreSqlUnavailable();
@@ -277,6 +311,78 @@ public sealed class ResearchRunQueueConcurrencyTests
         Assert.Equal(ResearchRunStatus.Searching, savedRun.Status);
         Assert.Equal("worker-b", savedRun.ProcessingLeaseOwner);
         Assert.Equal(2, savedRun.ProcessingLeaseVersion);
+    }
+
+    [SkippableFact]
+    public async Task MarkFailedAsync_StaleOwnerCannotFailNewerLease()
+    {
+        SkipIfPostgreSqlUnavailable();
+        await ClearNonTerminalRunsAsync();
+
+        var runId = await SeedActiveRunAsync(ResearchRunStatus.Extracting, "worker-a", DateTimeOffset.UtcNow.AddMinutes(-1), 1);
+
+        await using var staleContext = _fixture.CreateDbContext();
+        await using var reclaimContext = _fixture.CreateDbContext();
+        var staleQueue = new PostgreSqlResearchRunQueue(staleContext);
+        var reclaimQueue = new PostgreSqlResearchRunQueue(reclaimContext);
+        var staleClaim = new ClaimedResearchRun(
+            await staleContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None),
+            "Can a stale owner fail a reclaimed run?",
+            "worker-a",
+            1,
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            false);
+
+        var newerClaim = await reclaimQueue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, "worker-b", LeaseDuration, CancellationToken.None);
+        Assert.NotNull(newerClaim);
+
+        var failed = await staleQueue.MarkFailedAsync(
+            staleClaim,
+            "Stale worker should not win.",
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+
+        Assert.False(failed);
+        await using var verificationContext = _fixture.CreateDbContext();
+        var savedRun = await verificationContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None);
+        Assert.Equal(ResearchRunStatus.Extracting, savedRun.Status);
+        Assert.Equal("worker-b", savedRun.ProcessingLeaseOwner);
+        Assert.Equal(2, savedRun.ProcessingLeaseVersion);
+        Assert.Null(savedRun.FailureReason);
+    }
+
+    [SkippableFact]
+    public async Task ReleaseLeaseAsync_StaleOwnerCannotClearNewerLease()
+    {
+        SkipIfPostgreSqlUnavailable();
+        await ClearNonTerminalRunsAsync();
+
+        var runId = await SeedActiveRunAsync(ResearchRunStatus.Evaluating, "worker-a", DateTimeOffset.UtcNow.AddMinutes(-1), 1);
+
+        await using var staleContext = _fixture.CreateDbContext();
+        await using var reclaimContext = _fixture.CreateDbContext();
+        var staleQueue = new PostgreSqlResearchRunQueue(staleContext);
+        var reclaimQueue = new PostgreSqlResearchRunQueue(reclaimContext);
+        var staleClaim = new ClaimedResearchRun(
+            await staleContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None),
+            "Can a stale owner release a newer lease?",
+            "worker-a",
+            1,
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            false);
+
+        var newerClaim = await reclaimQueue.TryClaimNextQueuedRunAsync(DateTimeOffset.UtcNow, "worker-b", LeaseDuration, CancellationToken.None);
+        Assert.NotNull(newerClaim);
+
+        var released = await staleQueue.ReleaseLeaseAsync(staleClaim, CancellationToken.None);
+
+        Assert.False(released);
+        await using var verificationContext = _fixture.CreateDbContext();
+        var savedRun = await verificationContext.ResearchRuns.SingleAsync(run => run.Id == runId, CancellationToken.None);
+        Assert.Equal(ResearchRunStatus.Evaluating, savedRun.Status);
+        Assert.Equal("worker-b", savedRun.ProcessingLeaseOwner);
+        Assert.Equal(2, savedRun.ProcessingLeaseVersion);
+        Assert.NotNull(savedRun.ProcessingLeaseExpiresAt);
     }
 
     [SkippableFact]

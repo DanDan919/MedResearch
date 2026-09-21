@@ -130,6 +130,8 @@ public sealed class ResearchReportStoreTests
         Assert.Equal(1, trace.source.ContentVersion);
         Assert.Equal(seed.Pmid, trace.study.Pmid);
     }
+
+    [SkippableFact]
     public async Task PersistReportAsync_PreservesInsufficientEvidenceReportWithoutClaims()
     {
         SkipIfPostgreSqlUnavailable();
