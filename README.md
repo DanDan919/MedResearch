@@ -230,6 +230,8 @@ Domain, Application, Infrastructure, architecture-boundary, and API tests run wi
 
 ## Development Notes
 
+For a beginner-friendly architecture map, start with `docs/architecture-overview.md`. For a code-oriented request trace, read `docs/request-lifecycle.md`. For a guided study sequence, read `docs/learning-path.md`.
+
 Read `AGENTS.md`, `ARCHITECTURE.md`, and `docs/development/current-state.md` before significant changes.
 
 

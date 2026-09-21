@@ -1,5 +1,7 @@
 # Architecture
 
+For a short Russian onboarding guide, read `docs/architecture-overview.md`. For the exact request lifecycle through code, read `docs/request-lifecycle.md`. For a staged learning roadmap, read `docs/learning-path.md`.
+
 MedResearch is a modular, layered monolith. The system should remain simple until concrete needs justify more infrastructure.
 
 ## Dependency Direction

@@ -5,6 +5,10 @@ Date: 2026-09-17
 ## Exists Now
 
 - Initial repository documentation and development trail.
+- Architecture comprehension documentation:
+  - `docs/architecture-overview.md` for a simple Russian system overview.
+  - `docs/request-lifecycle.md` for the code-level request/pipeline trace.
+  - `docs/learning-path.md` for a staged reading and tracing guide.
 - .NET 10 solution file: `MedResearch.slnx`.
 - Local .NET tool manifest with `dotnet-ef`.
 - Layered projects:
