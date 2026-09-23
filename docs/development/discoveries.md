@@ -45,3 +45,11 @@
 - REML tau-squared estimation can be added as pure deterministic Application code over the same M17 contribution set; persistence is unnecessary while quantitative outputs remain transient read models.
 - A boundary estimate of tau² = 0 is different from numerical non-convergence. MedResearch now represents non-estimation explicitly instead of silently returning zero.
 - The `metafor` BCG example is a useful independent reference dataset: `escalc(measure="RR")` followed by `rma(yi, vi, method="REML")` reports tau² approximately 0.3132.
+
+## Milestone 22 Discoveries
+
+- REML tau-squared becomes operationally useful only when consumed by a separate random-effects synthesis result; M22 keeps that result beside the M17 common/fixed-effect result instead of replacing it.
+- `tau² = 0` is a valid REML boundary estimate. With the same contribution population, random-effects weights collapse to common/fixed-effect inverse-variance weights.
+- Random-effects Wald synthesis remains analysis-scale mathematics. OR/RR/HR values must stay on the natural-log scale until the final reported-scale back-transform.
+- The BCG/metafor dataset remains useful as an independent reference because it exercises positive tau², unequal within-study variances, and a known random-effects estimate.
+- HKSJ, prediction intervals, tau-squared confidence intervals, and automatic model selection are distinct methodology decisions and must not be implied by M22.

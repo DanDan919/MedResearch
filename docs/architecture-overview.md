@@ -256,18 +256,19 @@ LLM output всегда считается недоверенным. Даже st
 
 Только после этого `SynthesisContextBuilder` ограничивает corpus по настройкам `Synthesis:*` и добавляет deterministic summaries.
 
-## Quantitative block M15-M19
+## Quantitative block M15-M22
 
-Количественный слой сейчас является Application read model поверх validated EvidenceCorpus. Он не создает persisted meta-analysis таблицу.
+Количественный слой сейчас является Application read model поверх validated EvidenceCorpus. Он не создает persisted meta-analysis таблицу. M22 добавляет random-effects view рядом с common/fixed-effect view, а не заменяет его.
 
 | Milestone | Что добавлено | Чего нет |
 | --- | --- | --- |
 | M15 | `QuantitativeEvidenceAssessor`: eligibility, effect-measure classification, compatibility groups | broad meta-analysis result |
 | M17 | `FixedEffectQuantitativeStatisticalSynthesizer`: inverse-variance fixed-effect OR/RR/HR groups | random effects, forest plots, MD/SMD/correlation pooling |
 | M18 | Cochran's Q, df, I-squared diagnostics over same fixed-effect contributions | model selection, causal heterogeneity explanation |
-| M19 | REML tau-squared estimator foundation | random-effects weights, random-effects pooled estimate, HKSJ, prediction intervals |
+| M19 | REML tau-squared estimator foundation | random-effects pooling was deferred until M22 |
+| M22 | REML random-effects inverse-variance pooled estimate with Wald CI | HKSJ, prediction intervals, tau-squared CI, automatic model selection |
 
-LLM может описывать supplied deterministic quantitative values, но не рассчитывает pooled estimates и не изменяет их.
+LLM может описывать supplied deterministic quantitative values, но не рассчитывает pooled estimates, random-effects weights, tau-squared, confidence intervals и не изменяет их.
 
 ## Worker, leases и recovery
 
@@ -390,11 +391,11 @@ CI is authoritative for PostgreSQL when local Docker Desktop is unavailable. In 
 - formal GRADE/RoB frameworks;
 - semantic outcome harmonization;
 - cohort-overlap detection;
-- random-effects weights and pooled random-effects estimate;
+- HKSJ inference, prediction intervals, tau-squared confidence intervals, automatic model selection, and persisted quantitative result artifacts;
 - persisted quantitative result artifact;
 - production migration strategy;
 - distributed provider rate limiter.
 
 ## Двухминутное объяснение проекта
 
-MedResearch - это .NET layered monolith для evidence synthesis. API принимает research question и сразу возвращает queued `ResearchRun`. Hosted worker claim-ит run в PostgreSQL через lease, проходит stages Planning, Searching, Source acquisition, Extraction, Evaluation, Synthesis и пишет отчет. PubMed и Europe PMC дают provider-neutral study candidates, PostgreSQL решает canonical `Study` по PMID/PMCID/DOI и сохраняет отдельную provenance для каждого source/query. LLM используется только за trust boundary: план, extraction, evaluation, synthesis валидируются C# кодом. Claims в отчете могут ссылаться только на current-run `Evidence`, а citation metadata берется из persisted `Study`, не из модели. Количественный слой сейчас deterministic read model: eligibility, fixed-effect OR/RR/HR pooling, Q/I² и REML tau² foundation, но без random-effects pooled estimate.
+MedResearch - это .NET layered monolith для evidence synthesis. API принимает research question и сразу возвращает queued `ResearchRun`. Hosted worker claim-ит run в PostgreSQL через lease, проходит stages Planning, Searching, Source acquisition, Extraction, Evaluation, Synthesis и пишет отчет. PubMed и Europe PMC дают provider-neutral study candidates, PostgreSQL решает canonical `Study` по PMID/PMCID/DOI и сохраняет отдельную provenance для каждого source/query. LLM используется только за trust boundary: план, extraction, evaluation, synthesis валидируются C# кодом. Claims в отчете могут ссылаться только на current-run `Evidence`, а citation metadata берется из persisted `Study`, не из модели. Количественный слой сейчас deterministic read model: eligibility, fixed/common-effect OR/RR/HR pooling, Q/I², REML tau² foundation и REML random-effects Wald pooling, но без HKSJ, prediction interval или автоматического выбора модели.

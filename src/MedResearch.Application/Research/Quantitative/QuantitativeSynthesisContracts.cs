@@ -8,7 +8,13 @@ public enum QuantitativeSynthesisStatus
 
 public enum QuantitativeSynthesisMethod
 {
-    FixedEffectInverseVariance = 0
+    FixedEffectInverseVariance = 0,
+    RandomEffectsInverseVariance = 1
+}
+
+public enum QuantitativeConfidenceIntervalMethod
+{
+    WaldStandardNormal = 0
 }
 
 public enum BetweenStudyVarianceEstimator
@@ -30,6 +36,19 @@ public enum BetweenStudyVarianceFailureReason
     NonFiniteCalculation = 3,
     FailedToBracket = 4,
     MaxIterationsExceeded = 5
+}
+
+public enum QuantitativeRandomEffectsFailureReason
+{
+    BetweenStudyVarianceNotEstimated = 0,
+    InvalidTauSquared = 1,
+    InvalidVariance = 2,
+    InvalidEffect = 3,
+    InvalidWeight = 4,
+    NonFinitePooledEffect = 5,
+    NonFiniteConfidenceInterval = 6,
+    BackTransformationFailed = 7,
+    DuplicateContribution = 8
 }
 
 public enum QuantitativeSynthesisRejectionReason
@@ -105,8 +124,30 @@ public sealed record QuantitativeSynthesisResult(
     double? ReportedScaleConfidenceIntervalUpper,
     QuantitativeHeterogeneityDiagnostics? HeterogeneityDiagnostics,
     BetweenStudyVarianceEstimate? BetweenStudyVariance,
+    QuantitativeRandomEffectsSynthesisResult? RandomEffects,
     IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
     IReadOnlyCollection<QuantitativeSynthesisRejectionReason> RejectionReasons);
+
+public sealed record QuantitativeRandomEffectsSynthesisResult(
+    QuantitativeSynthesisStatus Status,
+    QuantitativeSynthesisMethod Method,
+    string AlgorithmVersion,
+    QuantitativeConfidenceIntervalMethod ConfidenceIntervalMethod,
+    decimal OutputConfidenceLevel,
+    double? TauSquared,
+    BetweenStudyVarianceEstimator TauSquaredEstimator,
+    string TauSquaredAlgorithmVersion,
+    int StudyCount,
+    double? AnalysisScaleEffect,
+    double? AnalysisScaleVariance,
+    double? AnalysisScaleStandardError,
+    double? AnalysisScaleConfidenceIntervalLower,
+    double? AnalysisScaleConfidenceIntervalUpper,
+    double? ReportedScaleEffect,
+    double? ReportedScaleConfidenceIntervalLower,
+    double? ReportedScaleConfidenceIntervalUpper,
+    IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
+    IReadOnlyCollection<QuantitativeRandomEffectsFailureReason> FailureReasons);
 
 public sealed record QuantitativeHeterogeneityDiagnostics(
     double CochransQ,

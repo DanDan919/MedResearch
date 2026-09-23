@@ -141,6 +141,9 @@ public sealed partial class FullFakePipelineTests
         Assert.Contains("ISquared", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("TauSquared", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("RestrictedMaximumLikelihood", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RandomEffectsInverseVariance", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WaldStandardNormal", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ContributionWeights", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         using (var scope = factory.Services.CreateScope())
         {
             var corpus = await scope.ServiceProvider.GetRequiredService<IEvidenceCorpusBuilder>()

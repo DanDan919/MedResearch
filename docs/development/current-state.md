@@ -95,7 +95,7 @@ Date: 2026-09-17
   - Every persisted completed-report claim must cite supplied EvidenceIds from the same ResearchRun.
   - Citation authority comes from persisted Evidence and Study rows; model-supplied PMID, DOI, and StudyId are rejected.
   - No validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.
-  - Persisted ResearchReport synthesis remains narrative and traceable; deterministic fixed-effect pooled ratio results may be supplied as bounded context, but no random-effects meta-analysis, random-effects pooled estimate, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
+  - Persisted ResearchReport synthesis remains narrative and traceable; deterministic common/fixed-effect and REML random-effects Wald pooled ratio results may be supplied as bounded context, but no automatic model selection, HKSJ inference, prediction interval, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
 - Application persistence boundaries:
   - `IResearchStore` for HTTP create/read use cases.
   - `IResearchRunQueue` for worker claim/progress/failure operations.
@@ -185,7 +185,7 @@ Keep hardening trust boundaries, retry behavior, provider diagnostics, and ident
 - Full-text extraction.
 - Formal study quality frameworks such as GRADE, RoB 2, ROBINS-I, AMSTAR-2, or NOS.
 - Full-text evidence synthesis.
-- Random-effects meta-analysis, random-effects pooled estimates, forest plots, p-value pooling, and broad pooled-effect families beyond fixed-effect inverse-variance OR/RR/HR V1. Q/df/I-squared diagnostics exist for successful fixed-effect groups.
+- HKSJ inference, prediction intervals, tau-squared confidence intervals, forest plots, p-value pooling, and broad pooled-effect families beyond inverse-variance OR/RR/HR V1. Q/df/I-squared diagnostics and REML random-effects Wald synthesis exist for successful compatible groups.
 - Semantic outcome harmonization.
 - Cohort-overlap or citation-overlap detection for systematic reviews and primary studies.
 - RAG/vector search.
@@ -238,14 +238,14 @@ The source-material layer is now persisted and used as the authoritative extract
 - Output is transient and exposed through `SynthesisContext.QuantitativeSyntheses`; no database migration or persisted quantitative report table was added.
 - The narrative synthesis prompt may receive deterministic pooled results but is forbidden from calculating or altering pooled estimates itself.
 - Defaults: `QuantitativeSynthesis:OutputConfidenceLevel=0.95`, `QuantitativeSynthesis:MinimumUniqueStudies=2`.
-- Still not implemented: random-effects weights, random-effects pooled estimates, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
+- Still not implemented: HKSJ inference, prediction intervals, tau-squared confidence intervals, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
 ## Fixed-Effect Heterogeneity Diagnostics V1
 
 Milestone 18 extends the transient quantitative synthesis read model with deterministic heterogeneity diagnostics for successful M17 fixed-effect groups. `HeterogeneityDiagnosticsCalculator` computes Cochran's Q, degrees of freedom, and I-squared using the same M17 contribution set, analysis-scale effects, pooled analysis-scale effect, and inverse-variance weights.
 
 The diagnostics are versioned as `cochran-q-i2-v1` and are projected into `SynthesisContext` and the synthesis prompt. They remain derived read-model data and are not persisted as Evidence, Study metadata, or a database table.
 
-Scope intentionally not implemented: random-effects weights, random-effects pooled estimates, prediction intervals, Q p-values, forest plots, funnel plots, publication-bias tests, subgroup analysis, and automatic model selection.
+Scope intentionally not implemented: HKSJ inference, prediction intervals, tau-squared confidence intervals, Q p-values, forest plots, funnel plots, publication-bias tests, subgroup analysis, and automatic model selection.
 ## REML Between-Study Variance Foundation V1
 
 Milestone 19 extends successful transient quantitative synthesis results with `BetweenStudyVarianceEstimate` using `RestrictedMaximumLikelihoodTauSquaredEstimator`.
@@ -257,7 +257,22 @@ Milestone 19 extends successful transient quantitative synthesis results with `B
 - Values are projected into `SynthesisContext` and the synthesis prompt with algorithm version `reml-tau-squared-v1`.
 - No migration or persisted quantitative-result table was added.
 - M17 fixed-effect pooled values and M18 Q/df/I-squared semantics remain unchanged.
-- Still not implemented: random-effects weights, random-effects pooled estimates, HKSJ, prediction intervals, Q-profile tau-squared intervals, automatic model selection, and tau-based I-squared replacement.
+- M22 now implements REML random-effects weights and a Wald pooled random-effects estimate. Still not implemented: HKSJ, prediction intervals, Q-profile tau-squared intervals, automatic model selection, and tau-based I-squared replacement.
+
+## Random-Effects REML/Wald Quantitative Synthesis V1
+
+Milestone 22 adds `RandomEffectsQuantitativeStatisticalSynthesizer` as a deterministic Application read model nested under each successful common/fixed-effect synthesis result.
+
+- The random-effects result consumes the M19 `BetweenStudyVarianceEstimate`; it does not estimate tau-squared again.
+- Raw random-effects weights are `1 / (vi + tau²)` using the same validated independent Study-level contribution population as M17-M19.
+- The pooled random-effects estimate, variance, standard error, and confidence interval are computed on the analysis scale.
+- OR/RR/HR reported-scale values are back-transformed with `exp(...)` only after analysis-scale synthesis is complete.
+- The confidence interval is standard-normal Wald only for M22.
+- `tau² = 0` is valid and collapses to the M17 common/fixed-effect inverse-variance result for the same contribution set.
+- If M19 tau-squared is `NotEstimated`, the random-effects result is explicitly unavailable rather than fabricating zero or falling back to M17.
+- Values are projected into `SynthesisContext` and the synthesis prompt. The LLM is forbidden from calculating or altering them.
+- No migration or persisted quantitative-result table was added.
+- Still not implemented: HKSJ, modified/ad-hoc HKSJ, prediction intervals, tau-squared confidence intervals, model recommendation/selection, subgroup analysis, meta-regression, publication-bias methods, forest plots, and persisted quantitative artifacts.
 ## Milestone 21 Architecture Verification Audit
 
 Milestone 21 independently audited the post-M20 architecture claims before adding any new scientific capability. The audit found that the documented major boundaries still match the implementation: Study remains global, search/discovery provenance remains source/query-specific, Evidence/Evaluation/Report data remains ResearchRun-scoped, synthesis rejects model-supplied citation identifiers, and worker lease owner/version fencing is enforced in PostgreSQL queue writes.

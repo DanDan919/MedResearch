@@ -221,7 +221,7 @@ Trace one persisted claim from `ResearchReportDraft` to `ResearchReportClaimEvid
 
 ## Level 9: Quantitative read models
 
-Goal: understand what M15-M19 added and what remains explicitly out of scope.
+Goal: understand what M15-M22 added and what remains explicitly out of scope.
 
 Read:
 
@@ -230,8 +230,9 @@ Read:
 - `src/MedResearch.Application/Research/Quantitative/FixedEffectQuantitativeStatisticalSynthesizer.cs`
 - `src/MedResearch.Application/Research/Quantitative/HeterogeneityDiagnosticsCalculator.cs`
 - `src/MedResearch.Application/Research/Quantitative/RestrictedMaximumLikelihoodTauSquaredEstimator.cs`
+- `src/MedResearch.Application/Research/Quantitative/RandomEffectsQuantitativeStatisticalSynthesizer.cs`
 - `tests/MedResearch.Application.Tests/QuantitativeEvidenceAssessorTests.cs`
-- `tests/MedResearch.Application.Tests/FixedEffectQuantitativeStatisticalSynthesizerTests.cs`
+- `tests/MedResearch.Application.Tests/QuantitativeStatisticalSynthesizerTests.cs`
 - `tests/MedResearch.Application.Tests/HeterogeneityDiagnosticsCalculatorTests.cs`
 - `tests/MedResearch.Application.Tests/RestrictedMaximumLikelihoodTauSquaredEstimatorTests.cs`
 
@@ -243,11 +244,11 @@ Questions:
 
 1. Why are p-values alone not enough to create an effect size?
 2. Why does fixed-effect V1 support OR/RR/HR but not every measure family?
-3. Why does REML tau-squared not mean a random-effects pooled estimate exists?
+3. Why does M22 reuse M19 REML tau-squared instead of re-estimating tau-squared?
 
 Exercise:
 
-Pick one eligible OR/RR/HR evidence group and trace how it becomes a fixed-effect result, Q/I-squared diagnostics, and REML tau-squared estimate in `SynthesisContext`.
+Pick one eligible OR/RR/HR evidence group and trace how it becomes a fixed-effect result, Q/I-squared diagnostics, REML tau-squared estimate, and REML random-effects Wald result in `SynthesisContext`.
 
 ## Level 10: Persistence and migrations
 

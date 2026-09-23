@@ -159,7 +159,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
         {
-            limitations.Add("Fixed-effect inverse-variance pooled estimates, heterogeneity diagnostics, and REML tau-squared estimates are deterministic descriptive synthesis over compatible current-run evidence; random-effects weights, random-effects pooled estimates, and causal heterogeneity explanations are not implemented.");
+            limitations.Add("Fixed-effect inverse-variance pooled estimates, heterogeneity diagnostics, REML tau-squared estimates, and REML random-effects Wald syntheses are deterministic descriptive synthesis over compatible current-run evidence; HKSJ inference, prediction intervals, tau-squared confidence intervals, automatic model selection, and causal heterogeneity explanations are not implemented.");
         }
 
         var context = new SynthesisContext(
@@ -238,6 +238,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
                         result.BetweenStudyVariance.Converged,
                         result.BetweenStudyVariance.IterationCount,
                         result.BetweenStudyVariance.FailureReason),
+                MapRandomEffects(result.RandomEffects),
                 result.Contributions
                     .OrderBy(contribution => contribution.StudyId)
                     .ThenBy(contribution => contribution.EvidenceId)
@@ -252,6 +253,44 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             .ToArray();
     }
 
+    private static SynthesisRandomEffectsResultContext? MapRandomEffects(QuantitativeRandomEffectsSynthesisResult? result)
+    {
+        if (result is null)
+        {
+            return null;
+        }
+
+        return new SynthesisRandomEffectsResultContext(
+            result.Status,
+            result.Method,
+            result.AlgorithmVersion,
+            result.ConfidenceIntervalMethod,
+            result.OutputConfidenceLevel,
+            result.TauSquared,
+            result.TauSquaredEstimator,
+            result.TauSquaredAlgorithmVersion,
+            result.StudyCount,
+            result.AnalysisScaleEffect,
+            result.AnalysisScaleVariance,
+            result.AnalysisScaleStandardError,
+            result.AnalysisScaleConfidenceIntervalLower,
+            result.AnalysisScaleConfidenceIntervalUpper,
+            result.ReportedScaleEffect,
+            result.ReportedScaleConfidenceIntervalLower,
+            result.ReportedScaleConfidenceIntervalUpper,
+            result.Contributions
+                .OrderBy(contribution => contribution.StudyId)
+                .ThenBy(contribution => contribution.EvidenceId)
+                .Select(contribution => new SynthesisQuantitativeContributionContext(
+                    contribution.EvidenceId,
+                    contribution.StudyId,
+                    contribution.AnalysisScaleEffect,
+                    contribution.AnalysisScaleVariance,
+                    contribution.Weight,
+                    contribution.NormalizedWeight))
+                .ToArray(),
+            result.FailureReasons);
+    }
     private static IReadOnlyCollection<SynthesisOutcomeDirectionSummary> BuildOutcomeSummaries(IReadOnlyCollection<SynthesisEvidenceContext> evidence)
     {
         return evidence

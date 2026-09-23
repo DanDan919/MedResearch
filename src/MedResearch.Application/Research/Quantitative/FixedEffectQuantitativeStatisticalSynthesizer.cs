@@ -107,6 +107,8 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
         }
 
         var betweenStudyVariance = RestrictedMaximumLikelihoodTauSquaredEstimator.Estimate(contributions);
+        var randomEffects = new RandomEffectsQuantitativeStatisticalSynthesizer(_options)
+            .Synthesize(betweenStudyVariance, contributions, group.EffectMeasureType);
 
         var reportedEffect = Math.Exp(pooledEffect);
         var reportedLower = Math.Exp(lower);
@@ -142,6 +144,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             reportedUpper,
             heterogeneityDiagnostics,
             betweenStudyVariance,
+            randomEffects,
             contributions,
             []);
     }
@@ -255,6 +258,7 @@ public sealed class FixedEffectQuantitativeStatisticalSynthesizer : IQuantitativ
             _options.OutputConfidenceLevel,
             group.EvidenceCount,
             group.UniqueStudyCount,
+            null,
             null,
             null,
             null,

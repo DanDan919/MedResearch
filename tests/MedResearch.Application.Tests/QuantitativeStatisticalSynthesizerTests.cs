@@ -398,12 +398,203 @@ public sealed class QuantitativeStatisticalSynthesizerTests
         Assert.True(double.IsFinite(estimate.TauSquared.Value));
         Assert.True(estimate.TauSquared.Value >= 0d);
     }
+    [Fact]
+    public void Synthesize_AddsRandomEffectsWaldSynthesisForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(
+            runId,
+            CreateBcgRiskRatioReferenceAssessments(runId),
+            EffectMeasureType.RiskRatio);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, result.Status);
+        Assert.Equal(QuantitativeSynthesisMethod.FixedEffectInverseVariance, result.Method);
+        Assert.NotNull(result.RandomEffects);
+        var random = result.RandomEffects!;
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, random.Status);
+        Assert.Equal(QuantitativeSynthesisMethod.RandomEffectsInverseVariance, random.Method);
+        Assert.Equal(RandomEffectsQuantitativeStatisticalSynthesizer.AlgorithmVersion, random.AlgorithmVersion);
+        Assert.Equal(QuantitativeConfidenceIntervalMethod.WaldStandardNormal, random.ConfidenceIntervalMethod);
+        Assert.Equal(BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood, random.TauSquaredEstimator);
+        Assert.Equal(RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion, random.TauSquaredAlgorithmVersion);
+        Assert.Equal(result.BetweenStudyVariance!.TauSquared, random.TauSquared);
+        Assert.Equal(13, random.StudyCount);
+        Assert.Empty(random.FailureReasons);
+
+        // Reference: metafor dat.bcg/escalc(measure="RR"), rma(yi, vi, method="REML", test="z").
+        Assert.Equal(0.3132d, random.TauSquared!.Value, 5e-5);
+        Assert.Equal(-0.714528384090743d, random.AnalysisScaleEffect!.Value, 5e-5);
+        Assert.Equal(0.0323177998215058d, random.AnalysisScaleVariance!.Value, 5e-5);
+        Assert.Equal(0.179771521163687d, random.AnalysisScaleStandardError!.Value, 5e-5);
+        Assert.Equal(-1.06687409101755d, random.AnalysisScaleConfidenceIntervalLower!.Value, 5e-5);
+        Assert.Equal(-0.362182677163938d, random.AnalysisScaleConfidenceIntervalUpper!.Value, 5e-5);
+        Assert.Equal(0.489422876990929d, random.ReportedScaleEffect!.Value, 5e-5);
+        Assert.Equal(0.344082408392641d, random.ReportedScaleConfidenceIntervalLower!.Value, 5e-5);
+        Assert.Equal(0.696155184570607d, random.ReportedScaleConfidenceIntervalUpper!.Value, 5e-5);
+        Assert.Equal(13, random.Contributions.Count);
+        Assert.All(random.Contributions, contribution => Assert.True(contribution.Weight > 0d));
+        Assert.Equal(1d, random.Contributions.Sum(contribution => contribution.NormalizedWeight), 12);
+    }
+
+    [Fact]
+    public void Synthesize_RandomEffectsCollapseToFixedEffectWhenTauSquaredIsZero()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), Math.Log(2d), 0.04d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), Math.Log(2d), 0.16d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), Math.Log(2d), 0.25d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+        Assert.NotNull(result.RandomEffects);
+        var random = result.RandomEffects!;
+
+        Assert.Equal(0d, result.BetweenStudyVariance!.TauSquared!.Value, 12);
+        Assert.Equal(result.AnalysisScaleEffect!.Value, random.AnalysisScaleEffect!.Value, 12);
+        Assert.Equal(result.AnalysisScaleVariance!.Value, random.AnalysisScaleVariance!.Value, 12);
+        Assert.Equal(result.AnalysisScaleStandardError!.Value, random.AnalysisScaleStandardError!.Value, 12);
+        Assert.Equal(result.AnalysisScaleConfidenceIntervalLower!.Value, random.AnalysisScaleConfidenceIntervalLower!.Value, 12);
+        Assert.Equal(result.AnalysisScaleConfidenceIntervalUpper!.Value, random.AnalysisScaleConfidenceIntervalUpper!.Value, 12);
+        Assert.Equal(result.ReportedScaleEffect!.Value, random.ReportedScaleEffect!.Value, 12);
+        Assert.Equal(result.ReportedScaleConfidenceIntervalLower!.Value, random.ReportedScaleConfidenceIntervalLower!.Value, 12);
+        Assert.Equal(result.ReportedScaleConfidenceIntervalUpper!.Value, random.ReportedScaleConfidenceIntervalUpper!.Value, 12);
+
+        var fixedContributions = result.Contributions.OrderBy(contribution => contribution.StudyId).ToArray();
+        var randomContributions = random.Contributions.OrderBy(contribution => contribution.StudyId).ToArray();
+        Assert.Equal(fixedContributions.Length, randomContributions.Length);
+        for (var i = 0; i < fixedContributions.Length; i++)
+        {
+            Assert.Equal(fixedContributions[i].Weight, randomContributions[i].Weight, 12);
+            Assert.Equal(fixedContributions[i].NormalizedWeight, randomContributions[i].NormalizedWeight, 12);
+        }
+    }
+
+    [Fact]
+    public void Synthesize_RandomEffectsAreOrderIndependentForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var assessments = CreateBcgRiskRatioReferenceAssessments(runId);
+
+        var first = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments, EffectMeasureType.RiskRatio)).Results).RandomEffects!;
+        var second = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments.Reverse().ToArray(), EffectMeasureType.RiskRatio)).Results).RandomEffects!;
+
+        Assert.Equal(first.AnalysisScaleEffect!.Value, second.AnalysisScaleEffect!.Value, 12);
+        Assert.Equal(first.AnalysisScaleVariance!.Value, second.AnalysisScaleVariance!.Value, 12);
+        Assert.Equal(first.AnalysisScaleStandardError!.Value, second.AnalysisScaleStandardError!.Value, 12);
+        Assert.Equal(first.AnalysisScaleConfidenceIntervalLower!.Value, second.AnalysisScaleConfidenceIntervalLower!.Value, 12);
+        Assert.Equal(first.AnalysisScaleConfidenceIntervalUpper!.Value, second.AnalysisScaleConfidenceIntervalUpper!.Value, 12);
+        Assert.Equal(first.Contributions.OrderBy(contribution => contribution.StudyId).Select(contribution => contribution.NormalizedWeight), second.Contributions.OrderBy(contribution => contribution.StudyId).Select(contribution => contribution.NormalizedWeight));
+    }
+
+    [Fact]
+    public void RandomEffects_ReturnsUnavailableWhenTauSquaredIsNotEstimated()
+    {
+        var estimate = new BetweenStudyVarianceEstimate(
+            null,
+            BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood,
+            BetweenStudyVarianceEstimateStatus.NotEstimated,
+            RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion,
+            2,
+            false,
+            0,
+            BetweenStudyVarianceFailureReason.InvalidInput);
+
+        var result = new RandomEffectsQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions())
+            .Synthesize(estimate, [
+                CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0d, 1d),
+                CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 1d, 1d)
+            ], EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, result.Status);
+        Assert.Contains(QuantitativeRandomEffectsFailureReason.BetweenStudyVarianceNotEstimated, result.FailureReasons);
+        Assert.Null(result.AnalysisScaleEffect);
+    }
+
+    [Fact]
+    public void RandomEffects_RejectsInvalidTauSquaredAndNonFiniteContributionInput()
+    {
+        var invalidTau = new BetweenStudyVarianceEstimate(
+            -0.01d,
+            BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood,
+            BetweenStudyVarianceEstimateStatus.Estimated,
+            RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion,
+            2,
+            true,
+            1,
+            null);
+        var synthesizer = new RandomEffectsQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions());
+
+        var invalidTauResult = synthesizer.Synthesize(invalidTau, [
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0d, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 1d, 1d)
+        ], EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, invalidTauResult.Status);
+        Assert.Contains(QuantitativeRandomEffectsFailureReason.InvalidTauSquared, invalidTauResult.FailureReasons);
+
+        var estimate = CreateEstimatedTauSquared(0.1d, 2);
+        var invalidContributionResult = synthesizer.Synthesize(estimate, [
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), double.PositiveInfinity, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 1d, 1d)
+        ], EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, invalidContributionResult.Status);
+        Assert.Contains(QuantitativeRandomEffectsFailureReason.InvalidEffect, invalidContributionResult.FailureReasons);
+    }
+
+    [Fact]
+    public void RandomEffects_RejectsDuplicateStudyContributions()
+    {
+        var studyId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var result = new RandomEffectsQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions())
+            .Synthesize(CreateEstimatedTauSquared(0.1d, 2), [
+                CreateContribution(studyId, 0d, 1d),
+                CreateContribution(studyId, 1d, 1d)
+            ], EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, result.Status);
+        Assert.Contains(QuantitativeRandomEffectsFailureReason.DuplicateContribution, result.FailureReasons);
+    }
+
+    [Fact]
+    public void RandomEffects_PositiveTauSquaredReducesRelativeWeightSpread()
+    {
+        var contributions = new[]
+        {
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0d, 100d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 1d, 1d)
+        };
+        var fixedWeightRatio = contributions.Max(contribution => contribution.Weight) / contributions.Min(contribution => contribution.Weight);
+
+        var random = new RandomEffectsQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions())
+            .Synthesize(CreateEstimatedTauSquared(1d, 2), contributions, EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, random.Status);
+        var randomWeightRatio = random.Contributions.Max(contribution => contribution.Weight) / random.Contributions.Min(contribution => contribution.Weight);
+        Assert.True(randomWeightRatio < fixedWeightRatio);
+        Assert.Equal(1d, random.Contributions.Sum(contribution => contribution.NormalizedWeight), 12);
+    }
     private static FixedEffectQuantitativeStatisticalSynthesizer CreateSynthesizer(QuantitativeSynthesisOptions? options = null)
     {
         return new FixedEffectQuantitativeStatisticalSynthesizer(options ?? new QuantitativeSynthesisOptions());
     }
 
 
+    private static BetweenStudyVarianceEstimate CreateEstimatedTauSquared(double tauSquared, int studyCount)
+    {
+        return new BetweenStudyVarianceEstimate(
+            tauSquared,
+            BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood,
+            BetweenStudyVarianceEstimateStatus.Estimated,
+            RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion,
+            studyCount,
+            true,
+            1,
+            null);
+    }
     private static QuantitativeSynthesisContribution CreateContribution(Guid studyId, double analysisScaleEffect, double weight)
     {
         return new QuantitativeSynthesisContribution(

@@ -136,6 +136,26 @@ public sealed record SynthesisBetweenStudyVarianceContext(
     int IterationCount,
     BetweenStudyVarianceFailureReason? FailureReason);
 
+public sealed record SynthesisRandomEffectsResultContext(
+    QuantitativeSynthesisStatus Status,
+    QuantitativeSynthesisMethod Method,
+    string AlgorithmVersion,
+    QuantitativeConfidenceIntervalMethod ConfidenceIntervalMethod,
+    decimal OutputConfidenceLevel,
+    double? TauSquared,
+    BetweenStudyVarianceEstimator TauSquaredEstimator,
+    string TauSquaredAlgorithmVersion,
+    int StudyCount,
+    double? AnalysisScaleEffect,
+    double? AnalysisScaleVariance,
+    double? AnalysisScaleStandardError,
+    double? AnalysisScaleConfidenceIntervalLower,
+    double? AnalysisScaleConfidenceIntervalUpper,
+    double? ReportedScaleEffect,
+    double? ReportedScaleConfidenceIntervalLower,
+    double? ReportedScaleConfidenceIntervalUpper,
+    IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions,
+    IReadOnlyCollection<QuantitativeRandomEffectsFailureReason> FailureReasons);
 public sealed record SynthesisQuantitativeResultContext(
     string GroupKey,
     string OutcomeGroupKey,
@@ -157,6 +177,7 @@ public sealed record SynthesisQuantitativeResultContext(
     int UniqueStudyCount,
     SynthesisQuantitativeHeterogeneityDiagnosticsContext? HeterogeneityDiagnostics,
     SynthesisBetweenStudyVarianceContext? BetweenStudyVariance,
+    SynthesisRandomEffectsResultContext? RandomEffects,
     IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions);
 public sealed record SynthesisContext(
     Guid ResearchRunId,
