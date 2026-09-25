@@ -14,7 +14,8 @@ public enum QuantitativeSynthesisMethod
 
 public enum QuantitativeConfidenceIntervalMethod
 {
-    WaldStandardNormal = 0
+    WaldStandardNormal = 0,
+    HartungKnappSidikJonkman = 1
 }
 
 public enum BetweenStudyVarianceEstimator
@@ -49,6 +50,18 @@ public enum QuantitativeRandomEffectsFailureReason
     NonFiniteConfidenceInterval = 6,
     BackTransformationFailed = 7,
     DuplicateContribution = 8
+}
+
+public enum QuantitativeHksjFailureReason
+{
+    RandomEffectsNotSynthesized = 0,
+    InsufficientDegreesOfFreedom = 1,
+    InvalidEffect = 2,
+    InvalidWeight = 3,
+    InvalidWaldVariance = 4,
+    NonFiniteVarianceAdjustment = 5,
+    NonFiniteConfidenceInterval = 6,
+    BackTransformationFailed = 7
 }
 
 public enum QuantitativeSynthesisRejectionReason
@@ -146,8 +159,28 @@ public sealed record QuantitativeRandomEffectsSynthesisResult(
     double? ReportedScaleEffect,
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
+    QuantitativeHksjInferenceResult? HksjInference,
     IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
     IReadOnlyCollection<QuantitativeRandomEffectsFailureReason> FailureReasons);
+
+public sealed record QuantitativeHksjInferenceResult(
+    QuantitativeSynthesisStatus Status,
+    QuantitativeConfidenceIntervalMethod ConfidenceIntervalMethod,
+    string AlgorithmVersion,
+    decimal OutputConfidenceLevel,
+    int StudyCount,
+    int? DegreesOfFreedom,
+    double? VarianceAdjustment,
+    double? CriticalValue,
+    double? AnalysisScaleEffect,
+    double? AnalysisScaleVariance,
+    double? AnalysisScaleStandardError,
+    double? AnalysisScaleConfidenceIntervalLower,
+    double? AnalysisScaleConfidenceIntervalUpper,
+    double? ReportedScaleEffect,
+    double? ReportedScaleConfidenceIntervalLower,
+    double? ReportedScaleConfidenceIntervalUpper,
+    IReadOnlyCollection<QuantitativeHksjFailureReason> FailureReasons);
 
 public sealed record QuantitativeHeterogeneityDiagnostics(
     double CochransQ,

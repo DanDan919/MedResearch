@@ -143,6 +143,8 @@ public sealed partial class FullFakePipelineTests
         Assert.Contains("RestrictedMaximumLikelihood", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("RandomEffectsInverseVariance", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("WaldStandardNormal", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HartungKnappSidikJonkman", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HksjInference", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ContributionWeights", fakeLlm.ResearchSynthesisUserPrompt, StringComparison.OrdinalIgnoreCase);
         using (var scope = factory.Services.CreateScope())
         {
@@ -178,6 +180,11 @@ public sealed partial class FullFakePipelineTests
             Assert.True(pooled.BetweenStudyVariance.Converged);
             Assert.True(pooled.BetweenStudyVariance.TauSquared is >= 0d);
             Assert.True(double.IsFinite(pooled.BetweenStudyVariance.TauSquared!.Value));
+            Assert.NotNull(pooled.RandomEffects);
+            Assert.NotNull(pooled.RandomEffects!.HksjInference);
+            Assert.Equal(QuantitativeConfidenceIntervalMethod.HartungKnappSidikJonkman, pooled.RandomEffects.HksjInference!.ConfidenceIntervalMethod);
+            Assert.Equal(pooled.RandomEffects.AnalysisScaleEffect, pooled.RandomEffects.HksjInference.AnalysisScaleEffect);
+            Assert.Equal(2, pooled.RandomEffects.HksjInference.DegreesOfFreedom);
             var independentlyCalculatedPooledEffect = pooled.Contributions.Sum(contribution => contribution.Weight * contribution.AnalysisScaleEffect) / pooled.Contributions.Sum(contribution => contribution.Weight);
             Assert.Equal(Math.Exp(independentlyCalculatedPooledEffect), pooled.ReportedScaleEffect!.Value, 12);
             Assert.True(pooled.ReportedScaleEffect is > 1.60d and < 1.80d);

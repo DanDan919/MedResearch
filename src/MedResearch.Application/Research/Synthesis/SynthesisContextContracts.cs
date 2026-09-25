@@ -136,6 +136,25 @@ public sealed record SynthesisBetweenStudyVarianceContext(
     int IterationCount,
     BetweenStudyVarianceFailureReason? FailureReason);
 
+public sealed record SynthesisHksjInferenceContext(
+    QuantitativeSynthesisStatus Status,
+    QuantitativeConfidenceIntervalMethod ConfidenceIntervalMethod,
+    string AlgorithmVersion,
+    decimal OutputConfidenceLevel,
+    int StudyCount,
+    int? DegreesOfFreedom,
+    double? VarianceAdjustment,
+    double? CriticalValue,
+    double? AnalysisScaleEffect,
+    double? AnalysisScaleVariance,
+    double? AnalysisScaleStandardError,
+    double? AnalysisScaleConfidenceIntervalLower,
+    double? AnalysisScaleConfidenceIntervalUpper,
+    double? ReportedScaleEffect,
+    double? ReportedScaleConfidenceIntervalLower,
+    double? ReportedScaleConfidenceIntervalUpper,
+    IReadOnlyCollection<QuantitativeHksjFailureReason> FailureReasons);
+
 public sealed record SynthesisRandomEffectsResultContext(
     QuantitativeSynthesisStatus Status,
     QuantitativeSynthesisMethod Method,
@@ -154,6 +173,7 @@ public sealed record SynthesisRandomEffectsResultContext(
     double? ReportedScaleEffect,
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
+    SynthesisHksjInferenceContext? HksjInference,
     IReadOnlyCollection<SynthesisQuantitativeContributionContext> Contributions,
     IReadOnlyCollection<QuantitativeRandomEffectsFailureReason> FailureReasons);
 public sealed record SynthesisQuantitativeResultContext(

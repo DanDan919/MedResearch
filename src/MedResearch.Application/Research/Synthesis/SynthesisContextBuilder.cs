@@ -159,7 +159,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
         {
-            limitations.Add("Fixed-effect inverse-variance pooled estimates, heterogeneity diagnostics, REML tau-squared estimates, and REML random-effects Wald syntheses are deterministic descriptive synthesis over compatible current-run evidence; HKSJ inference, prediction intervals, tau-squared confidence intervals, automatic model selection, and causal heterogeneity explanations are not implemented.");
+            limitations.Add("Fixed-effect inverse-variance pooled estimates, heterogeneity diagnostics, REML tau-squared estimates, REML random-effects Wald syntheses, and canonical HKSJ summary-effect inference are deterministic descriptive synthesis over compatible current-run evidence; modified/ad-hoc HKSJ, prediction intervals, tau-squared confidence intervals, automatic model selection, and causal heterogeneity explanations are not implemented.");
         }
 
         var context = new SynthesisContext(
@@ -278,6 +278,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             result.ReportedScaleEffect,
             result.ReportedScaleConfidenceIntervalLower,
             result.ReportedScaleConfidenceIntervalUpper,
+            MapHksjInference(result.HksjInference),
             result.Contributions
                 .OrderBy(contribution => contribution.StudyId)
                 .ThenBy(contribution => contribution.EvidenceId)
@@ -289,6 +290,33 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
                     contribution.Weight,
                     contribution.NormalizedWeight))
                 .ToArray(),
+            result.FailureReasons);
+    }
+
+    private static SynthesisHksjInferenceContext? MapHksjInference(QuantitativeHksjInferenceResult? result)
+    {
+        if (result is null)
+        {
+            return null;
+        }
+
+        return new SynthesisHksjInferenceContext(
+            result.Status,
+            result.ConfidenceIntervalMethod,
+            result.AlgorithmVersion,
+            result.OutputConfidenceLevel,
+            result.StudyCount,
+            result.DegreesOfFreedom,
+            result.VarianceAdjustment,
+            result.CriticalValue,
+            result.AnalysisScaleEffect,
+            result.AnalysisScaleVariance,
+            result.AnalysisScaleStandardError,
+            result.AnalysisScaleConfidenceIntervalLower,
+            result.AnalysisScaleConfidenceIntervalUpper,
+            result.ReportedScaleEffect,
+            result.ReportedScaleConfidenceIntervalLower,
+            result.ReportedScaleConfidenceIntervalUpper,
             result.FailureReasons);
     }
     private static IReadOnlyCollection<SynthesisOutcomeDirectionSummary> BuildOutcomeSummaries(IReadOnlyCollection<SynthesisEvidenceContext> evidence)

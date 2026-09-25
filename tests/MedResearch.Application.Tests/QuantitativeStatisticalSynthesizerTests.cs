@@ -577,6 +577,142 @@ public sealed class QuantitativeStatisticalSynthesizerTests
         Assert.True(randomWeightRatio < fixedWeightRatio);
         Assert.Equal(1d, random.Contributions.Sum(contribution => contribution.NormalizedWeight), 12);
     }
+
+    [Fact]
+    public void Synthesize_AddsCanonicalHksjInferenceForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(
+            runId,
+            CreateBcgRiskRatioReferenceAssessments(runId),
+            EffectMeasureType.RiskRatio);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+        Assert.NotNull(result.RandomEffects);
+        var random = result.RandomEffects!;
+        Assert.NotNull(random.HksjInference);
+        var hksj = random.HksjInference!;
+
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, hksj.Status);
+        Assert.Equal(QuantitativeConfidenceIntervalMethod.HartungKnappSidikJonkman, hksj.ConfidenceIntervalMethod);
+        Assert.Equal(HksjSummaryEffectInferenceCalculator.AlgorithmVersion, hksj.AlgorithmVersion);
+        Assert.Equal(13, hksj.StudyCount);
+        Assert.Equal(12, hksj.DegreesOfFreedom);
+        Assert.Empty(hksj.FailureReasons);
+
+        // Reference: metafor dat.bcg/escalc(measure="RR"), rma(yi, vi, method="REML", test="knha").
+        Assert.Equal(random.AnalysisScaleEffect!.Value, hksj.AnalysisScaleEffect!.Value, 12);
+        Assert.Equal(random.ReportedScaleEffect!.Value, hksj.ReportedScaleEffect!.Value, 12);
+        Assert.Equal(1.01137224885285d, hksj.VarianceAdjustment!.Value, 2e-4);
+        Assert.Equal(2.17881282966342d, hksj.CriticalValue!.Value, 5e-10);
+        Assert.Equal(0.0326853258834525d, hksj.AnalysisScaleVariance!.Value, 2e-4);
+        Assert.Equal(0.180790834622368d, hksj.AnalysisScaleStandardError!.Value, 2e-4);
+        Assert.Equal(-1.10843777405152d, hksj.AnalysisScaleConfidenceIntervalLower!.Value, 2e-4);
+        Assert.Equal(-0.32061899412997d, hksj.AnalysisScaleConfidenceIntervalUpper!.Value, 2e-4);
+        Assert.Equal(0.330074208997783d, hksj.ReportedScaleConfidenceIntervalLower!.Value, 2e-4);
+        Assert.Equal(0.725699694166917d, hksj.ReportedScaleConfidenceIntervalUpper!.Value, 2e-4);
+
+        Assert.Equal(QuantitativeConfidenceIntervalMethod.WaldStandardNormal, random.ConfidenceIntervalMethod);
+        Assert.Equal(-1.06687409101755d, random.AnalysisScaleConfidenceIntervalLower!.Value, 5e-5);
+        Assert.Equal(-0.362182677163938d, random.AnalysisScaleConfidenceIntervalUpper!.Value, 5e-5);
+    }
+
+    [Fact]
+    public void Hksj_ReturnsUnavailableForSingleStudyBecauseDegreesOfFreedomAreZero()
+    {
+        var random = CreateRandomEffectsResult([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0.5d, 2d)
+        ]);
+
+        var hksj = new HksjSummaryEffectInferenceCalculator(new QuantitativeSynthesisOptions())
+            .Calculate(random, EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, hksj.Status);
+        Assert.Equal(1, hksj.StudyCount);
+        Assert.Equal(0, hksj.DegreesOfFreedom);
+        Assert.Contains(QuantitativeHksjFailureReason.InsufficientDegreesOfFreedom, hksj.FailureReasons);
+    }
+
+    [Fact]
+    public void Hksj_UsesStudentTWithKMinusOneDegreesOfFreedomForTwoStudies()
+    {
+        var random = new RandomEffectsQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions())
+            .Synthesize(CreateEstimatedTauSquared(0d, 2), [
+                CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 0d, 1d),
+                CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 2d, 1d)
+            ], EffectMeasureType.OddsRatio);
+
+        Assert.NotNull(random.HksjInference);
+        var hksj = random.HksjInference!;
+
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, hksj.Status);
+        Assert.Equal(1, hksj.DegreesOfFreedom);
+        Assert.Equal(12.7062047364321d, hksj.CriticalValue!.Value, 5e-10);
+        Assert.Equal(2d, hksj.VarianceAdjustment!.Value, 12);
+        Assert.Equal(1d, hksj.AnalysisScaleVariance!.Value, 12);
+        Assert.Equal(1d - 12.7062047364321d, hksj.AnalysisScaleConfidenceIntervalLower!.Value, 5e-10);
+        Assert.Equal(1d + 12.7062047364321d, hksj.AnalysisScaleConfidenceIntervalUpper!.Value, 5e-10);
+    }
+
+    [Fact]
+    public void Hksj_CanBeNarrowerThanWaldAtTauSquaredZeroWithoutAdhocClamp()
+    {
+        var runId = Guid.NewGuid();
+        var readiness = CreateReadiness(runId, [
+            CreateAssessment(runId, Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Guid.NewGuid(), 0d, 1d),
+            CreateAssessment(runId, Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Guid.NewGuid(), 0.1d, 1d),
+            CreateAssessment(runId, Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), Guid.NewGuid(), 0.2d, 1d)
+        ]);
+
+        var result = Assert.Single(CreateSynthesizer().Synthesize(readiness).Results);
+        Assert.NotNull(result.RandomEffects);
+        var random = result.RandomEffects!;
+        Assert.NotNull(random.HksjInference);
+        var hksj = random.HksjInference!;
+
+        Assert.Equal(0d, random.TauSquared!.Value, 12);
+        Assert.Equal(2, hksj.DegreesOfFreedom);
+        Assert.Equal(0.01d, hksj.VarianceAdjustment!.Value, 12);
+        Assert.Equal(0.00333333333333333d, hksj.AnalysisScaleVariance!.Value, 12);
+        Assert.True(hksj.AnalysisScaleStandardError < random.AnalysisScaleStandardError);
+    }
+
+    [Fact]
+    public void Hksj_IsOrderIndependentForBcgReferenceDataset()
+    {
+        var runId = Guid.NewGuid();
+        var assessments = CreateBcgRiskRatioReferenceAssessments(runId);
+
+        var firstRandom = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments, EffectMeasureType.RiskRatio)).Results).RandomEffects!;
+        Assert.NotNull(firstRandom.HksjInference);
+        var first = firstRandom.HksjInference!;
+        var secondRandom = Assert.Single(CreateSynthesizer().Synthesize(CreateReadiness(runId, assessments.Reverse().ToArray(), EffectMeasureType.RiskRatio)).Results).RandomEffects!;
+        Assert.NotNull(secondRandom.HksjInference);
+        var second = secondRandom.HksjInference!;
+
+        Assert.Equal(first.AnalysisScaleEffect!.Value, second.AnalysisScaleEffect!.Value, 12);
+        Assert.Equal(first.AnalysisScaleVariance!.Value, second.AnalysisScaleVariance!.Value, 12);
+        Assert.Equal(first.AnalysisScaleStandardError!.Value, second.AnalysisScaleStandardError!.Value, 12);
+        Assert.Equal(first.AnalysisScaleConfidenceIntervalLower!.Value, second.AnalysisScaleConfidenceIntervalLower!.Value, 12);
+        Assert.Equal(first.AnalysisScaleConfidenceIntervalUpper!.Value, second.AnalysisScaleConfidenceIntervalUpper!.Value, 12);
+        Assert.Equal(first.ReportedScaleConfidenceIntervalLower!.Value, second.ReportedScaleConfidenceIntervalLower!.Value, 12);
+        Assert.Equal(first.ReportedScaleConfidenceIntervalUpper!.Value, second.ReportedScaleConfidenceIntervalUpper!.Value, 12);
+    }
+
+    [Fact]
+    public void Hksj_RejectsNonFiniteContributionInputs()
+    {
+        var random = CreateRandomEffectsResult([
+            CreateContribution(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), 1d, 1d),
+            CreateContribution(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), double.NaN, 1d)
+        ]);
+
+        var hksj = new HksjSummaryEffectInferenceCalculator(new QuantitativeSynthesisOptions())
+            .Calculate(random, EffectMeasureType.OddsRatio);
+
+        Assert.Equal(QuantitativeSynthesisStatus.NotSynthesizable, hksj.Status);
+        Assert.Contains(QuantitativeHksjFailureReason.InvalidEffect, hksj.FailureReasons);
+    }
     private static FixedEffectQuantitativeStatisticalSynthesizer CreateSynthesizer(QuantitativeSynthesisOptions? options = null)
     {
         return new FixedEffectQuantitativeStatisticalSynthesizer(options ?? new QuantitativeSynthesisOptions());
@@ -609,6 +745,31 @@ public sealed class QuantitativeStatisticalSynthesizerTests
             0d);
     }
 
+
+    private static QuantitativeRandomEffectsSynthesisResult CreateRandomEffectsResult(IReadOnlyCollection<QuantitativeSynthesisContribution> contributions)
+    {
+        return new QuantitativeRandomEffectsSynthesisResult(
+            QuantitativeSynthesisStatus.Synthesized,
+            QuantitativeSynthesisMethod.RandomEffectsInverseVariance,
+            RandomEffectsQuantitativeStatisticalSynthesizer.AlgorithmVersion,
+            QuantitativeConfidenceIntervalMethod.WaldStandardNormal,
+            0.95m,
+            0d,
+            BetweenStudyVarianceEstimator.RestrictedMaximumLikelihood,
+            RestrictedMaximumLikelihoodTauSquaredEstimator.AlgorithmVersion,
+            contributions.Count,
+            AnalysisScaleEffect: 1d,
+            AnalysisScaleVariance: 1d / contributions.Sum(contribution => contribution.Weight),
+            AnalysisScaleStandardError: Math.Sqrt(1d / contributions.Sum(contribution => contribution.Weight)),
+            AnalysisScaleConfidenceIntervalLower: 0d,
+            AnalysisScaleConfidenceIntervalUpper: 2d,
+            ReportedScaleEffect: Math.Exp(1d),
+            ReportedScaleConfidenceIntervalLower: 1d,
+            ReportedScaleConfidenceIntervalUpper: Math.Exp(2d),
+            HksjInference: null,
+            Contributions: contributions,
+            FailureReasons: []);
+    }
     private static QuantitativeEvidenceAssessment[] CreateBcgRiskRatioReferenceAssessments(Guid runId)
     {
         // Reference: Viechtbauer metafor dat.bcg example, escalc(measure="RR") followed by rma(yi, vi, method="REML") reports tau^2 = 0.3132.

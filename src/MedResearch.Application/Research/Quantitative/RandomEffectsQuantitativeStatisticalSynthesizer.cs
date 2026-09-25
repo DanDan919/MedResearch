@@ -104,7 +104,7 @@ public sealed class RandomEffectsQuantitativeStatisticalSynthesizer
             return CreateRejected(betweenStudyVariance, contributions, reasons);
         }
 
-        return new QuantitativeRandomEffectsSynthesisResult(
+        var result = new QuantitativeRandomEffectsSynthesisResult(
             QuantitativeSynthesisStatus.Synthesized,
             QuantitativeSynthesisMethod.RandomEffectsInverseVariance,
             AlgorithmVersion,
@@ -122,8 +122,12 @@ public sealed class RandomEffectsQuantitativeStatisticalSynthesizer
             reportedEffect,
             reportedLower,
             reportedUpper,
+            HksjInference: null,
             contributions,
             []);
+
+        var hksjInference = new HksjSummaryEffectInferenceCalculator(_options).Calculate(result, effectMeasureType);
+        return result with { HksjInference = hksjInference };
     }
 
     private static IReadOnlyCollection<QuantitativeSynthesisContribution> BuildPreflightContributions(
@@ -209,6 +213,7 @@ public sealed class RandomEffectsQuantitativeStatisticalSynthesizer
             ReportedScaleEffect: null,
             ReportedScaleConfidenceIntervalLower: null,
             ReportedScaleConfidenceIntervalUpper: null,
+            HksjInference: null,
             Contributions: contributions,
             FailureReasons: reasons.Distinct().OrderBy(reason => reason).ToArray());
     }
