@@ -1,20 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { shouldPollResearchStatus, stageState } from "../src";
+import {
+  hasActiveResearchRuns,
+  queryKeys,
+  researchRunStatusPresentation
+} from "../src";
 
-describe("research status helpers", () => {
-  it("polls non-terminal research statuses only", () => {
-    expect(shouldPollResearchStatus("Queued")).toBe(true);
-    expect(shouldPollResearchStatus("Synthesizing")).toBe(true);
-    expect(shouldPollResearchStatus("Completed")).toBe(false);
-    expect(shouldPollResearchStatus("Failed")).toBe(false);
-    expect(shouldPollResearchStatus("Cancelled")).toBe(false);
+describe("research history status helpers", () => {
+  it("reports active histories when any run is non-terminal", () => {
+    expect(hasActiveResearchRuns(["Completed", "Searching"])).toBe(true);
+    expect(hasActiveResearchRuns(["Completed", "Failed", "Cancelled"])).toBe(false);
   });
 
-  it("derives pipeline stage presentation without inventing hidden progress", () => {
-    expect(stageState("Queued", "Searching")).toBe("complete");
-    expect(stageState("Searching", "Searching")).toBe("current");
-    expect(stageState("Completed", "Searching")).toBe("pending");
-    expect(stageState("Planning", "Failed")).toBe("failed");
-    expect(stageState("Planning", "Cancelled")).toBe("cancelled");
+  it("keeps stable query keys for default and filtered history pages", () => {
+    expect(queryKeys.research.list()).toEqual(["research", "list", 1, 20, "All"]);
+    expect(queryKeys.research.list({ page: 2, pageSize: 10, status: "Failed" })).toEqual([
+      "research",
+      "list",
+      2,
+      10,
+      "Failed"
+    ]);
+  });
+
+  it("publishes presentation metadata for every terminal state", () => {
+    expect(researchRunStatusPresentation.Completed.terminal).toBe(true);
+    expect(researchRunStatusPresentation.Failed.tone).toBe("danger");
+    expect(researchRunStatusPresentation.Cancelled.tone).toBe("warning");
   });
 });

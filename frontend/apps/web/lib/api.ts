@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { queryKeys, shouldPollResearchStatus } from "@medresearch/api";
-import type { CreateResearchRequest } from "@medresearch/api";
+import { hasActiveResearchRuns, queryKeys, shouldPollResearchStatus } from "@medresearch/api";
+import type { CreateResearchRequest, ResearchRunListFilters } from "@medresearch/api";
 import { createApiClient } from "../components/api-client-provider";
 
 export function useApiClient() {
@@ -17,8 +17,20 @@ export function useCreateResearch() {
   return useMutation({
     mutationFn: (request: CreateResearchRequest) => client.createResearch(request),
     onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.research.list() });
       queryClient.invalidateQueries({ queryKey: queryKeys.research.detail(response.researchRunId) });
     }
+  });
+}
+
+export function useResearchRuns(filters: ResearchRunListFilters) {
+  const client = useApiClient();
+
+  return useQuery({
+    queryKey: queryKeys.research.list(filters),
+    queryFn: ({ signal }) => client.listResearchRuns(filters, signal),
+    refetchInterval: (query) =>
+      query.state.data && hasActiveResearchRuns(query.state.data.items.map((item) => item.status)) ? 10_000 : false
   });
 }
 

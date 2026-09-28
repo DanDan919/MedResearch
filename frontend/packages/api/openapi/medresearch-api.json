@@ -29,6 +29,55 @@
       }
     },
     "/api/research": {
+      "get": {
+        "operationId": "listResearchRuns",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ResearchRunStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged research run history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
       "post": {
         "operationId": "createResearch",
         "requestBody": {
@@ -204,6 +253,67 @@
           },
           "failureReason": {
             "type": ["string", "null"]
+          }
+        }
+      },
+      "ResearchRunSummaryResponse": {
+        "type": "object",
+        "required": ["researchRunId", "researchQuestionId", "question", "status", "createdAt", "startedAt", "completedAt", "failureReason"],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "researchQuestionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "question": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResearchRunStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "ResearchRunListResponse": {
+        "type": "object",
+        "required": ["items", "page", "pageSize", "totalCount", "totalPages"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResearchRunSummaryResponse"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "totalCount": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
           }
         }
       },

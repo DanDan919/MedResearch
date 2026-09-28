@@ -16,6 +16,29 @@ export function isTerminalResearchStatus(status: ResearchRunStatus): boolean {
   return terminalStatuses.has(status);
 }
 
+export const researchRunStatusPresentation: Record<
+  ResearchRunStatus,
+  {
+    label: string;
+    tone: "neutral" | "success" | "warning" | "danger" | "info";
+    terminal: boolean;
+  }
+> = {
+  Queued: { label: "Queued", tone: "neutral", terminal: false },
+  Planning: { label: "Planning", tone: "info", terminal: false },
+  Searching: { label: "Searching", tone: "info", terminal: false },
+  Extracting: { label: "Extracting", tone: "info", terminal: false },
+  Evaluating: { label: "Evaluating", tone: "info", terminal: false },
+  Synthesizing: { label: "Synthesizing", tone: "info", terminal: false },
+  Completed: { label: "Completed", tone: "success", terminal: true },
+  Failed: { label: "Failed", tone: "danger", terminal: true },
+  Cancelled: { label: "Cancelled", tone: "warning", terminal: true }
+};
+
+export function hasActiveResearchRuns(statuses: readonly ResearchRunStatus[]): boolean {
+  return statuses.some((status) => !isTerminalResearchStatus(status));
+}
+
 export function shouldPollResearchStatus(status: ResearchRunStatus | undefined): boolean {
   return status === undefined ? false : !isTerminalResearchStatus(status);
 }

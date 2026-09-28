@@ -72,6 +72,9 @@ internal sealed class ResearchRunConfiguration : IEntityTypeConfiguration<Resear
         builder.HasIndex(run => new { run.Status, run.CreatedAt })
             .HasDatabaseName("ix_research_runs_status_created_at");
 
+        builder.HasIndex(run => new { run.CreatedAt, run.Id })
+            .HasDatabaseName("ix_research_runs_created_at_id");
+
         builder.HasIndex(run => new { run.Status, run.ProcessingLeaseExpiresAt, run.CreatedAt })
             .HasDatabaseName("ix_research_runs_status_lease_expires_at_created_at");
     }

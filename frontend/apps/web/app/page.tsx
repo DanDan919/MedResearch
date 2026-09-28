@@ -8,7 +8,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-normal">Dashboard</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          MedResearch is connected to the existing ASP.NET Core research API. This foundation shows real run creation, run status, report retrieval, and honest gaps where backend list/detail APIs do not exist yet.
+          MedResearch is connected to the existing ASP.NET Core research API. This workspace shows real run creation, research history, run status, report retrieval, and honest gaps where backend APIs do not exist yet.
         </p>
       </div>
 

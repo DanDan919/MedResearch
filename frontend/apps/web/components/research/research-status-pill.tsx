@@ -1,15 +1,9 @@
 import { Badge } from "@medresearch/ui";
+import { researchRunStatusPresentation } from "@medresearch/api";
 import type { ResearchRunStatus } from "@medresearch/api";
 
 export function ResearchStatusPill({ status }: { status: ResearchRunStatus }) {
-  const tone =
-    status === "Completed"
-      ? "success"
-      : status === "Failed"
-        ? "danger"
-        : status === "Cancelled"
-          ? "warning"
-          : "neutral";
+  const presentation = researchRunStatusPresentation[status];
 
-  return <Badge tone={tone}>{status}</Badge>;
+  return <Badge tone={presentation.tone}>{presentation.label}</Badge>;
 }

@@ -70,6 +70,80 @@ public sealed class ResearchApiTests
     }
 
     [Fact]
+    public async Task GetResearchList_ReturnsPagedResearchHistory()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        var olderRunId = Guid.Parse("11111111-1111-4111-8111-111111111111");
+        var newerRunId = Guid.Parse("22222222-2222-4222-8222-222222222222");
+
+        factory.Store.Seed(new ResearchRunDetails(
+            olderRunId,
+            "Older research question?",
+            ResearchRunStatus.Queued.ToString(),
+            DateTimeOffset.UtcNow.AddMinutes(-2),
+            null,
+            null,
+            null));
+        factory.Store.Seed(new ResearchRunDetails(
+            newerRunId,
+            "Newer research question?",
+            ResearchRunStatus.Completed.ToString(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            null));
+
+        var response = await client.GetAsync("/api/research?page=1&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ResearchRunListResponse>();
+
+        Assert.NotNull(body);
+        var item = Assert.Single(body.Items);
+        Assert.Equal(newerRunId, item.ResearchRunId);
+        Assert.Equal("Newer research question?", item.Question);
+        Assert.Equal(1, body.Page);
+        Assert.Equal(1, body.PageSize);
+        Assert.Equal(2, body.TotalCount);
+        Assert.Equal(2, body.TotalPages);
+    }
+
+    [Fact]
+    public async Task GetResearchList_WithStatusFilter_ReturnsFilteredHistory()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        factory.Store.Seed(new ResearchRunDetails(Guid.NewGuid(), "Queued?", ResearchRunStatus.Queued.ToString(), DateTimeOffset.UtcNow, null, null, null));
+        factory.Store.Seed(new ResearchRunDetails(Guid.NewGuid(), "Completed?", ResearchRunStatus.Completed.ToString(), DateTimeOffset.UtcNow.AddMinutes(1), null, DateTimeOffset.UtcNow.AddMinutes(2), null));
+
+        var response = await client.GetAsync("/api/research?status=Completed");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ResearchRunListResponse>();
+
+        Assert.NotNull(body);
+        var item = Assert.Single(body.Items);
+        Assert.Equal(ResearchRunStatus.Completed.ToString(), item.Status);
+        Assert.Equal(1, body.TotalCount);
+    }
+
+    [Theory]
+    [InlineData("/api/research?page=0")]
+    [InlineData("/api/research?pageSize=0")]
+    [InlineData("/api/research?pageSize=101")]
+    [InlineData("/api/research?status=Done")]
+    public async Task GetResearchList_WithInvalidQuery_ReturnsBadRequest(string uri)
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(uri);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetResearch_WithFailedRun_ReturnsFailureState()
     {
         using var factory = new ResearchApiFactory();
@@ -279,6 +353,39 @@ public sealed class ResearchApiTests
         {
             _runs.TryGetValue(researchRunId, out var result);
             return Task.FromResult(result);
+        }
+
+        public Task<ResearchRunListResult> ListResearchRunsAsync(
+            int page,
+            int pageSize,
+            ResearchRunStatus? status,
+            CancellationToken cancellationToken)
+        {
+            var filtered = _runs.Values
+                .Where(run => status is null || run.Status == status.Value.ToString())
+                .OrderByDescending(run => run.CreatedAt)
+                .ThenByDescending(run => run.ResearchRunId)
+                .ToArray();
+
+            var items = filtered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(run => new ResearchRunSummary(
+                    run.ResearchRunId,
+                    Guid.NewGuid(),
+                    run.Question,
+                    run.Status,
+                    run.CreatedAt,
+                    run.StartedAt,
+                    run.CompletedAt,
+                    run.FailureReason))
+                .ToArray();
+
+            var totalPages = filtered.Length == 0
+                ? 0
+                : (int)Math.Ceiling(filtered.Length / (double)pageSize);
+
+            return Task.FromResult(new ResearchRunListResult(items, page, pageSize, filtered.Length, totalPages));
         }
     }
 }

@@ -103,6 +103,37 @@ research.MapPost("/", async (
     .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
+research.MapGet("/", async (
+        int? page,
+        int? pageSize,
+        string? status,
+        ListResearchRunsUseCase useCase,
+        CancellationToken cancellationToken) =>
+    {
+        var result = await useCase.ExecuteAsync(
+            new ListResearchRunsQuery(page, pageSize, status),
+            cancellationToken);
+
+        return Results.Ok(new ResearchRunListResponse(
+            result.Items.Select(item => new ResearchRunSummaryResponse(
+                item.ResearchRunId,
+                item.ResearchQuestionId,
+                item.Question,
+                item.Status,
+                item.CreatedAt,
+                item.StartedAt,
+                item.CompletedAt,
+                item.FailureReason)).ToArray(),
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages));
+    })
+    .WithName("ListResearchRuns")
+    .Produces<ResearchRunListResponse>(StatusCodes.Status200OK)
+    .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+    .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
+
 research.MapGet("/{researchRunId:guid}", async (
         Guid researchRunId,
         GetResearchUseCase useCase,

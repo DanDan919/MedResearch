@@ -12,3 +12,22 @@ public sealed record ResearchRunDetails(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     string? FailureReason);
+
+public sealed record ListResearchRunsQuery(int? Page, int? PageSize, string? Status);
+
+public sealed record ResearchRunSummary(
+    Guid ResearchRunId,
+    Guid ResearchQuestionId,
+    string Question,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? CompletedAt,
+    string? FailureReason);
+
+public sealed record ResearchRunListResult(
+    IReadOnlyCollection<ResearchRunSummary> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);

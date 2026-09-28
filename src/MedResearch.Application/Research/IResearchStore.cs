@@ -7,4 +7,10 @@ public interface IResearchStore
     Task PersistInitialResearchAsync(ResearchQuestion question, ResearchRun run, CancellationToken cancellationToken);
 
     Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, CancellationToken cancellationToken);
+
+    Task<ResearchRunListResult> ListResearchRunsAsync(
+        int page,
+        int pageSize,
+        ResearchRunStatus? status,
+        CancellationToken cancellationToken);
 }

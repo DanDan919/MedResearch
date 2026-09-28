@@ -64,8 +64,10 @@ frontend/packages/api/src/generated/medresearch-api.ts
 
 Do not manually edit generated files except as a temporary recovery step before regenerating.
 
+F2 adds the run-history contract to the checked-in OpenAPI snapshot. When backend API response models change, update the snapshot and rerun generation before running frontend typecheck.
+
 ## Test Policy
 
 Normal frontend tests use mocked API responses. They must not call OpenAI, PubMed, Europe PMC, live full-text endpoints, or arbitrary internet services.
 
-Playwright tests are foundation smoke tests for routing and shell rendering. They do not require a live backend.
+Playwright tests are smoke tests for routing and shell rendering. They mock backend responses for deterministic frontend validation and do not require a live backend.

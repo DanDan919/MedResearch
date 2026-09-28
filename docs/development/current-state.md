@@ -24,8 +24,15 @@ Date: 2026-09-17
 - Standard ASP.NET Core health check endpoints at `/health`, `/health/live`, and `/health/ready`.
 - Infrastructure registration through `services.AddInfrastructure(configuration)`.
 - Application registration through `services.AddApplication()`.
+- Frontend workspace under `frontend/`:
+  - Next.js web app for dashboard, research creation, research run history, run detail, and report display.
+  - Tauri desktop shell foundation.
+  - shared `@medresearch/api` package with generated OpenAPI contracts, typed fetch client, Zod response validation, query keys, and status helpers.
+  - shared `@medresearch/ui` primitives.
+  - frontend tests use mocked backend responses and do not call live scientific or AI providers.
 - First end-to-end research API use case:
   - `POST /api/research` creates a `ResearchQuestion` and queued `ResearchRun`.
+  - `GET /api/research` retrieves paginated research run history with optional exact status filtering.
   - `GET /api/research/{researchRunId}` retrieves the run state and original question.
   - `GET /api/research/{researchRunId}/report` retrieves the persisted synthesis report when ready.
   - API endpoints call Application use cases and do not query EF directly.
@@ -119,6 +126,7 @@ Date: 2026-09-17
     - `20260902031207_AllowMultipleDiscoveryPathsPerStudy`
     - `20260902150845_AddStudyPmcidIdentity`
     - 20260908074149_AddSourceMaterials
+    - `20260928164923_AddResearchRunHistoryIndex`
 - Docker Compose local development environment:
   - `postgres` service using PostgreSQL 17 Alpine
   - `api` service for `MedResearch.Api`, including the hosted background worker

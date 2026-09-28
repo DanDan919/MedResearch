@@ -1,16 +1,15 @@
 # Frontend API Gaps
 
-F1 wires the frontend only to existing backend behavior. Missing capabilities below are intentionally documented instead of implemented in this frontend foundation milestone.
+The frontend uses backend APIs directly and documents missing backend capabilities instead of inventing local stand-ins.
 
-## Missing Run List
+## Resolved Run List
 
-The backend exposes:
+F2 adds a real paginated run-history endpoint:
 
-- `POST /api/research`
-- `GET /api/research/{researchRunId}`
-- `GET /api/research/{researchRunId}/report`
+- `GET /api/research?page=1&pageSize=20`
+- optional exact `status` filter using backend `ResearchRunStatus` values.
 
-It does not expose a paginated research-run list. The `/research` route therefore renders an honest API-gap state and links to `/research/new`.
+The `/research` route now renders backend-backed research history. It does not synthesize local history from detail endpoints or browser state.
 
 ## Missing Study Browser
 
@@ -24,7 +23,7 @@ Reports are retrievable by research run id only. There is no report index endpoi
 
 The frontend contains a checked-in OpenAPI snapshot in `frontend/packages/api/openapi/medresearch-api.json`. The backend now exposes `/openapi/v1.json`, but CI currently validates generation from the snapshot to keep frontend validation deterministic without starting the API. A future milestone can add a backend-generated OpenAPI artifact check if the API contract becomes part of release governance.
 
-## Not Gaps For F1
+## Not Frontend Responsibilities
 
 The frontend must not add local replacements for backend scientific behavior:
 

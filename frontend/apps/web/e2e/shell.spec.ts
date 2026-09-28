@@ -7,3 +7,51 @@ test("application shell loads and navigates to New Research", async ({ page }) =
   await expect(page.getByRole("heading", { name: "New Research" })).toBeVisible();
   await expect(page.getByLabel("Research question")).toBeVisible();
 });
+
+test("research history loads runs and links to details", async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+
+      if (url.includes("/health/ready")) {
+        return new Response("Healthy", { status: 200 });
+      }
+
+      if (url.includes("/api/research")) {
+        return new Response(
+          JSON.stringify({
+          items: [
+            {
+              researchRunId: "11111111-1111-4111-8111-111111111111",
+              researchQuestionId: "22222222-2222-4222-8222-222222222222",
+              question: "Does sleep deprivation impair memory?",
+              status: "Completed",
+              createdAt: "2026-09-28T12:00:00Z",
+              startedAt: "2026-09-28T12:01:00Z",
+              completedAt: "2026-09-28T12:05:00Z",
+              failureReason: null
+            }
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+          totalPages: 1
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      return originalFetch(input, init);
+    };
+  });
+
+  await page.goto("/research");
+
+  await expect(page.getByRole("heading", { name: "Research" })).toBeVisible();
+  await expect(page.getByText("Does sleep deprivation impair memory?")).toBeVisible();
+  await expect(page.getByRole("link", { name: /open/i })).toHaveAttribute(
+    "href",
+    "/research/11111111-1111-4111-8111-111111111111"
+  );
+});

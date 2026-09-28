@@ -43,7 +43,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listResearchRuns"];
         put?: never;
         post: operations["createResearch"];
         delete?: never;
@@ -108,6 +108,28 @@ export interface components {
             /** Format: date-time */
             completedAt: string | null;
             failureReason: string | null;
+        };
+        ResearchRunSummaryResponse: {
+            /** Format: uuid */
+            researchRunId: string;
+            /** Format: uuid */
+            researchQuestionId: string;
+            question: string;
+            status: components["schemas"]["ResearchRunStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            failureReason: string | null;
+        };
+        ResearchRunListResponse: {
+            items: components["schemas"]["ResearchRunSummaryResponse"][];
+            page: number;
+            pageSize: number;
+            totalCount: number;
+            totalPages: number;
         };
         /** @enum {string} */
         ResearchRunStatus: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
@@ -239,6 +261,32 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    listResearchRuns: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["ResearchRunStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged research run history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchRunListResponse"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            500: components["responses"]["Problem"];
         };
     };
     createResearch: {

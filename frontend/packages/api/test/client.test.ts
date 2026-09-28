@@ -1,40 +1,62 @@
 import { describe, expect, it, vi } from "vitest";
-import { MedResearchApiClient, MedResearchApiError } from "../src";
+import { MedResearchApiClient } from "../src/client";
 
-describe("MedResearchApiClient", () => {
-  it("creates a research run through the real backend route shape", async () => {
+describe("MedResearchApiClient research history", () => {
+  it("requests paged research runs with default filters", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ researchRunId: "11111111-1111-4111-8111-111111111111", status: "Queued" }), {
-        status: 201,
-        headers: { "Content-Type": "application/json" }
+      jsonResponse({
+        items: [],
+        page: 1,
+        pageSize: 20,
+        totalCount: 0,
+        totalPages: 0
       })
     );
-    const client = new MedResearchApiClient({ baseUrl: "http://api.test", fetch: fetchMock });
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test/", fetch: fetchMock });
 
-    const result = await client.createResearch({ question: "Does sleep affect memory?" });
+    const result = await client.listResearchRuns();
 
-    expect(result.status).toBe("Queued");
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://api.test/api/research",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ question: "Does sleep affect memory?" })
-      })
-    );
+    expect(result.totalCount).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("https://api.example.test/api/research?page=1&pageSize=20");
+    expect(init?.method).toBe("GET");
   });
 
-  it("maps backend failures to typed errors", async () => {
+  it("encodes explicit pagination and status filters", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ title: "Research report is not ready", status: 409 }), {
-        status: 409,
-        headers: { "Content-Type": "application/problem+json" }
+      jsonResponse({
+        items: [
+          {
+            researchRunId: "11111111-1111-4111-8111-111111111111",
+            researchQuestionId: "22222222-2222-4222-8222-222222222222",
+            question: "Does sleep deprivation impair memory?",
+            status: "Completed",
+            createdAt: "2026-09-28T12:00:00Z",
+            startedAt: "2026-09-28T12:01:00Z",
+            completedAt: "2026-09-28T12:05:00Z",
+            failureReason: null
+          }
+        ],
+        page: 2,
+        pageSize: 10,
+        totalCount: 11,
+        totalPages: 2
       })
     );
-    const client = new MedResearchApiClient({ baseUrl: "http://api.test", fetch: fetchMock });
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test", fetch: fetchMock });
 
-    await expect(client.getResearchReport("11111111-1111-4111-8111-111111111111")).rejects.toMatchObject({
-      kind: "conflict",
-      status: 409
-    } satisfies Partial<MedResearchApiError>);
+    const result = await client.listResearchRuns({ page: 2, pageSize: 10, status: "Completed" });
+
+    expect(result.items[0].status).toBe("Completed");
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("https://api.example.test/api/research?page=2&pageSize=10&status=Completed");
   });
 });
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
+}

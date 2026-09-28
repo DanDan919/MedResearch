@@ -2,6 +2,7 @@ import { normalizeApiBaseUrl } from "./config";
 import { createApiError, MedResearchApiError } from "./errors";
 import {
   createResearchResponseSchema,
+  researchRunListResponseSchema,
   researchReportResponseSchema,
   researchRunResponseSchema
 } from "./schemas";
@@ -10,6 +11,8 @@ import type {
   CreateResearchResponse,
   HealthState,
   ResearchReportResponse,
+  ResearchRunListFilters,
+  ResearchRunListResponse,
   ResearchRunResponse
 } from "./types";
 
@@ -54,6 +57,28 @@ export class MedResearchApiClient {
       },
       body: JSON.stringify(request)
     });
+  }
+
+  public async listResearchRuns(
+    filters: ResearchRunListFilters = {},
+    signal?: AbortSignal
+  ): Promise<ResearchRunListResponse> {
+    const searchParams = new URLSearchParams();
+    searchParams.set("page", String(filters.page ?? 1));
+    searchParams.set("pageSize", String(filters.pageSize ?? 20));
+    if (filters.status) {
+      searchParams.set("status", filters.status);
+    }
+
+    return this.requestJson(
+      `/api/research?${searchParams.toString()}`,
+      researchRunListResponseSchema.parse,
+      {
+        method: "GET",
+        signal,
+        headers: { Accept: "application/json" }
+      }
+    );
   }
 
   public async getResearchRun(

@@ -27,6 +27,25 @@ export const researchRunResponseSchema = z.object({
   failureReason: z.string().nullable()
 });
 
+export const researchRunSummaryResponseSchema = z.object({
+  researchRunId: z.string().uuid(),
+  researchQuestionId: z.string().uuid(),
+  question: z.string(),
+  status: researchRunStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  failureReason: z.string().nullable()
+});
+
+export const researchRunListResponseSchema = z.object({
+  items: z.array(researchRunSummaryResponseSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  totalCount: z.number(),
+  totalPages: z.number()
+});
+
 export const researchReportCitationSchema = z.object({
   evidenceId: z.string().uuid(),
   studyId: z.string().uuid(),
