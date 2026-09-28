@@ -135,3 +135,20 @@ PI = theta_RE +/- t_(1-alpha/2, df) * prediction_SE
 ## CI expectations
 
 Normal CI should run the deterministic Application tests, normal fake-provider tests, and Docker-backed PostgreSQL/Testcontainers suite with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`. This milestone does not require live OpenAI, live PubMed, Europe PMC, or external statistical services.
+
+## CI result
+
+- Workflow: `.github/workflows/ci.yml`
+- Run: `36404421685`
+- URL: `https://github.com/DanDan919/MedResearch/actions/runs/36404421685`
+- Commit: `223392e1cfab456b0d33b7a66d2bd512ba9c07ff`
+- Runner: `ubuntu-latest`
+- .NET: `10.0.x`
+- Status: success
+- Job: `Build and test`, success
+- CI `Docker info`: success
+- CI `Test`: success
+- CI EF pending-model check: success
+- CI Docker Compose config: success
+- Workflow sets `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`; its TRX parser fails the job if any test reports skipped tests. Because the run succeeded, required Docker/PostgreSQL/Testcontainers tests did not silently skip.
+- Test result artifact `test-results` was uploaded. Public API exposed artifact metadata, but direct artifact/log download from this environment required authentication/admin access, so exact CI TRX counters were not locally extractable here.
