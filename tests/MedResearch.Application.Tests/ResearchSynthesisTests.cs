@@ -152,6 +152,11 @@ public sealed class SynthesisContextBuilderTests
         Assert.Equal(QuantitativeConfidenceIntervalMethod.HartungKnappSidikJonkman, synthesis.RandomEffects.HksjInference.ConfidenceIntervalMethod);
         Assert.Equal(synthesis.RandomEffects.AnalysisScaleEffect, synthesis.RandomEffects.HksjInference.AnalysisScaleEffect);
         Assert.Equal(1, synthesis.RandomEffects.HksjInference.DegreesOfFreedom);
+        Assert.NotNull(synthesis.RandomEffects.PredictionInterval);
+        Assert.Equal(QuantitativeSynthesisStatus.Synthesized, synthesis.RandomEffects.PredictionInterval!.Status);
+        Assert.Equal(QuantitativePredictionIntervalMethod.CochraneRandomEffectsStudentT, synthesis.RandomEffects.PredictionInterval.Method);
+        Assert.Equal(synthesis.RandomEffects.AnalysisScaleEffect, synthesis.RandomEffects.PredictionInterval.AnalysisScaleEffect);
+        Assert.Equal(1, synthesis.RandomEffects.PredictionInterval.DegreesOfFreedom);
         Assert.Equal(2, synthesis.RandomEffects.Contributions.Count);
         Assert.Equal(1d, synthesis.RandomEffects.Contributions.Sum(contribution => contribution.NormalizedWeight), 12);
         var prompt = ResearchSynthesisPrompt.Create(context);
@@ -163,12 +168,16 @@ public sealed class SynthesisContextBuilderTests
         Assert.Contains("WaldStandardNormal", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("HartungKnappSidikJonkman", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("HksjInference", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PredictionInterval", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CochraneRandomEffectsStudentT", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PredictionVariance", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("DegreesOfFreedom", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ContributionWeights", prompt.UserPrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("Fixed-effect inverse-variance", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("REML tau-squared", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("random-effects Wald", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("canonical HKSJ", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(context.DeterministicLimitations, limitation => limitation.Contains("prediction intervals", StringComparison.OrdinalIgnoreCase));
     }
 
     private static SynthesisContextBuilder CreateBuilder(SynthesisCorpusSnapshot snapshot, SynthesisOptions? options = null)

@@ -123,11 +123,17 @@ public sealed class RandomEffectsQuantitativeStatisticalSynthesizer
             reportedLower,
             reportedUpper,
             HksjInference: null,
+            PredictionInterval: null,
             contributions,
             []);
 
         var hksjInference = new HksjSummaryEffectInferenceCalculator(_options).Calculate(result, effectMeasureType);
-        return result with { HksjInference = hksjInference };
+        var predictionInterval = new RandomEffectsPredictionIntervalCalculator(_options).Calculate(result, effectMeasureType);
+        return result with
+        {
+            HksjInference = hksjInference,
+            PredictionInterval = predictionInterval
+        };
     }
 
     private static IReadOnlyCollection<QuantitativeSynthesisContribution> BuildPreflightContributions(
@@ -214,6 +220,7 @@ public sealed class RandomEffectsQuantitativeStatisticalSynthesizer
             ReportedScaleConfidenceIntervalLower: null,
             ReportedScaleConfidenceIntervalUpper: null,
             HksjInference: null,
+            PredictionInterval: null,
             Contributions: contributions,
             FailureReasons: reasons.Distinct().OrderBy(reason => reason).ToArray());
     }

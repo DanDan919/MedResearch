@@ -52,4 +52,4 @@
 - `tau² = 0` is a valid REML boundary estimate. With the same contribution population, random-effects weights collapse to common/fixed-effect inverse-variance weights.
 - Random-effects Wald synthesis remains analysis-scale mathematics. OR/RR/HR values must stay on the natural-log scale until the final reported-scale back-transform.
 - The BCG/metafor dataset remains useful as an independent reference because it exercises positive tau², unequal within-study variances, and a known random-effects estimate.
-- HKSJ, prediction intervals, tau-squared confidence intervals, and automatic model selection are distinct methodology decisions and must not be implied by M22.
+- HKSJ, prediction intervals, tau-squared confidence intervals, and automatic model selection are distinct methodology decisions and must not be implied by M22. M24 implements only one explicit Cochrane-style random-effects prediction interval beside Wald/HKSJ; it still does not imply prediction interval selection/recommendation or tau-squared confidence intervals.

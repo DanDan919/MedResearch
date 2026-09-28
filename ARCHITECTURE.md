@@ -206,7 +206,7 @@ Flow: ResearchRun -> distinct discovered Studies -> current SourceMaterial metad
 
 The builder validates the authoritative ResearchRun id, unique Study snapshots, Evidence run/study scope, Extraction source lineage, grounded completed extraction status, Evaluation EvidenceIds, and search provenance. It computes coverage metrics and conservative normalized outcome groups while retaining positive/negative disagreement as conflict. Multiple discovery paths therefore remain provenance, not duplicate Study snapshots.
 
-Synthesis is narrative evidence synthesis, but the Application layer now also builds narrow deterministic common/fixed-effect, REML random-effects Wald, and canonical HKSJ inverse-variance quantitative synthesis read models for M15-compatible OR/RR/HR evidence groups. The system does not average raw EffectValue values, vote-count studies, or let the LLM calculate pooled estimates. Modified/ad-hoc HKSJ, prediction intervals, tau-squared confidence intervals, forest plots, and formal meta-analysis reporting remain out of scope; Q/df/I-squared diagnostics, REML tau-squared, REML random-effects Wald synthesis, and canonical HKSJ summary-effect inference are available as deterministic read-model metadata.
+Synthesis is narrative evidence synthesis, but the Application layer now also builds narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval inverse-variance quantitative synthesis read models for M15-compatible OR/RR/HR evidence groups. The system does not average raw EffectValue values, vote-count studies, or let the LLM calculate pooled estimates. Modified/ad-hoc HKSJ, tau-squared confidence intervals, forest plots, and formal meta-analysis reporting remain out of scope; Q/df/I-squared diagnostics, REML tau-squared, REML random-effects Wald synthesis, canonical HKSJ summary-effect inference, and Cochrane-style random-effects prediction intervals are available as deterministic read-model metadata.
 ## Canonical HKSJ Summary-Effect Inference V1
 
 M23 adds `HksjSummaryEffectInferenceCalculator` as pure Application code. It consumes the existing M22 random-effects result and therefore reuses the same REML tau-squared estimate, random-effects weights, independent Study contribution population, point estimate, Wald variance, and configured confidence level.
@@ -224,6 +224,24 @@ CI_HKSJ = theta_RE +/- t_(1-alpha/2, df) * SE_HKSJ
 The result is exposed as `RandomEffects.HksjInference` beside the existing Wald interval. Wald fields remain unchanged. `k = 1` returns an explicit unavailable HKSJ result with `df = 0`. This is canonical HKSJ only; no ad-hoc clamp is applied, so the HKSJ interval may be narrower than Wald when the variance adjustment is below 1.
 
 `SynthesisContext` and `ResearchSynthesisPrompt` carry the deterministic HKSJ result to the narrative synthesizer. The prompt forbids the LLM from calculating or changing HKSJ values. No database schema change is involved.
+## Random-Effects Prediction Interval V1
+
+M24 adds `RandomEffectsPredictionIntervalCalculator` as pure Application code. It consumes the existing M22 random-effects result and therefore reuses the same REML tau-squared estimate, random-effects point estimate, Wald summary-effect variance, independent Study contribution population, and configured confidence level. It does not re-estimate tau-squared and does not modify M17 fixed-effect, M18 heterogeneity, M22 Wald, or M23 HKSJ results.
+
+For successful random-effects results with at least two studies, the calculation is:
+
+```text
+df = k - 1
+prediction_variance = variance_Wald(theta_RE) + tau²_REML
+prediction_SE = sqrt(prediction_variance)
+PI = theta_RE +/- t_(1-alpha/2, df) * prediction_SE
+```
+
+For OR/RR/HR groups, all arithmetic remains on the natural-log analysis scale and reported-scale endpoints are produced by exponentiating only after the interval has been calculated. `k = 1` returns an explicit unavailable prediction interval with `df = 0`. When `tau² = 0`, the prediction variance collapses to the M22 Wald summary variance and the interval uses the Student-t critical value for the selected prediction-interval method; the existing M22 standard-normal Wald CI is not changed.
+
+The result is exposed as `RandomEffects.PredictionInterval` beside the existing Wald and HKSJ outputs. This is a deterministic interval describing the expected spread of true effects for a similar future study under the selected random-effects model; it is not automatic model selection, a prediction interval recommendation engine, a tau-squared confidence interval, or a persisted meta-analysis artifact.
+
+`SynthesisContext` and `ResearchSynthesisPrompt` carry the deterministic prediction interval to the narrative synthesizer. The prompt forbids the LLM from calculating, changing, selecting, or inferring prediction-interval values. No database schema change is involved.
 ## Evidence Synthesis
 
 Application performs evidence synthesis through `ResearchSynthesizer`, which reuses `IStructuredLlmClient` for strict structured output and validates model drafts before persistence.
@@ -434,7 +452,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - No live OpenAI smoke test is configured or run by default.
 - No PDF/HTML scraping, publisher crawling, RAG, or vector search exists; bounded Europe PMC structured full text is supported.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
-- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, modified/ad-hoc HKSJ, prediction intervals, tau-squared confidence intervals, and forest plots are not implemented.
+- Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, modified/ad-hoc HKSJ, tau-squared confidence intervals, and forest plots are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
 - PubMed and Europe PMC rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
@@ -528,4 +546,4 @@ For OR/RR/HR groups, `theta_i` remains the normalized natural-log effect and rep
 
 The result is nested under `QuantitativeSynthesisResult.RandomEffects` and projected into `SynthesisContext` and the synthesis prompt. The existing fixed/common-effect result remains the outer result so M17 consumers continue to see the same method, weights, pooled estimate, and confidence interval. If M19 tau-squared is `NotEstimated`, the random-effects result is explicitly `NotSynthesizable`. If `tau² = 0`, random-effects weights and Wald synthesis collapse to the common/fixed-effect inverse-variance values for the same contribution population.
 
-M22 deliberately stopped before HKSJ. M23 implements canonical HKSJ summary-effect inference beside the Wald result. Modified/ad-hoc HKSJ, prediction intervals, tau-squared confidence intervals, automatic model selection, p-values, subgroup analysis, meta-regression, publication-bias methods, or persisted quantitative result artifacts remain out of scope.
+M22 deliberately stopped before HKSJ. M23 implements canonical HKSJ summary-effect inference beside the Wald result. M24 implements a Cochrane-style random-effects prediction interval beside Wald and HKSJ. Modified/ad-hoc HKSJ, tau-squared confidence intervals, automatic model selection, p-values, subgroup analysis, meta-regression, publication-bias methods, or persisted quantitative result artifacts remain out of scope.

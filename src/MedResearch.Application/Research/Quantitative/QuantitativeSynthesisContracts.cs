@@ -18,6 +18,11 @@ public enum QuantitativeConfidenceIntervalMethod
     HartungKnappSidikJonkman = 1
 }
 
+public enum QuantitativePredictionIntervalMethod
+{
+    CochraneRandomEffectsStudentT = 0
+}
+
 public enum BetweenStudyVarianceEstimator
 {
     RestrictedMaximumLikelihood = 0
@@ -62,6 +67,17 @@ public enum QuantitativeHksjFailureReason
     NonFiniteVarianceAdjustment = 5,
     NonFiniteConfidenceInterval = 6,
     BackTransformationFailed = 7
+}
+
+public enum QuantitativePredictionIntervalFailureReason
+{
+    RandomEffectsNotSynthesized = 0,
+    InsufficientDegreesOfFreedom = 1,
+    InvalidTauSquared = 2,
+    InvalidSummaryVariance = 3,
+    NonFinitePredictionVariance = 4,
+    NonFinitePredictionInterval = 5,
+    BackTransformationFailed = 6
 }
 
 public enum QuantitativeSynthesisRejectionReason
@@ -160,6 +176,7 @@ public sealed record QuantitativeRandomEffectsSynthesisResult(
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
     QuantitativeHksjInferenceResult? HksjInference,
+    QuantitativePredictionIntervalResult? PredictionInterval,
     IReadOnlyCollection<QuantitativeSynthesisContribution> Contributions,
     IReadOnlyCollection<QuantitativeRandomEffectsFailureReason> FailureReasons);
 
@@ -181,6 +198,27 @@ public sealed record QuantitativeHksjInferenceResult(
     double? ReportedScaleConfidenceIntervalLower,
     double? ReportedScaleConfidenceIntervalUpper,
     IReadOnlyCollection<QuantitativeHksjFailureReason> FailureReasons);
+
+public sealed record QuantitativePredictionIntervalResult(
+    QuantitativeSynthesisStatus Status,
+    QuantitativePredictionIntervalMethod Method,
+    string AlgorithmVersion,
+    decimal OutputConfidenceLevel,
+    int StudyCount,
+    int? DegreesOfFreedom,
+    double? TauSquared,
+    double? SummaryEffectVariance,
+    double? SummaryEffectStandardError,
+    double? PredictionVariance,
+    double? PredictionStandardError,
+    double? CriticalValue,
+    double? AnalysisScaleEffect,
+    double? AnalysisScaleLower,
+    double? AnalysisScaleUpper,
+    double? ReportedScaleEffect,
+    double? ReportedScaleLower,
+    double? ReportedScaleUpper,
+    IReadOnlyCollection<QuantitativePredictionIntervalFailureReason> FailureReasons);
 
 public sealed record QuantitativeHeterogeneityDiagnostics(
     double CochransQ,
