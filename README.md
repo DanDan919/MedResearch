@@ -36,6 +36,14 @@ src/
     MedResearch.Domain
     MedResearch.Infrastructure
 
+frontend/
+    apps/
+        web
+        desktop
+    packages/
+        api
+        ui
+
 tests/
     MedResearch.Domain.Tests
     MedResearch.Application.Tests
@@ -63,6 +71,16 @@ GET /health
 GET /health/live
 GET /health/ready
 ```
+
+The frontend workspace lives under `frontend/`. The web app is a Next.js/React/TypeScript client and the desktop shell is Tauri 2 with React/Vite. Both use shared API and UI packages and call the ASP.NET Core API; they do not perform scientific or statistical calculations locally.
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+For details, see `docs/frontend/architecture.md`, `docs/frontend/development.md`, and `docs/frontend/api-gaps.md`.
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
 
@@ -196,6 +214,8 @@ When no validated evidence exists, MedResearch creates an explicit `Insufficient
 ## CI
 
 GitHub Actions runs on Ubuntu with Docker available. The workflow restores, builds, runs the full test suite with Testcontainers required, fails if Docker-required CI reports skipped tests, checks for pending EF model changes, validates Docker Compose, and uploads TRX test results for diagnostics. The Testcontainers fixture applies EF migrations to a fresh PostgreSQL database before PostgreSQL integration tests execute.
+
+The CI workflow also validates the frontend workspace with deterministic pnpm install, OpenAPI type generation, lint, typecheck, unit/component tests, and a production web build. Normal CI does not run live provider checks and does not require OpenAI, PubMed, Europe PMC, or frontend secrets.
 
 ## EF Core Migrations
 

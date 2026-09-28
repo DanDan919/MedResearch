@@ -1,0 +1,342 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MedResearch API",
+    "version": "f1"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getHealthLive",
+        "responses": {
+          "200": {
+            "description": "Application process is alive"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getHealthReady",
+        "responses": {
+          "200": {
+            "description": "Application is ready and can reach PostgreSQL"
+          },
+          "503": {
+            "description": "Application is not ready"
+          }
+        }
+      }
+    },
+    "/api/research": {
+      "post": {
+        "operationId": "createResearch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Research run queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateResearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/research/{researchRunId}": {
+      "get": {
+        "operationId": "getResearch",
+        "parameters": [
+          {
+            "name": "researchRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research run state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/api/research/{researchRunId}/report": {
+      "get": {
+        "operationId": "getResearchReport",
+        "parameters": [
+          {
+            "name": "researchRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted research report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchReportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Problem": {
+        "description": "Problem Details",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          },
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CreateResearchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "CreateResearchResponse": {
+        "type": "object",
+        "required": ["researchRunId", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResearchRunStatus"
+          }
+        }
+      },
+      "ResearchRunResponse": {
+        "type": "object",
+        "required": ["researchRunId", "question", "status", "createdAt", "startedAt", "completedAt", "failureReason"],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "question": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResearchRunStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "ResearchRunStatus": {
+        "type": "string",
+        "enum": ["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]
+      },
+      "ResearchReportResponse": {
+        "type": "object",
+        "required": [
+          "researchRunId",
+          "researchReportId",
+          "status",
+          "insufficientEvidenceReason",
+          "question",
+          "executiveSummary",
+          "evidenceSummary",
+          "conflictSummary",
+          "limitationsSummary",
+          "conclusion",
+          "synthesisConfidence",
+          "promptVersion",
+          "generatedAt",
+          "coverage",
+          "deterministicLimitations",
+          "claims"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": { "type": "string", "format": "uuid" },
+          "researchReportId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string" },
+          "insufficientEvidenceReason": { "type": ["string", "null"] },
+          "question": { "type": "string" },
+          "executiveSummary": { "type": "string" },
+          "evidenceSummary": { "type": "string" },
+          "conflictSummary": { "type": "string" },
+          "limitationsSummary": { "type": "string" },
+          "conclusion": { "type": "string" },
+          "synthesisConfidence": { "type": "string" },
+          "promptVersion": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "coverage": { "$ref": "#/components/schemas/ResearchReportCoverageResponse" },
+          "deterministicLimitations": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "claims": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ResearchReportClaimResponse" }
+          }
+        }
+      },
+      "ResearchReportCoverageResponse": {
+        "type": "object",
+        "required": [
+          "discoveredStudyCount",
+          "extractedStudyCount",
+          "evaluatedStudyCount",
+          "evidenceFindingCount",
+          "includedStudyCount",
+          "includedEvidenceFindingCount",
+          "searchQueryCount",
+          "studiesWithNoExtractableEvidence",
+          "studiesWithInsufficientEvaluationSource",
+          "potentialConflictDetected",
+          "evidenceTruncated",
+          "usesAbstractLevelEvidenceOnly",
+          "searchedSources"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "discoveredStudyCount": { "type": "integer" },
+          "extractedStudyCount": { "type": "integer" },
+          "evaluatedStudyCount": { "type": "integer" },
+          "evidenceFindingCount": { "type": "integer" },
+          "includedStudyCount": { "type": "integer" },
+          "includedEvidenceFindingCount": { "type": "integer" },
+          "searchQueryCount": { "type": "integer" },
+          "studiesWithNoExtractableEvidence": { "type": "integer" },
+          "studiesWithInsufficientEvaluationSource": { "type": "integer" },
+          "potentialConflictDetected": { "type": "boolean" },
+          "evidenceTruncated": { "type": "boolean" },
+          "usesAbstractLevelEvidenceOnly": { "type": "boolean" },
+          "searchedSources": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "ResearchReportClaimResponse": {
+        "type": "object",
+        "required": ["claimId", "claimType", "direction", "text", "ordinal", "citations"],
+        "additionalProperties": false,
+        "properties": {
+          "claimId": { "type": "string", "format": "uuid" },
+          "claimType": { "type": "string" },
+          "direction": { "type": "string" },
+          "text": { "type": "string" },
+          "ordinal": { "type": "integer" },
+          "citations": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ResearchReportCitationResponse" }
+          }
+        }
+      },
+      "ResearchReportCitationResponse": {
+        "type": "object",
+        "required": ["evidenceId", "studyId", "pmid", "pmcid", "doi", "title", "supportingText", "evidenceDirection", "ordinal"],
+        "additionalProperties": false,
+        "properties": {
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "pmid": { "type": ["string", "null"] },
+          "pmcid": { "type": ["string", "null"] },
+          "doi": { "type": ["string", "null"] },
+          "title": { "type": "string" },
+          "supportingText": { "type": "string" },
+          "evidenceDirection": { "type": "string" },
+          "ordinal": { "type": "integer" }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" }
+        }
+      }
+    }
+  }
+}

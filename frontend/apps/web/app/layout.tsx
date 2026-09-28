@@ -1,0 +1,21 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { AppProviders } from "../components/app-providers";
+import { AppShell } from "../components/app-shell";
+
+export const metadata: Metadata = {
+  title: "MedResearch",
+  description: "Evidence synthesis research workspace"
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <AppProviders>
+          <AppShell>{children}</AppShell>
+        </AppProviders>
+      </body>
+    </html>
+  );
+}

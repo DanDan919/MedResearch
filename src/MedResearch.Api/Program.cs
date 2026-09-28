@@ -10,6 +10,24 @@ using Microsoft.AspNetCore.Mvc;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
+var allowedCorsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+if (allowedCorsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("Frontend", policy =>
+        {
+            policy
+                .WithOrigins(allowedCorsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+    });
+}
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -47,8 +65,14 @@ app.UseExceptionHandler(errorApp =>
                 ? new Dictionary<string, object?> { ["error"] = exception?.Message }
                 : null)
             .ExecuteAsync(context);
-    });
+        });
 });
+
+app.MapOpenApi();
+if (allowedCorsOrigins.Length > 0)
+{
+    app.UseCors("Frontend");
+}
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions

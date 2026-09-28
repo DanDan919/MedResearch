@@ -1,0 +1,42 @@
+{
+  "name": "medresearch-frontend",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "pnpm --filter @medresearch/web dev",
+    "build": "pnpm --filter @medresearch/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @medresearch/web test:e2e",
+    "api:generate": "pnpm --filter @medresearch/api generate",
+    "desktop:dev": "pnpm --filter @medresearch/desktop tauri dev",
+    "desktop:build": "pnpm --filter @medresearch/desktop tauri build",
+    "desktop:check": "pnpm --filter @medresearch/desktop tauri info"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@next/eslint-plugin-next": "latest",
+    "@playwright/test": "latest",
+    "@tauri-apps/cli": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "globals": "latest",
+    "jsdom": "latest",
+    "openapi-typescript": "latest",
+    "playwright": "latest",
+    "prettier": "latest",
+    "typescript": "5.9.3",
+    "typescript-eslint": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}

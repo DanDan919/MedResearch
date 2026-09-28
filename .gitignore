@@ -15,3 +15,12 @@ TestResults/
 !.env.example
 secrets.json
 appsettings.*.local.json
+frontend/**/node_modules/
+frontend/**/.next/
+frontend/**/dist/
+frontend/**/out/
+frontend/**/coverage/
+frontend/**/playwright-report/
+frontend/**/test-results/
+frontend/**/src-tauri/target/
+frontend/**/*.tsbuildinfo
