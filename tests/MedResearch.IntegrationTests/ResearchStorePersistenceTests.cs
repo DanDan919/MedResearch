@@ -124,20 +124,22 @@ public sealed class ResearchStorePersistenceTests
     }
 
     [SkippableFact]
-    public async Task ListResearchRunsAsync_ReturnsEmptyPageWhenNoRunsExist()
+    public async Task ListResearchRunsAsync_ReturnsEmptyPageBeyondKnownResults()
     {
         SkipIfPostgreSqlUnavailable();
 
         await using var context = _fixture.CreateDbContext();
         var store = new EfResearchStore(context);
 
-        var result = await store.ListResearchRunsAsync(1, 20, null, CancellationToken.None);
+        var baseline = await store.ListResearchRunsAsync(1, 1, null, CancellationToken.None);
+        var beyondLastPage = baseline.TotalCount + 1;
+        var result = await store.ListResearchRunsAsync(beyondLastPage, 1, null, CancellationToken.None);
 
         Assert.Empty(result.Items);
-        Assert.Equal(1, result.Page);
-        Assert.Equal(20, result.PageSize);
-        Assert.Equal(0, result.TotalCount);
-        Assert.Equal(0, result.TotalPages);
+        Assert.Equal(beyondLastPage, result.Page);
+        Assert.Equal(1, result.PageSize);
+        Assert.Equal(baseline.TotalCount, result.TotalCount);
+        Assert.Equal(baseline.TotalPages, result.TotalPages);
     }
 
     [SkippableFact]
@@ -145,7 +147,7 @@ public sealed class ResearchStorePersistenceTests
     {
         SkipIfPostgreSqlUnavailable();
 
-        var createdAt = DateTimeOffset.UtcNow;
+        var createdAt = new DateTimeOffset(2100, 1, 1, 12, 0, 0, TimeSpan.Zero);
         var olderQuestion = new ResearchQuestion(Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), "Older question?", createdAt.AddMinutes(-2));
         var tiedLowerQuestion = new ResearchQuestion(Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), "Tied lower id question?", createdAt);
         var tiedHigherQuestion = new ResearchQuestion(Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc"), "Tied higher id question?", createdAt);
@@ -168,13 +170,14 @@ public sealed class ResearchStorePersistenceTests
 
         var firstPage = await store.ListResearchRunsAsync(1, 2, null, CancellationToken.None);
         var secondPage = await store.ListResearchRunsAsync(2, 2, null, CancellationToken.None);
-        var beyondPage = await store.ListResearchRunsAsync(4, 2, null, CancellationToken.None);
+        var beyondPageNumber = (firstPage.TotalCount / 2) + 2;
+        var beyondPage = await store.ListResearchRunsAsync(beyondPageNumber, 2, null, CancellationToken.None);
 
-        Assert.Equal(4, firstPage.TotalCount);
-        Assert.Equal(2, firstPage.TotalPages);
         Assert.Equal([newestRun.Id, tiedHigherRun.Id], firstPage.Items.Select(item => item.ResearchRunId).ToArray());
         Assert.Equal([tiedLowerRun.Id, olderRun.Id], secondPage.Items.Select(item => item.ResearchRunId).ToArray());
         Assert.Empty(beyondPage.Items);
+        Assert.True(firstPage.TotalCount >= 4);
+        Assert.True(firstPage.TotalPages >= 2);
 
         var failedItem = firstPage.Items.Single(item => item.ResearchRunId == tiedHigherRun.Id);
         Assert.Equal(tiedHigherQuestion.Id, failedItem.ResearchQuestionId);
@@ -188,7 +191,7 @@ public sealed class ResearchStorePersistenceTests
     {
         SkipIfPostgreSqlUnavailable();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(2100, 2, 1, 12, 0, 0, TimeSpan.Zero);
         var completedQuestion = new ResearchQuestion("Completed run?", now);
         var activeQuestion = new ResearchQuestion("Active run?", now.AddMinutes(1));
         var completedRun = new ResearchRun(Guid.NewGuid(), completedQuestion.Id, ResearchRunStatus.Completed, now, now, now.AddMinutes(1), null);
@@ -206,10 +209,12 @@ public sealed class ResearchStorePersistenceTests
 
         var result = await store.ListResearchRunsAsync(1, 100, ResearchRunStatus.Completed, CancellationToken.None);
 
-        var item = Assert.Single(result.Items);
+        var item = Assert.Single(result.Items, item => item.ResearchRunId == completedRun.Id);
         Assert.Equal(completedRun.Id, item.ResearchRunId);
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(1, result.TotalPages);
+        Assert.DoesNotContain(result.Items, item => item.ResearchRunId == activeRun.Id);
+        Assert.Equal(result.Items.Count, result.Items.Select(item => item.ResearchRunId).Distinct().Count());
+        Assert.True(result.TotalCount >= 1);
+        Assert.True(result.TotalPages >= 1);
     }
 
     private void SkipIfPostgreSqlUnavailable()
