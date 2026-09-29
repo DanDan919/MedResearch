@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         quantitativeSynthesisOptions.Validate();
         services.AddSingleton(quantitativeSynthesisOptions);
         services.AddScoped<IQuantitativeStatisticalSynthesizer, FixedEffectQuantitativeStatisticalSynthesizer>();
+        services.AddScoped<GetQuantitativeSynthesisArtifactsUseCase>();
         services.AddScoped<ResearchReportDraftValidator>();
         services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
         services.AddScoped<GetResearchReportUseCase>();

@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<EfResearchSynthesisStore>();
         services.AddScoped<ISynthesisCorpusStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
         services.AddScoped<IResearchReportStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
+        services.AddScoped<IQuantitativeSynthesisArtifactStore, EfQuantitativeSynthesisArtifactStore>();
 
         var openAIOptions = CreateOpenAIOptions(configuration);
         if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))

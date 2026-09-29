@@ -201,3 +201,11 @@ Root cause: The original planner validator intentionally used one static maximum
 Decision / fix: Added `ResearchPlanning:MaxSearchQueries` with a default of 5 and live harness override of 2. The prompt schema, prompt text, and validator all use the configured bound.
 Verification: Application tests cover rejection above a configured limit and schema `maxItems` generation. Full local/CI verification is tracked in the milestone report.
 Remaining concerns: This bounds source fan-out; it does not make live provider availability deterministic.
+
+Date: 2026-09-29
+Area: Quantitative artifact migration verification
+Problem: The development machine had a PostgreSQL listener on `localhost:5432`, but the configured local credentials were rejected with PostgreSQL `28P01` while EF tooling attempted to check migration history.
+Observed behavior: EF model build and migration scaffolding succeeded, but local database-history inspection could not use that unrelated instance. The Docker Desktop Linux engine remains unavailable, so Testcontainers cannot run locally.
+Decision / fix: Kept the forward-only `AddQuantitativeSynthesisArtifacts` migration and relied on the repository's strict CI/Testcontainers environment for fresh-database application. No local database was reset or modified.
+Verification: The solution builds and deterministic tests pass locally; the new PostgreSQL artifact tests are explicit SkippableFacts locally and fail instead of skipping when `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`.
+Remaining concerns: CI must execute the new migration and artifact tests against fresh PostgreSQL before F6 can claim runtime database confidence.

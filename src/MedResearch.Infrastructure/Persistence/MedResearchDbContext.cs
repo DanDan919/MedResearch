@@ -36,6 +36,10 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<ResearchStudyDiscovery> ResearchStudyDiscoveries => Set<ResearchStudyDiscovery>();
 
+    public DbSet<QuantitativeSynthesisArtifactEntity> QuantitativeSynthesisArtifacts => Set<QuantitativeSynthesisArtifactEntity>();
+
+    public DbSet<QuantitativeSynthesisContributionSnapshotEntity> QuantitativeSynthesisContributionSnapshots => Set<QuantitativeSynthesisContributionSnapshotEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MedResearchDbContext).Assembly);

@@ -98,6 +98,18 @@ public sealed partial class FullFakePipelineTests
             Assert.True(await db.Evidence.AnyAsync(evidence => evidence.ResearchRunId == created.ResearchRunId && evidence.GroundingValidated, CancellationToken.None));
             Assert.True(await db.EvidenceEvaluations.AnyAsync(evaluation => evaluation.ResearchRunId == created.ResearchRunId, CancellationToken.None));
             Assert.True(await db.ResearchReports.AnyAsync(report => report.ResearchRunId == created.ResearchRunId, CancellationToken.None));
+            Assert.True(await db.QuantitativeSynthesisArtifacts.AnyAsync(artifact => artifact.ResearchRunId == created.ResearchRunId, CancellationToken.None));
+            Assert.True(await db.QuantitativeSynthesisContributionSnapshots.AnyAsync(snapshot =>
+                db.QuantitativeSynthesisArtifacts.Any(artifact => artifact.Id == snapshot.ArtifactId && artifact.ResearchRunId == created.ResearchRunId),
+                CancellationToken.None));
+            Assert.True(await db.QuantitativeSynthesisContributionSnapshots.AnyAsync(snapshot =>
+                snapshot.AnalysisMethod == "fixed-effect"
+                && db.QuantitativeSynthesisArtifacts.Any(artifact => artifact.Id == snapshot.ArtifactId && artifact.ResearchRunId == created.ResearchRunId),
+                CancellationToken.None));
+            Assert.True(await db.QuantitativeSynthesisContributionSnapshots.AnyAsync(snapshot =>
+                snapshot.AnalysisMethod == "random-effects"
+                && db.QuantitativeSynthesisArtifacts.Any(artifact => artifact.Id == snapshot.ArtifactId && artifact.ResearchRunId == created.ResearchRunId),
+                CancellationToken.None));
 
             var claimEvidence = await (
                 from reportEntity in db.ResearchReports
@@ -129,6 +141,17 @@ public sealed partial class FullFakePipelineTests
         Assert.Equal("10.1000/medresearch-e2e-sleep-recall", returnedCitation.Doi);
         Assert.Equal("Fake structured full text odds ratio trial", returnedCitation.Title);
         Assert.Contains("depression severity improved", returnedCitation.SupportingText, StringComparison.OrdinalIgnoreCase);
+
+        var quantitativeResponse = await client.GetAsync($"/api/research/{created.ResearchRunId}/quantitative");
+        Assert.Equal(HttpStatusCode.OK, quantitativeResponse.StatusCode);
+        var quantitativeArtifacts = await quantitativeResponse.Content.ReadFromJsonAsync<QuantitativeSynthesisArtifactResponse[]>();
+        Assert.NotNull(quantitativeArtifacts);
+        var quantitativeArtifact = Assert.Single(quantitativeArtifacts!, artifact => artifact.Result.Status == QuantitativeSynthesisStatus.Synthesized);
+        Assert.NotEmpty(quantitativeArtifact.SnapshotFingerprint);
+        Assert.NotNull(quantitativeArtifact.Result.RandomEffects);
+        Assert.NotNull(quantitativeArtifact.Result.RandomEffects!.HksjInference);
+        Assert.NotNull(quantitativeArtifact.Result.RandomEffects.PredictionInterval);
+        Assert.All(quantitativeArtifact.Result.Contributions, contribution => Assert.NotEqual(Guid.Empty, contribution.EvidenceId));
 
         Assert.Equal(1, fakeLlm.RequestedTypes.Count(type => type == typeof(ResearchPlanDraft)));
         Assert.Equal(3, fakeLlm.RequestedTypes.Count(type => type == typeof(EvidenceExtractionDraft)));

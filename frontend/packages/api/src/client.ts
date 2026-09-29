@@ -5,7 +5,8 @@ import {
   researchRunProgressResponseSchema,
   researchRunListResponseSchema,
   researchReportResponseSchema,
-  researchRunResponseSchema
+  researchRunResponseSchema,
+  quantitativeSynthesisArtifactResponseSchema
 } from "./schemas";
 import type {
   CreateResearchRequest,
@@ -15,7 +16,8 @@ import type {
   ResearchRunListFilters,
   ResearchRunListResponse,
   ResearchRunProgressResponse,
-  ResearchRunResponse
+  ResearchRunResponse,
+  QuantitativeSynthesisArtifactResponse
 } from "./types";
 
 export interface MedResearchApiClientOptions {
@@ -120,6 +122,21 @@ export class MedResearchApiClient {
     return this.requestJson(
       `/api/research/${encodeURIComponent(researchRunId)}/report`,
       researchReportResponseSchema.parse,
+      {
+        method: "GET",
+        signal,
+        headers: { Accept: "application/json" }
+      }
+    );
+  }
+
+  public async getQuantitativeSynthesisArtifacts(
+    researchRunId: string,
+    signal?: AbortSignal
+  ): Promise<QuantitativeSynthesisArtifactResponse[]> {
+    return this.requestJson(
+      `/api/research/${encodeURIComponent(researchRunId)}/quantitative`,
+      value => quantitativeSynthesisArtifactResponseSchema.array().parse(value) as QuantitativeSynthesisArtifactResponse[],
       {
         method: "GET",
         signal,

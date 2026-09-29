@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/{researchRunId}/quantitative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getQuantitativeSynthesisArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -305,6 +321,64 @@ export interface components {
             wasTruncated: boolean;
             sectionNames: string[];
         };
+        QuantitativeSynthesisArtifactResponse: {
+            /** Format: uuid */
+            artifactId: string;
+            /** Format: date-time */
+            persistedAt: string;
+            snapshotFingerprint: string;
+            result: components["schemas"]["QuantitativeSynthesisResult"];
+        };
+        QuantitativeSynthesisResult: {
+            /** Format: uuid */
+            researchRunId: string;
+            groupKey: string;
+            outcomeGroupKey: string;
+            populationCompatibilityKey: string;
+            comparatorCompatibilityKey: string;
+            studyDesignCompatibilityKey: string;
+            effectMeasureType: number;
+            status: number;
+            method: number;
+            algorithmVersion: string;
+            outputConfidenceLevel: number;
+            evidenceCount: number;
+            uniqueStudyCount: number;
+            analysisScaleEffect: number | null;
+            analysisScaleVariance: number | null;
+            analysisScaleStandardError: number | null;
+            analysisScaleConfidenceIntervalLower: number | null;
+            analysisScaleConfidenceIntervalUpper: number | null;
+            reportedScaleEffect: number | null;
+            reportedScaleConfidenceIntervalLower: number | null;
+            reportedScaleConfidenceIntervalUpper: number | null;
+            heterogeneityDiagnostics: {
+                [key: string]: unknown;
+            } | null;
+            betweenStudyVariance: {
+                [key: string]: unknown;
+            } | null;
+            randomEffects: {
+                [key: string]: unknown;
+            } | null;
+            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
+            rejectionReasons: number[];
+        };
+        QuantitativeSynthesisContribution: {
+            /** Format: uuid */
+            evidenceId: string;
+            /** Format: uuid */
+            studyId: string;
+            /** Format: uuid */
+            evidenceExtractionId: string;
+            /** Format: uuid */
+            sourceMaterialId: string;
+            analysisScaleEffect: number;
+            analysisScaleVariance: number;
+            analysisScaleStandardError: number;
+            weight: number;
+            normalizedWeight: number;
+        };
         ProblemDetails: {
             type?: string;
             title?: string;
@@ -499,6 +573,30 @@ export interface operations {
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            500: components["responses"]["Problem"];
+        };
+    };
+    getQuantitativeSynthesisArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Persisted deterministic quantitative synthesis artifacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantitativeSynthesisArtifactResponse"][];
+                };
+            };
+            404: components["responses"]["Problem"];
             500: components["responses"]["Problem"];
         };
     };

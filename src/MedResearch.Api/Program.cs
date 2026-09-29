@@ -1,6 +1,7 @@
 using MedResearch.Api.Research;
 using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Diagnostics;
@@ -225,6 +226,34 @@ research.MapGet("/{researchRunId:guid}/report", async (
     .Produces<ResearchReportResponse>(StatusCodes.Status200OK)
     .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
     .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+    .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
+
+research.MapGet("/{researchRunId:guid}/quantitative", async (
+        Guid researchRunId,
+        GetResearchUseCase getResearchUseCase,
+        GetQuantitativeSynthesisArtifactsUseCase useCase,
+        CancellationToken cancellationToken) =>
+    {
+        var run = await getResearchUseCase.ExecuteAsync(researchRunId, cancellationToken);
+        if (run is null)
+        {
+            return Results.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Research run not found"
+            });
+        }
+
+        var artifacts = await useCase.ExecuteAsync(researchRunId, cancellationToken);
+        return Results.Ok(artifacts.Select(artifact => new QuantitativeSynthesisArtifactResponse(
+            artifact.ArtifactId,
+            artifact.PersistedAt,
+            artifact.SnapshotFingerprint,
+            artifact.Result)).ToArray());
+    })
+    .WithName("GetQuantitativeSynthesisArtifacts")
+    .Produces<IReadOnlyCollection<QuantitativeSynthesisArtifactResponse>>(StatusCodes.Status200OK)
+    .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 app.Run();
 

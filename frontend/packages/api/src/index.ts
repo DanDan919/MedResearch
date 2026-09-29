@@ -19,6 +19,7 @@ export type {
   ResearchRunListResponse,
   ResearchRunProgressResponse,
   ResearchReportResponse,
+  QuantitativeSynthesisArtifactResponse,
   ResearchRunResponse,
   ResearchRunSummaryResponse,
   ResearchRunStatus

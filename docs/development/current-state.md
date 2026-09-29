@@ -252,7 +252,7 @@ The source-material layer is now persisted and used as the authoritative extract
 - Added `FixedEffectQuantitativeStatisticalSynthesizer` in Application as a deterministic read model over M15 `CompatibleEvidenceGroup` output.
 - V1 supports only OR/RR/HR compatible groups with independent Study contributions, finite normalized log effects, and finite positive variance.
 - The model computes generic inverse-variance fixed-effect weights, pooled log effect, variance, standard error, configured two-sided confidence interval, and exponentiated reported-scale result.
-- Output is transient and exposed through `SynthesisContext.QuantitativeSyntheses`; no database migration or persisted quantitative report table was added.
+- Output is exposed through `SynthesisContext.QuantitativeSyntheses` and, since F6, persisted as an immutable quantitative artifact with exact contribution snapshots.
 - The narrative synthesis prompt may receive deterministic pooled results but is forbidden from calculating or altering pooled estimates itself.
 - Defaults: `QuantitativeSynthesis:OutputConfidenceLevel=0.95`, `QuantitativeSynthesis:MinimumUniqueStudies=2`.
 - Still not implemented: modified/ad-hoc HKSJ, tau-squared confidence intervals, forest plots, MD/SMD/correlation pooling, p-value pooling, semantic outcome harmonization, or cohort-overlap correction.
@@ -260,7 +260,7 @@ The source-material layer is now persisted and used as the authoritative extract
 
 Milestone 18 extends the transient quantitative synthesis read model with deterministic heterogeneity diagnostics for successful M17 fixed-effect groups. `HeterogeneityDiagnosticsCalculator` computes Cochran's Q, degrees of freedom, and I-squared using the same M17 contribution set, analysis-scale effects, pooled analysis-scale effect, and inverse-variance weights.
 
-The diagnostics are versioned as `cochran-q-i2-v1` and are projected into `SynthesisContext` and the synthesis prompt. They remain derived read-model data and are not persisted as Evidence, Study metadata, or a database table.
+The diagnostics are versioned as `cochran-q-i2-v1`, projected into `SynthesisContext` and the synthesis prompt, and included in the F6 quantitative artifact snapshot. They are not persisted as Evidence or Study metadata and do not have a separate diagnostics table.
 
 Scope intentionally not implemented: tau-squared confidence intervals, Q p-values, forest plots, funnel plots, publication-bias tests, subgroup analysis, automatic model selection, and modified/ad-hoc HKSJ.
 ## REML Between-Study Variance Foundation V1
@@ -272,7 +272,7 @@ Milestone 19 extends successful transient quantitative synthesis results with `B
 - Boundary `tau² = 0`, failed bracketing, non-finite arithmetic, and max-iteration behavior are explicit rather than hidden behind a fabricated zero.
 - The implementation is pure Application code with deterministic finite bracketing and bounded bisection.
 - Values are projected into `SynthesisContext` and the synthesis prompt with algorithm version `reml-tau-squared-v1`.
-- No migration or persisted quantitative-result table was added.
+- F6 adds a forward-only migration for persisted quantitative result artifacts; M17 fixed-effect pooled values and M18 Q/df/I-squared semantics remain unchanged.
 - M17 fixed-effect pooled values and M18 Q/df/I-squared semantics remain unchanged.
 - M22 implements REML random-effects weights and a Wald pooled random-effects estimate. M23 adds canonical HKSJ summary-effect inference beside Wald. M24 adds random-effects prediction intervals beside Wald/HKSJ. Still not implemented: modified/ad-hoc HKSJ, Q-profile tau-squared intervals, automatic model selection, and tau-based I-squared replacement.
 
@@ -288,8 +288,8 @@ Milestone 22 adds `RandomEffectsQuantitativeStatisticalSynthesizer` as a determi
 - `tau² = 0` is valid and collapses to the M17 common/fixed-effect inverse-variance result for the same contribution set.
 - If M19 tau-squared is `NotEstimated`, the random-effects result is explicitly unavailable rather than fabricating zero or falling back to M17.
 - Values are projected into `SynthesisContext` and the synthesis prompt. The LLM is forbidden from calculating or altering them.
-- No migration or persisted quantitative-result table was added.
-- Still not implemented: modified/ad-hoc HKSJ, tau-squared confidence intervals, model recommendation/selection, subgroup analysis, meta-regression, publication-bias methods, forest plots, and persisted quantitative artifacts.
+- F6 persists the full deterministic result and fixed/random contribution snapshots; the read endpoint is machine-readable and no quantitative UI is included.
+- Still not implemented: modified/ad-hoc HKSJ, tau-squared confidence intervals, model recommendation/selection, subgroup analysis, meta-regression, publication-bias methods, and forest plots.
 ## Milestone 21 Architecture Verification Audit
 
 Milestone 21 independently audited the post-M20 architecture claims before adding any new scientific capability. The audit found that the documented major boundaries still match the implementation: Study remains global, search/discovery provenance remains source/query-specific, Evidence/Evaluation/Report data remains ResearchRun-scoped, synthesis rejects model-supplied citation identifiers, and worker lease owner/version fencing is enforced in PostgreSQL queue writes.
@@ -324,8 +324,8 @@ Milestone 23 adds `HksjSummaryEffectInferenceCalculator` as a deterministic Appl
 - The HKSJ interval uses Student-t critical values and the canonical variance adjustment `sum(w_i_RE * (theta_i - theta_RE)^2) / (k - 1)`.
 - Canonical HKSJ is exposed beside, not instead of, the existing Wald result.
 - The synthesis prompt receives deterministic HKSJ values and forbids the LLM from calculating or altering them.
-- No database migration or persisted quantitative-result table was added.
-- Still not implemented: modified/ad-hoc HKSJ, tau-squared confidence intervals, p-values, automatic inference/model selection, forest plots, and persisted quantitative artifacts.
+- Before F6 these values were transient; F6 now persists the complete deterministic result as a run-scoped artifact with exact contribution snapshots.
+- Still not implemented: modified/ad-hoc HKSJ, tau-squared confidence intervals, p-values, automatic inference/model selection, forest plots, and quantitative UI.
 
 ## Random-Effects Prediction Interval V1
 
@@ -339,7 +339,7 @@ Milestone 24 adds `RandomEffectsPredictionIntervalCalculator` as a deterministic
 - `tau² = 0` is valid; the prediction variance then collapses to the M22 Wald summary variance and still uses the prediction-interval Student-t critical value.
 - Prediction intervals are exposed beside Wald and HKSJ rather than replacing or selecting among them.
 - The synthesis prompt receives deterministic prediction interval values and forbids the LLM from calculating or altering them.
-- Still not implemented: prediction interval model selection/recommendation, modified/ad-hoc HKSJ, tau-squared confidence intervals, prediction intervals for unsupported effect families, p-values, forest plots, and persisted quantitative artifacts.
+- Still not implemented: prediction interval model selection/recommendation, modified/ad-hoc HKSJ, tau-squared confidence intervals, prediction intervals for unsupported effect families, p-values, forest plots, and quantitative UI.
 
 ## Frontend F4 Scientific Report Workspace
 
@@ -350,3 +350,13 @@ F4 turns `/research/[id]/report` into a traceable report workspace backed by the
 - PMID, PMCID, and DOI links are rendered only when the API returns the corresponding identifier. Missing study metadata remains explicitly unavailable; no identifier or confidence score is invented in the browser.
 - `404` (unknown run) and `409` (known run whose report is not ready) remain distinct UI states. Report print controls are hidden from printed output.
 - Frontend unit and Playwright tests use mocked API responses and do not call scientific or AI providers.
+
+## F6 Persisted Quantitative Synthesis Artifacts
+
+F6 makes M17-M24 quantitative results durable without changing their formulas. `SynthesisContextBuilder` persists every deterministic group result, including non-estimated states, before the narrative synthesis call. The same in-memory result is still projected into `SynthesisContext`; the LLM does not calculate or select statistical values.
+
+- `quantitative_synthesis_artifacts` stores the complete result snapshot, algorithm versions, statuses, failure reasons, counts, confidence level, and deterministic fingerprint.
+- `quantitative_synthesis_contribution_snapshots` stores fixed-effect and random-effects contribution populations with exact `double` effect/variance/SE/weight values and FK lineage to Evidence, Study, EvidenceExtraction, and SourceMaterial.
+- Artifact persistence is transactional and idempotent on `(ResearchRunId, GroupKey)` plus fingerprint. A different retry result cannot overwrite an existing artifact.
+- `GET /api/research/{researchRunId}/quantitative` returns the machine-readable artifact read model without raw source text, prompts, credentials, or processing lease data.
+- No quantitative frontend workspace was added; the generated API contract is ready for a later client milestone.

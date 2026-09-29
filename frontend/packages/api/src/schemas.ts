@@ -189,6 +189,13 @@ export const researchReportResponseSchema = z.object({
   claims: z.array(researchReportClaimSchema)
 });
 
+export const quantitativeSynthesisArtifactResponseSchema = z.object({
+  artifactId: z.string().uuid(),
+  persistedAt: z.string(),
+  snapshotFingerprint: z.string(),
+  result: z.record(z.string(), z.unknown())
+});
+
 export const problemDetailsSchema = z
   .object({
     type: z.string().optional(),

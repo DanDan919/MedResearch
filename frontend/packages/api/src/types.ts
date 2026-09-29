@@ -8,6 +8,7 @@ export type ResearchRunListResponse = components["schemas"]["ResearchRunListResp
 export type ResearchRunProgressResponse = components["schemas"]["ResearchRunProgressResponse"];
 export type ResearchRunStatus = components["schemas"]["ResearchRunStatus"];
 export type ResearchReportResponse = components["schemas"]["ResearchReportResponse"];
+export type QuantitativeSynthesisArtifactResponse = components["schemas"]["QuantitativeSynthesisArtifactResponse"];
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
 
 export type HealthState = "connected" | "unavailable";

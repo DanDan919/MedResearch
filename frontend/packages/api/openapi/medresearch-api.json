@@ -214,6 +214,37 @@
           }
         }
       }
+    },
+    "/api/research/{researchRunId}/quantitative": {
+      "get": {
+        "operationId": "getQuantitativeSynthesisArtifacts",
+        "parameters": [
+          {
+            "name": "researchRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted deterministic quantitative synthesis artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/QuantitativeSynthesisArtifactResponse" }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "500": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -627,6 +658,66 @@
           "accessStatus": { "type": "string" },
           "wasTruncated": { "type": "boolean" },
           "sectionNames": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "QuantitativeSynthesisArtifactResponse": {
+        "type": "object",
+        "required": ["artifactId", "persistedAt", "snapshotFingerprint", "result"],
+        "additionalProperties": false,
+        "properties": {
+          "artifactId": { "type": "string", "format": "uuid" },
+          "persistedAt": { "type": "string", "format": "date-time" },
+          "snapshotFingerprint": { "type": "string" },
+          "result": { "$ref": "#/components/schemas/QuantitativeSynthesisResult" }
+        }
+      },
+      "QuantitativeSynthesisResult": {
+        "type": "object",
+        "required": ["researchRunId", "groupKey", "outcomeGroupKey", "populationCompatibilityKey", "comparatorCompatibilityKey", "studyDesignCompatibilityKey", "effectMeasureType", "status", "method", "algorithmVersion", "outputConfidenceLevel", "evidenceCount", "uniqueStudyCount", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "heterogeneityDiagnostics", "betweenStudyVariance", "randomEffects", "contributions", "rejectionReasons"],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": { "type": "string", "format": "uuid" },
+          "groupKey": { "type": "string" },
+          "outcomeGroupKey": { "type": "string" },
+          "populationCompatibilityKey": { "type": "string" },
+          "comparatorCompatibilityKey": { "type": "string" },
+          "studyDesignCompatibilityKey": { "type": "string" },
+          "effectMeasureType": { "type": "integer" },
+          "status": { "type": "integer" },
+          "method": { "type": "integer" },
+          "algorithmVersion": { "type": "string" },
+          "outputConfidenceLevel": { "type": "number" },
+          "evidenceCount": { "type": "integer" },
+          "uniqueStudyCount": { "type": "integer" },
+          "analysisScaleEffect": { "type": ["number", "null"] },
+          "analysisScaleVariance": { "type": ["number", "null"] },
+          "analysisScaleStandardError": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "reportedScaleEffect": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "heterogeneityDiagnostics": { "type": ["object", "null"], "additionalProperties": true },
+          "betweenStudyVariance": { "type": ["object", "null"], "additionalProperties": true },
+          "randomEffects": { "type": ["object", "null"], "additionalProperties": true },
+          "contributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeSynthesisContribution" } },
+          "rejectionReasons": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "QuantitativeSynthesisContribution": {
+        "type": "object",
+        "required": ["evidenceId", "studyId", "evidenceExtractionId", "sourceMaterialId", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "weight", "normalizedWeight"],
+        "additionalProperties": false,
+        "properties": {
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "evidenceExtractionId": { "type": "string", "format": "uuid" },
+          "sourceMaterialId": { "type": "string", "format": "uuid" },
+          "analysisScaleEffect": { "type": "number" },
+          "analysisScaleVariance": { "type": "number" },
+          "analysisScaleStandardError": { "type": "number" },
+          "weight": { "type": "number" },
+          "normalizedWeight": { "type": "number" }
         }
       },
       "ProblemDetails": {

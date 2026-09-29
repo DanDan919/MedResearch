@@ -1,3 +1,5 @@
+using MedResearch.Application.Research.Quantitative;
+
 namespace MedResearch.Api.Research;
 
 public sealed record CreateResearchRequest(string? Question);
@@ -164,3 +166,9 @@ public sealed record ResearchReportSourceMaterialResponse(
     string AccessStatus,
     bool WasTruncated,
     IReadOnlyCollection<string> SectionNames);
+
+public sealed record QuantitativeSynthesisArtifactResponse(
+    Guid ArtifactId,
+    DateTimeOffset PersistedAt,
+    string SnapshotFingerprint,
+    QuantitativeSynthesisResult Result);

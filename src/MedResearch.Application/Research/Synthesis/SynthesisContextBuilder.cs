@@ -9,6 +9,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
     private readonly IEvidenceCorpusBuilder _evidenceCorpusBuilder;
     private readonly IQuantitativeEvidenceAssessor _quantitativeEvidenceAssessor;
     private readonly IQuantitativeStatisticalSynthesizer _quantitativeStatisticalSynthesizer;
+    private readonly IQuantitativeSynthesisArtifactStore? _quantitativeSynthesisArtifactStore;
     private readonly SynthesisOptions _options;
     private readonly ILogger<SynthesisContextBuilder> _logger;
 
@@ -18,11 +19,13 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         ILogger<SynthesisContextBuilder> logger,
         IEvidenceCorpusBuilder? evidenceCorpusBuilder = null,
         IQuantitativeEvidenceAssessor? quantitativeEvidenceAssessor = null,
-        IQuantitativeStatisticalSynthesizer? quantitativeStatisticalSynthesizer = null)
+        IQuantitativeStatisticalSynthesizer? quantitativeStatisticalSynthesizer = null,
+        IQuantitativeSynthesisArtifactStore? quantitativeSynthesisArtifactStore = null)
     {
         _evidenceCorpusBuilder = evidenceCorpusBuilder ?? new EvidenceCorpusBuilder(corpusStore);
         _quantitativeEvidenceAssessor = quantitativeEvidenceAssessor ?? new QuantitativeEvidenceAssessor();
         _quantitativeStatisticalSynthesizer = quantitativeStatisticalSynthesizer ?? new FixedEffectQuantitativeStatisticalSynthesizer(new QuantitativeSynthesisOptions());
+        _quantitativeSynthesisArtifactStore = quantitativeSynthesisArtifactStore;
         _options = options;
         _logger = logger;
     }
@@ -156,6 +159,10 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var limitations = BuildLimitations(coverage, statistics, outcomeSummaries, evidenceTruncated).ToList();
         var quantitativeReadiness = _quantitativeEvidenceAssessor.Assess(corpus with { Evidence = selectedEvidence });
         var quantitativeSynthesis = _quantitativeStatisticalSynthesizer.Synthesize(quantitativeReadiness);
+        if (_quantitativeSynthesisArtifactStore is not null)
+        {
+            await _quantitativeSynthesisArtifactStore.PersistAsync(quantitativeSynthesis, cancellationToken);
+        }
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
         {
