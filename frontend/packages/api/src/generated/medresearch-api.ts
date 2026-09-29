@@ -262,9 +262,48 @@ export interface components {
             pmcid: string | null;
             doi: string | null;
             title: string;
+            journal: string | null;
+            publicationYear: number | null;
+            publicationMonth: number | null;
+            publicationDay: number | null;
+            publicationTypes: string[];
+            authors: string[];
+            studySource: string | null;
+            outcome: string;
+            resultSummary: string | null;
             supportingText: string;
             evidenceDirection: string;
+            sourceScope: string;
+            groundingValidated: boolean;
+            population: string | null;
+            exposureOrIntervention: string | null;
+            comparator: string | null;
+            studyDesign: string | null;
+            sampleSize: number | null;
+            effectMeasure: string | null;
+            effectValue: number | null;
+            confidenceIntervalLower: number | null;
+            confidenceIntervalUpper: number | null;
+            confidenceLevel: number | null;
+            reportedStandardError: number | null;
+            pValue: number | null;
+            /** Format: date-time */
+            extractedAt: string;
+            sourceMaterial: components["schemas"]["ResearchReportSourceMaterialResponse"] | null;
             ordinal: number;
+        };
+        ResearchReportSourceMaterialResponse: {
+            /** Format: uuid */
+            sourceMaterialId: string;
+            type: string;
+            provider: string;
+            retrievalMethod: string;
+            contentVersion: number;
+            /** Format: date-time */
+            retrievedAt: string;
+            accessStatus: string;
+            wasTruncated: boolean;
+            sectionNames: string[];
         };
         ProblemDetails: {
             type?: string;

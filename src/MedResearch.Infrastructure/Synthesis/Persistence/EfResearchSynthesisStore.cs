@@ -326,16 +326,35 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 evidence => evidence.Id,
                 (link, evidence) => new { link, evidence })
             .Join(
+                _dbContext.EvidenceExtractions.AsNoTracking(),
+                item => item.evidence.EvidenceExtractionId,
+                extraction => extraction.Id,
+                (item, extraction) => new { item.link, item.evidence, extraction })
+            .Join(
                 _dbContext.Studies.AsNoTracking(),
                 item => item.evidence.StudyId,
                 study => study.Id,
-                (item, study) => new
+                (item, study) => new { item.link, item.evidence, item.extraction, study })
+            .GroupJoin(
+                _dbContext.SourceMaterials.AsNoTracking(),
+                item => item.extraction.SourceMaterialId,
+                sourceMaterial => sourceMaterial.Id,
+                (item, sourceMaterials) => new { item.link, item.evidence, item.extraction, item.study, sourceMaterials })
+            .SelectMany(
+                item => item.sourceMaterials.DefaultIfEmpty(),
+                (item, sourceMaterial) => new
                 {
                     item.link.ResearchReportClaimId,
                     item.link.Ordinal,
                     Evidence = item.evidence,
-                    Study = study
+                    Extraction = item.extraction,
+                    Study = item.study,
+                    SourceMaterial = sourceMaterial
                 })
+            .Where(item => item.Evidence.ResearchRunId == reportEntity.ResearchRunId
+                && item.Extraction.ResearchRunId == reportEntity.ResearchRunId
+                && item.Extraction.StudyId == item.Evidence.StudyId
+                && (item.SourceMaterial == null || item.SourceMaterial.StudyId == item.Study.Id))
             .OrderBy(item => item.ResearchReportClaimId)
             .ThenBy(item => item.Ordinal)
             .ToArrayAsync(cancellationToken);
@@ -352,8 +371,44 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                         row.Study.Pmcid,
                         row.Study.Doi,
                         row.Study.Title,
+                        row.Study.Journal,
+                        row.Study.PublicationYear,
+                        row.Study.PublicationMonth,
+                        row.Study.PublicationDay,
+                        row.Study.PublicationTypes,
+                        row.Study.Authors,
+                        row.Study.Source,
+                        row.Evidence.Outcome,
+                        row.Evidence.ResultSummary,
                         row.Evidence.SupportingText,
                         row.Evidence.Direction,
+                        row.Evidence.SourceScope,
+                        row.Evidence.GroundingValidated,
+                        row.Evidence.Population,
+                        row.Evidence.ExposureOrIntervention,
+                        row.Evidence.Comparator,
+                        row.Evidence.StudyDesign,
+                        row.Evidence.SampleSize,
+                        row.Evidence.EffectMeasure,
+                        row.Evidence.EffectValue,
+                        row.Evidence.ConfidenceIntervalLower,
+                        row.Evidence.ConfidenceIntervalUpper,
+                        row.Evidence.ConfidenceLevel,
+                        row.Evidence.ReportedStandardError,
+                        row.Evidence.PValue,
+                        row.Evidence.ExtractedAt,
+                        row.SourceMaterial is null
+                            ? null
+                            : new ResearchReportSourceMaterialReadModel(
+                                row.SourceMaterial.Id,
+                                row.SourceMaterial.Type.ToString(),
+                                row.SourceMaterial.Provider,
+                                row.SourceMaterial.RetrievalMethod,
+                                row.SourceMaterial.ContentVersion,
+                                row.SourceMaterial.RetrievedAt,
+                                row.SourceMaterial.AccessStatus.ToString(),
+                                row.SourceMaterial.WasTruncated,
+                                row.SourceMaterial.SectionNames),
                         row.Ordinal))
                     .ToArray());
 

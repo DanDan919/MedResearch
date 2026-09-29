@@ -37,7 +37,7 @@ Implemented routes:
 - `/research` real paginated run history through `GET /api/research`.
 - `/research/new` real `POST /api/research` create flow.
 - `/research/[id]` real `GET /api/research/{id}/progress` observability workspace with polling while non-terminal.
-- `/research/[id]/report` minimal report projection through `GET /api/research/{id}/report`.
+- `/research/[id]/report` traceable scientific report workspace through `GET /api/research/{id}/report`.
 - `/studies` honest empty state because no study-browsing API exists.
 - `/settings` environment configuration summary.
 
@@ -48,6 +48,8 @@ The app shell includes responsive navigation, light/dark theme support, an API r
 The desktop foundation is a Tauri 2 shell around a React/Vite UI. Rust is intentionally minimal and contains no scientific or business logic. The shell does not request shell or filesystem permissions.
 
 The current desktop app verifies the configured API readiness endpoint and documents that backend services own all research processing. Future desktop milestones can reuse the shared API and UI packages rather than duplicating backend behavior.
+
+The report workspace treats the report endpoint as a persisted read model. It renders narrative, coverage facts, ordered claims, and expandable Evidence citations with authoritative Study metadata. Identifier links are created only for identifiers returned by the API. Source-material lineage exposes provider, retrieval, version, access, and section metadata, but never raw source content. A known run without a report is rendered as a not-ready state (409); an unknown run remains a not-found state (404).
 
 ## Backend-Facing Contract
 

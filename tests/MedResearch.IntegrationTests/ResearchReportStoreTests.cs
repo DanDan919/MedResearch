@@ -87,6 +87,26 @@ public sealed class ResearchReportStoreTests
         Assert.Equal(seed.Pmid, citation.Pmid);
         Assert.Equal(seed.Doi, citation.Doi);
         Assert.Equal("Sleep and recall report", citation.Title);
+        Assert.Equal("Journal", citation.Journal);
+        Assert.Equal(2026, citation.PublicationYear);
+        Assert.Equal("PubMed", citation.StudySource);
+        Assert.Equal("recall", citation.Outcome);
+        Assert.Equal("Recall improved after sleep.", citation.ResultSummary);
+        Assert.Equal("reported improved recall in 120 adults", citation.SupportingText);
+        Assert.Equal(EvidenceSourceScope.Abstract, citation.SourceScope);
+        Assert.True(citation.GroundingValidated);
+        Assert.Equal("adults", citation.Population);
+        Assert.Equal("sleep", citation.ExposureOrIntervention);
+        Assert.Equal("wakefulness", citation.Comparator);
+        Assert.Equal("controlled trial", citation.StudyDesign);
+        Assert.Equal(120, citation.SampleSize);
+        Assert.NotNull(citation.SourceMaterial);
+        Assert.Equal(SourceMaterialType.Abstract.ToString(), citation.SourceMaterial.Type);
+        Assert.Equal("PubMed", citation.SourceMaterial.Provider);
+        Assert.Equal("SearchMetadataAbstract", citation.SourceMaterial.RetrievalMethod);
+        Assert.Equal(1, citation.SourceMaterial.ContentVersion);
+        Assert.Equal(SourceMaterialAccessStatus.Unknown.ToString(), citation.SourceMaterial.AccessStatus);
+        Assert.False(citation.SourceMaterial.WasTruncated);
     }
 
     [SkippableFact]
@@ -239,6 +259,35 @@ public sealed class ResearchReportStoreTests
         Assert.Equal(first.Doi, row.Doi);
         Assert.Equal("Sleep and recall report", row.Title);
         Assert.Equal("reported improved recall in 120 adults", row.SupportingText);
+    }
+
+    [SkippableFact]
+    public async Task FindReportAsync_DoesNotProjectCrossRunClaimEvidenceLink()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var first = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        var second = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchSynthesisStore(context);
+            await store.PersistReportAsync(CreateCompletedResult(second.RunId, second.EvidenceIds), CancellationToken.None);
+
+            var report = await context.ResearchReports.SingleAsync(report => report.ResearchRunId == second.RunId, CancellationToken.None);
+            var claim = await context.ResearchReportClaims.SingleAsync(claim => claim.ResearchReportId == report.Id, CancellationToken.None);
+            context.ResearchReportClaimEvidence.Add(new ResearchReportClaimEvidence(claim.Id, first.EvidenceIds[0], 9));
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        var readStore = new EfResearchSynthesisStore(verification);
+        var reportReadModel = await readStore.FindReportAsync(second.RunId, CancellationToken.None);
+
+        Assert.NotNull(reportReadModel);
+        var claimReadModel = Assert.Single(reportReadModel.Claims);
+        var citation = Assert.Single(claimReadModel.Citations);
+        Assert.Equal(second.EvidenceIds[0], citation.EvidenceId);
+        Assert.DoesNotContain(claimReadModel.Citations, item => item.EvidenceId == first.EvidenceIds[0]);
     }
 
     private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount)

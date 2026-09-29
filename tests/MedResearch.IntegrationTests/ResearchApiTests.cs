@@ -246,6 +246,10 @@ public sealed class ResearchApiTests
         Assert.Equal("12345678", citation.Pmid);
         Assert.Equal("10.1000/authoritative", citation.Doi);
         Assert.Equal("Authoritative study title", citation.Title);
+        Assert.Equal("recall", citation.Outcome);
+        Assert.Equal("Abstract", citation.SourceScope);
+        Assert.NotNull(citation.SourceMaterial);
+        Assert.Equal("PubMed", citation.SourceMaterial.Provider);
     }
 
     [Fact]
@@ -295,7 +299,7 @@ public sealed class ResearchApiTests
     {
         var coverage = new ResearchReportCoverageReadModel(1, 1, 1, status == ResearchReportStatus.Completed ? 1 : 0, status == ResearchReportStatus.Completed ? 1 : 0, status == ResearchReportStatus.Completed ? 1 : 0, 1, 0, 1, 0, status == ResearchReportStatus.Completed ? 1 : 0, 0, false, false, true, ["PubMed"]);
         ResearchReportClaimReadModel[] claims = status == ResearchReportStatus.Completed
-            ? [new ResearchReportClaimReadModel(Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Supported conclusion claim.", 0, [new ResearchReportCitationReadModel(evidenceId, Guid.NewGuid(), "12345678", null, "10.1000/authoritative", "Authoritative study title", "supporting excerpt", EvidenceDirection.Positive, 0)])]
+            ? [new ResearchReportClaimReadModel(Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Supported conclusion claim.", 0, [CreateCitation(evidenceId)])]
             : [];
 
         return new ResearchReportReadModel(
@@ -315,6 +319,54 @@ public sealed class ResearchApiTests
             coverage,
             ["Abstract-level evidence only."],
             claims);
+    }
+
+    private static ResearchReportCitationReadModel CreateCitation(Guid evidenceId)
+    {
+        return new ResearchReportCitationReadModel(
+            evidenceId,
+            Guid.NewGuid(),
+            "12345678",
+            null,
+            "10.1000/authoritative",
+            "Authoritative study title",
+            "Journal",
+            2026,
+            1,
+            null,
+            ["Journal Article"],
+            ["Ada Lovelace"],
+            "PubMed",
+            "recall",
+            "Recall improved after sleep.",
+            "supporting excerpt",
+            EvidenceDirection.Positive,
+            EvidenceSourceScope.Abstract,
+            true,
+            "adults",
+            "sleep",
+            "wakefulness",
+            "controlled trial",
+            120,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            DateTimeOffset.UtcNow,
+            new ResearchReportSourceMaterialReadModel(
+                Guid.NewGuid(),
+                SourceMaterialType.Abstract.ToString(),
+                "PubMed",
+                "SearchMetadataAbstract",
+                1,
+                DateTimeOffset.UtcNow,
+                SourceMaterialAccessStatus.Unknown.ToString(),
+                false,
+                ["Abstract"]),
+            0);
     }
     private sealed class ResearchApiFactory : WebApplicationFactory<Program>
     {

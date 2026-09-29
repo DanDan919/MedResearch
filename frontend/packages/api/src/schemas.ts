@@ -96,6 +96,18 @@ export const researchRunProgressResponseSchema = z.object({
   stages: z.array(researchRunStageProgressSchema)
 });
 
+export const researchReportSourceMaterialSchema = z.object({
+  sourceMaterialId: z.string().uuid(),
+  type: z.string(),
+  provider: z.string(),
+  retrievalMethod: z.string(),
+  contentVersion: z.number(),
+  retrievedAt: z.string(),
+  accessStatus: z.string(),
+  wasTruncated: z.boolean(),
+  sectionNames: z.array(z.string())
+});
+
 export const researchReportCitationSchema = z.object({
   evidenceId: z.string().uuid(),
   studyId: z.string().uuid(),
@@ -103,8 +115,33 @@ export const researchReportCitationSchema = z.object({
   pmcid: z.string().nullable(),
   doi: z.string().nullable(),
   title: z.string(),
+  journal: z.string().nullable(),
+  publicationYear: z.number().nullable(),
+  publicationMonth: z.number().nullable(),
+  publicationDay: z.number().nullable(),
+  publicationTypes: z.array(z.string()),
+  authors: z.array(z.string()),
+  studySource: z.string().nullable(),
+  outcome: z.string(),
+  resultSummary: z.string().nullable(),
   supportingText: z.string(),
   evidenceDirection: z.string(),
+  sourceScope: z.string(),
+  groundingValidated: z.boolean(),
+  population: z.string().nullable(),
+  exposureOrIntervention: z.string().nullable(),
+  comparator: z.string().nullable(),
+  studyDesign: z.string().nullable(),
+  sampleSize: z.number().nullable(),
+  effectMeasure: z.string().nullable(),
+  effectValue: z.number().nullable(),
+  confidenceIntervalLower: z.number().nullable(),
+  confidenceIntervalUpper: z.number().nullable(),
+  confidenceLevel: z.number().nullable(),
+  reportedStandardError: z.number().nullable(),
+  pValue: z.number().nullable(),
+  extractedAt: z.string(),
+  sourceMaterial: researchReportSourceMaterialSchema.nullable(),
   ordinal: z.number()
 });
 

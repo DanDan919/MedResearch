@@ -69,3 +69,21 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+@media print {
+  .report-navigation {
+    display: none !important;
+  }
+
+  .report-workspace {
+    color: #000;
+  }
+
+  .report-workspace details {
+    break-inside: avoid;
+  }
+
+  .report-workspace details:not([open]) > *:not(summary) {
+    display: block;
+  }
+}

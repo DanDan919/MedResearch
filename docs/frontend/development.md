@@ -66,8 +66,12 @@ Do not manually edit generated files except as a temporary recovery step before 
 
 F2 adds the run-history contract to the checked-in OpenAPI snapshot. When backend API response models change, update the snapshot and rerun generation before running frontend typecheck.
 
+F4 extends the report citation contract with persisted Study, Evidence, and SourceMaterial metadata. The report workspace uses native disclosure elements for evidence details, avoids scientific calculations, and keeps print controls out of printed output. Keep the checked-in OpenAPI snapshot and generated TypeScript contract synchronized.
+
 ## Test Policy
 
 Normal frontend tests use mocked API responses. They must not call OpenAI, PubMed, Europe PMC, live full-text endpoints, or arbitrary internet services.
 
 Playwright tests are smoke tests for routing and shell rendering. They mock backend responses for deterministic frontend validation and do not require a live backend.
+
+Report tests cover a completed report, a 409 report-not-ready response, a 404 unknown run, and citations with missing identifiers. They must not assert data that the backend does not persist.

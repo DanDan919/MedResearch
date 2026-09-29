@@ -27,6 +27,17 @@ The backend persists `Study`, `LiteratureSearch`, and `ResearchStudyDiscovery`, 
 
 Reports are retrievable by research run id only. There is no report index endpoint.
 
+## Resolved Report Traceability Projection
+
+F4 adds a report workspace backed by the existing `GET /api/research/{researchRunId}/report` endpoint. The response now projects persisted claim-to-Evidence links, authoritative Study identifiers and metadata, and SourceMaterial lineage metadata without exposing raw source content.
+
+Still intentionally not exposed by this endpoint:
+
+- a standalone provenance explorer for every search/discovery path;
+- raw SourceMaterial content or full-text browsing;
+- an automatic Evidence-to-EvidenceEvaluation projection when no direct report citation association exists;
+- quantitative result read models beyond the report contract already provided by the backend.
+
 ## Missing OpenAPI CI Source Of Truth
 
 The frontend contains a checked-in OpenAPI snapshot in `frontend/packages/api/openapi/medresearch-api.json`. The backend now exposes `/openapi/v1.json`, but CI currently validates generation from the snapshot to keep frontend validation deterministic without starting the API. A future milestone can add a backend-generated OpenAPI artifact check if the API contract becomes part of release governance.

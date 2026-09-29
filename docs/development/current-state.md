@@ -333,3 +333,13 @@ Milestone 24 adds `RandomEffectsPredictionIntervalCalculator` as a deterministic
 - Prediction intervals are exposed beside Wald and HKSJ rather than replacing or selecting among them.
 - The synthesis prompt receives deterministic prediction interval values and forbids the LLM from calculating or altering them.
 - Still not implemented: prediction interval model selection/recommendation, modified/ad-hoc HKSJ, tau-squared confidence intervals, prediction intervals for unsupported effect families, p-values, forest plots, and persisted quantitative artifacts.
+
+## Frontend F4 Scientific Report Workspace
+
+F4 turns `/research/[id]/report` into a traceable report workspace backed by the existing persisted report endpoint.
+
+- The API read model projects ordered report claims, claim-to-Evidence links, authoritative Study identifiers and metadata, and SourceMaterial lineage metadata without returning raw source content.
+- The UI renders the persisted narrative and coverage facts, keeps claim order and citation order, and uses native expandable sections for evidence details.
+- PMID, PMCID, and DOI links are rendered only when the API returns the corresponding identifier. Missing study metadata remains explicitly unavailable; no identifier or confidence score is invented in the browser.
+- `404` (unknown run) and `409` (known run whose report is not ready) remain distinct UI states. Report print controls are hidden from printed output.
+- Frontend unit and Playwright tests use mocked API responses and do not call scientific or AI providers.
