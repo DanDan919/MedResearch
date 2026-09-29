@@ -140,13 +140,14 @@ public sealed class ResearchProgressStoreTests
             "fake-model",
             "research-planner-v1",
             now.AddSeconds(2));
+        var pmcid = RandomPmcid();
         var study = new Study(
             Guid.NewGuid(),
             "Sleep and recall",
             "A trial reported improved recall.",
             $"10.9090/{Guid.NewGuid():N}",
             RandomPmid(),
-            "PMC1234567",
+            pmcid,
             "Journal",
             new DateOnly(2026, 1, 1),
             2026,
@@ -188,6 +189,11 @@ public sealed class ResearchProgressStoreTests
     private static string RandomPmid()
     {
         return Random.Shared.Next(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string RandomPmcid()
+    {
+        return $"PMC{Random.Shared.Next(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
     }
 
     private void SkipIfPostgreSqlUnavailable()
