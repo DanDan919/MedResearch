@@ -59,7 +59,14 @@ public sealed class QuantitativeSynthesisArtifactStoreTests
         {
             var question = new ResearchQuestion("Other question", DateTimeOffset.UtcNow);
             context.ResearchQuestions.Add(question);
-            context.ResearchRuns.Add(new ResearchRun(otherRunId, question.CreatedAt));
+            context.ResearchRuns.Add(new ResearchRun(
+                otherRunId,
+                question.Id,
+                ResearchRunStatus.Queued,
+                question.CreatedAt,
+                null,
+                null,
+                null));
             await context.SaveChangesAsync();
         }
 
