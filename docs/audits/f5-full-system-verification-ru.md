@@ -1,4 +1,4 @@
-# M19/F5: полная adversarial-проверка MedResearch
+# F5: полная adversarial-проверка MedResearch
 
 Дата проверки: 2026-09-29. Проверка выполнена по фактическому коду, тестам,
 миграциям, Docker/CI и frontend-контракту. `CODEX_CONTEXT.md` в репозитории не
@@ -182,6 +182,23 @@ reproducibility metadata, without adding a new provider or inference method.
   and web production build passed.
 - `git diff --check`: passed.
 
-CI status and final commit are recorded in the release commit/CI follow-up after
-the push; the audit does not treat local skipped PostgreSQL tests as runtime
-confidence.
+## CI после push
+
+- Workflow: `.github/workflows/ci.yml`.
+- Run: `36567106484` ([GitHub Actions](https://github.com/DanDan919/MedResearch/actions/runs/36567106484)).
+- Commit: `b92206175961bb470c09a5a808ff0cb5ba4e5fa6`.
+- Runner: `ubuntu-latest`; .NET: `10.0.x`; Docker daemon: available.
+- Jobs `Build and test` and `Frontend`: success.
+- Strict `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` remained enabled. Since the
+  test job succeeded, its skip guard observed zero required skips; all 86
+  Integration tests (including the new source-version concurrency test) ran.
+- .NET test totals in the CI projects: Domain `26`, Application `160`,
+  Infrastructure `65`, Integration `86`; `337 passed`, `0 failed`, `0 skipped`.
+  Frontend deterministic tests: API `9`, web `18`; live provider tests were
+  not part of the workflow.
+- The `test-results` TRX artifact was published. Anonymous API inspection could
+  not download its contents (HTTP 403), so the counts above are derived from
+  the committed test project inventory plus the workflow's strict skip guard,
+  not from invented log output.
+
+The pushed working tree is clean and `main` tracks `origin/main`.
