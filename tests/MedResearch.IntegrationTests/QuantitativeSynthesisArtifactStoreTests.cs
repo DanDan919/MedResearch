@@ -86,8 +86,10 @@ public sealed class QuantitativeSynthesisArtifactStoreTests
         await using var context = _fixture.CreateDbContext();
         var question = new ResearchQuestion("Does the intervention change the outcome?", DateTimeOffset.UtcNow);
         var run = new ResearchRun(question.Id, question.CreatedAt);
-        var study = new Study(Guid.NewGuid(), "Study title", "Abstract", "10.1000/example", "12345", "Journal", new DateOnly(2025, 1, 2), "PubMed");
-        var material = SourceMaterial.Create(study.Id, SourceMaterialType.Abstract, "PubMed", "12345", "fixture", "source text", 1, DateTimeOffset.UtcNow, null, null, null, SourceMaterialAccessStatus.OpenAccess, false, []);
+        var studyId = Guid.NewGuid();
+        var providerId = studyId.ToString("N");
+        var study = new Study(studyId, "Study title", "Abstract", $"10.1000/example-{providerId}", providerId, "Journal", new DateOnly(2025, 1, 2), "PubMed");
+        var material = SourceMaterial.Create(study.Id, SourceMaterialType.Abstract, "PubMed", providerId, "fixture", "source text", 1, DateTimeOffset.UtcNow, null, null, null, SourceMaterialAccessStatus.OpenAccess, false, []);
         var extraction = new EvidenceExtraction(Guid.NewGuid(), run.Id, study.Id, material.Id, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "fake", "fake", "fixture-v1", DateTimeOffset.UtcNow, 1, true);
         var evidence = new Evidence(Guid.NewGuid(), run.Id, study.Id, extraction.Id, "outcome", "result", "source text", EvidenceDirection.Positive, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, true, "population", "intervention", "control", "trial", 100, "odds ratio", 1.25m, 1.0m, 1.5m, 0.05m, 0.95m, 0.1m);
         context.ResearchQuestions.Add(question);
