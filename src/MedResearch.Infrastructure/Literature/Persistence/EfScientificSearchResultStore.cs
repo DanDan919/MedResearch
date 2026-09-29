@@ -233,6 +233,11 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         var providerSourceId = candidate.ProviderRecordId ?? candidate.Pmid ?? candidate.Pmcid ?? candidate.Doi;
         var contentHash = SourceMaterial.ComputeContentHash(content);
 
+        await PostgreSqlAdvisoryLock.AcquireTransactionLockAsync(
+            _dbContext.Database,
+            CreateSourceMaterialLockKey(studyId, SourceMaterialType.Abstract, candidate.Source, providerSourceId),
+            cancellationToken);
+
         if (_dbContext.SourceMaterials.Local.Any(material =>
             material.StudyId == studyId
             && material.Type == SourceMaterialType.Abstract
@@ -288,6 +293,15 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             SourceMaterialAccessStatus.Unknown,
             false,
             ["Abstract"]));
+    }
+
+    private static string CreateSourceMaterialLockKey(
+        Guid studyId,
+        SourceMaterialType type,
+        string provider,
+        string? providerSourceId)
+    {
+        return $"source-material:{studyId:N}:{type}:{provider}:{providerSourceId ?? "<null>"}";
     }
 
     private static Study CreateStudy(ScientificStudyCandidate candidate)

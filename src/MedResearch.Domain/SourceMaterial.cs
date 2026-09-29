@@ -65,14 +65,27 @@ public sealed class SourceMaterial
             throw new ArgumentOutOfRangeException(nameof(characterCount), "Source material character count must be positive.");
         }
 
+        var normalizedContent = NormalizeContent(content);
+        var normalizedContentHash = NormalizeRequired(contentHash, nameof(contentHash)).ToLowerInvariant();
+        var expectedContentHash = ComputeContentHash(normalizedContent);
+        if (!string.Equals(normalizedContentHash, expectedContentHash, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Source material content hash does not match the normalized content.", nameof(contentHash));
+        }
+
+        if (characterCount != normalizedContent.Length)
+        {
+            throw new ArgumentException("Source material character count does not match the normalized content.", nameof(characterCount));
+        }
+
         Id = id;
         StudyId = studyId;
         Type = type;
         Provider = NormalizeRequired(provider, nameof(provider));
         ProviderSourceId = NormalizeOptional(providerSourceId);
         RetrievalMethod = NormalizeRequired(retrievalMethod, nameof(retrievalMethod));
-        Content = NormalizeContent(content);
-        ContentHash = NormalizeRequired(contentHash, nameof(contentHash));
+        Content = normalizedContent;
+        ContentHash = normalizedContentHash;
         ContentVersion = contentVersion;
         RetrievedAt = retrievedAt;
         SourceUpdatedAt = sourceUpdatedAt;

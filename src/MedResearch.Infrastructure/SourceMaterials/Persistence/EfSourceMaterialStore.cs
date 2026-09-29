@@ -83,6 +83,10 @@ public sealed class EfSourceMaterialStore : ISourceMaterialStore
         var providerSourceId = string.IsNullOrWhiteSpace(candidate.ProviderSourceId)
             ? null
             : string.Join(' ', candidate.ProviderSourceId.Split(null as char[], StringSplitOptions.RemoveEmptyEntries));
+        await PostgreSqlAdvisoryLock.AcquireTransactionLockAsync(
+            _dbContext.Database,
+            CreateSourceMaterialLockKey(studyId, candidate.Type, candidate.Provider, providerSourceId),
+            cancellationToken);
 
         var existingSameVersion = await _dbContext.SourceMaterials
             .SingleOrDefaultAsync(material =>
@@ -148,5 +152,14 @@ public sealed class EfSourceMaterialStore : ISourceMaterialStore
             nextVersion > 1,
             sourceMaterial.ContentHash,
             sourceMaterial.ContentVersion);
+    }
+
+    private static string CreateSourceMaterialLockKey(
+        Guid studyId,
+        SourceMaterialType type,
+        string provider,
+        string? providerSourceId)
+    {
+        return $"source-material:{studyId:N}:{type}:{provider}:{providerSourceId ?? "<null>"}";
     }
 }

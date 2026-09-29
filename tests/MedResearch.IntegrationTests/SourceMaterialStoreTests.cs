@@ -48,6 +48,33 @@ public sealed class SourceMaterialStoreTests
     }
 
     [SkippableFact]
+    public async Task PersistSourceMaterialAsync_SerializesConcurrentVersionUpdates()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedDiscoveredStudyAsync("Abstract version one.");
+        var firstTask = PersistFromIndependentContextAsync(seed.StudyId, "Concurrent version one.");
+        var secondTask = PersistFromIndependentContextAsync(seed.StudyId, "Concurrent version two.");
+
+        var results = await Task.WhenAll(firstTask, secondTask);
+
+        Assert.All(results, result => Assert.True(result.Created || result.NewVersionCreated));
+
+        await using var verification = _fixture.CreateDbContext();
+        var versions = await verification.SourceMaterials
+            .Where(material => material.StudyId == seed.StudyId && material.Type == SourceMaterialType.Abstract)
+            .OrderBy(material => material.ContentVersion)
+            .ToArrayAsync(CancellationToken.None);
+
+        Assert.Equal(2, versions.Length);
+        Assert.Equal([1, 2], versions.Select(material => material.ContentVersion).ToArray());
+        Assert.Single(versions, material => material.IsCurrent);
+        Assert.All(versions, material => Assert.Equal(
+            SourceMaterial.ComputeContentHash(material.Content),
+            material.ContentHash));
+    }
+
+    [SkippableFact]
     public async Task FindStudiesForSourceAcquisitionAsync_DeduplicatesMultipleDiscoveryPaths()
     {
         SkipIfPostgreSqlUnavailable();
@@ -171,6 +198,13 @@ public sealed class SourceMaterialStoreTests
             SourceMaterialAccessStatus.Unknown,
             false,
             ["Abstract"]);
+    }
+
+    private async Task<SourceMaterialPersistenceResult> PersistFromIndependentContextAsync(Guid studyId, string content)
+    {
+        await using var context = _fixture.CreateDbContext();
+        var store = new EfSourceMaterialStore(context);
+        return await store.PersistSourceMaterialAsync(studyId, Candidate(content), CancellationToken.None);
     }
 
     private static string RandomPmid()

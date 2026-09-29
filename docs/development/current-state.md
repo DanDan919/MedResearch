@@ -2,6 +2,13 @@
 
 Date: 2026-09-29
 
+The F5 full-system adversarial verification is recorded in
+`docs/audits/f5-full-system-verification-ru.md`. It confirms the implemented
+pipeline and explicitly labels application-only versus database-enforced
+invariants. SourceMaterial constructors validate content hash/length, and
+source-material version writers serialize updates with a PostgreSQL transaction
+advisory lock.
+
 ## Exists Now
 
 - Initial repository documentation and development trail.

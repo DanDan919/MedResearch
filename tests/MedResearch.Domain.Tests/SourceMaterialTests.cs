@@ -68,6 +68,44 @@ public sealed class SourceMaterialTests
     }
 
     [Fact]
+    public void Constructor_RejectsHashOrCharacterCountThatDoesNotMatchContent()
+    {
+        var content = "Normalized content.";
+        var id = Guid.NewGuid();
+        var studyId = Guid.NewGuid();
+        var retrievedAt = DateTimeOffset.UtcNow;
+
+        SourceMaterial Create(string hash, int characterCount)
+        {
+            return new SourceMaterial(
+                id,
+                studyId,
+                SourceMaterialType.Abstract,
+                "PubMed",
+                "12345678",
+                "SearchMetadataAbstract",
+                content,
+                hash,
+                1,
+                retrievedAt,
+                null,
+                null,
+                null,
+                SourceMaterialAccessStatus.Unknown,
+                characterCount,
+                false,
+                true,
+                ["Abstract"]);
+        }
+
+        Assert.Throws<ArgumentException>(() => Create("0".PadLeft(64, '0'), content.Length));
+
+        Assert.Throws<ArgumentException>(() => Create(
+            SourceMaterial.ComputeContentHash(content),
+            content.Length - 1));
+    }
+
+    [Fact]
     public void MarkNotCurrent_PreservesHistoricalVersion()
     {
         var material = SourceMaterial.Create(
