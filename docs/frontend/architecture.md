@@ -36,7 +36,7 @@ Implemented routes:
 - `/` dashboard and backend-boundary overview.
 - `/research` real paginated run history through `GET /api/research`.
 - `/research/new` real `POST /api/research` create flow.
-- `/research/[id]` real `GET /api/research/{id}` status view with polling while non-terminal.
+- `/research/[id]` real `GET /api/research/{id}/progress` observability workspace with polling while non-terminal.
 - `/research/[id]/report` minimal report projection through `GET /api/research/{id}/report`.
 - `/studies` honest empty state because no study-browsing API exists.
 - `/settings` environment configuration summary.
@@ -56,7 +56,8 @@ The frontend consumes:
 - `POST /api/research`
 - `GET /api/research`
 - `GET /api/research/{researchRunId}`
+- `GET /api/research/{researchRunId}/progress`
 - `GET /api/research/{researchRunId}/report`
 - `GET /health/ready`
 
-Run history is paginated and status-filtered by the backend. The web app invalidates the history query after creating a new run and polls the list only while a returned run is non-terminal.
+Run history is paginated and status-filtered by the backend. The run detail workspace polls the progress endpoint only while a returned run is non-terminal. The frontend displays persisted counters and lease state but does not estimate percentages, ETA, failed stage, provider activity, evidence quality, or scientific/statistical values locally.

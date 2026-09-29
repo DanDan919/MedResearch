@@ -44,6 +44,7 @@ public static class ServiceCollectionExtensions
         services.AddDbContextFactory<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString), ServiceLifetime.Scoped);
 
         services.AddScoped<IResearchStore, EfResearchStore>();
+        services.AddScoped<IResearchProgressStore, EfResearchProgressStore>();
         services.AddScoped<IResearchRunQueue>(provider =>
             new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();

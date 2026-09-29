@@ -175,12 +175,50 @@ public sealed class ResearchApiTests
     }
 
     [Fact]
+    public async Task GetResearchProgress_WithExistingRun_ReturnsObservableProgress()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        var runId = Guid.NewGuid();
+        factory.Store.Seed(new ResearchRunDetails(
+            runId,
+            "Does progress endpoint expose persisted state?",
+            ResearchRunStatus.Queued.ToString(),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null));
+
+        var response = await client.GetAsync($"/api/research/{runId}/progress");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ResearchRunProgressResponse>();
+
+        Assert.NotNull(body);
+        Assert.Equal(runId, body.ResearchRunId);
+        Assert.Equal(ResearchRunStatus.Queued.ToString(), body.Status);
+        Assert.Equal("None", body.Processing.LeaseState);
+        Assert.Contains(body.Stages, stage => stage.Stage == ResearchRunStatus.Queued.ToString() && stage.State == "Current");
+    }
+
+    [Fact]
     public async Task GetResearch_WithUnknownRun_ReturnsNotFound()
     {
         using var factory = new ResearchApiFactory();
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync($"/api/research/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetResearchProgress_WithUnknownRun_ReturnsNotFound()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/research/{Guid.NewGuid()}/progress");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -290,8 +328,10 @@ public sealed class ResearchApiTests
             {
                 services.RemoveAll<IHostedService>();
                 services.RemoveAll<IResearchStore>();
+                services.RemoveAll<IResearchProgressStore>();
                 services.RemoveAll<IResearchReportStore>();
                 services.AddSingleton<IResearchStore>(Store);
+                services.AddSingleton<IResearchProgressStore>(Store);
                 services.AddSingleton<IResearchReportStore>(ReportStore);
             });
         }
@@ -324,6 +364,7 @@ public sealed class ResearchApiTests
         }
     }
     private sealed class InMemoryResearchStore : IResearchStore
+        , IResearchProgressStore
     {
         private readonly ConcurrentDictionary<Guid, ResearchRunDetails> _runs = [];
 
@@ -386,6 +427,48 @@ public sealed class ResearchApiTests
                 : (int)Math.Ceiling(filtered.Length / (double)pageSize);
 
             return Task.FromResult(new ResearchRunListResult(items, page, pageSize, filtered.Length, totalPages));
+        }
+
+        public Task<ResearchRunProgressSnapshot?> FindResearchRunProgressSnapshotAsync(
+            Guid researchRunId,
+            CancellationToken cancellationToken)
+        {
+            if (!_runs.TryGetValue(researchRunId, out var run))
+            {
+                return Task.FromResult<ResearchRunProgressSnapshot?>(null);
+            }
+
+            return Task.FromResult<ResearchRunProgressSnapshot?>(new ResearchRunProgressSnapshot(
+                run.ResearchRunId,
+                run.Question,
+                Enum.Parse<ResearchRunStatus>(run.Status),
+                run.CreatedAt,
+                run.StartedAt,
+                run.CompletedAt,
+                run.FailureReason,
+                null,
+                null,
+                0,
+                new ResearchRunProgressMetrics(
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0)));
         }
     }
 }

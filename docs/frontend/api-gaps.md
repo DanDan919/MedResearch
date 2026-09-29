@@ -11,6 +11,14 @@ F2 adds a real paginated run-history endpoint:
 
 The `/research` route now renders backend-backed research history. It does not synthesize local history from detail endpoints or browser state.
 
+## Resolved Run Progress
+
+F3 adds a persisted run-progress endpoint:
+
+- `GET /api/research/{researchRunId}/progress`
+
+The `/research/[id]` route now renders a backend-backed execution observatory with pipeline stages, persisted counters, processing lease state, timestamps, and safe failure state. It does not invent percentages, ETA, live provider status, or a failed stage that the backend has not persisted.
+
 ## Missing Study Browser
 
 The backend persists `Study`, `LiteratureSearch`, and `ResearchStudyDiscovery`, but does not expose a study list/search/detail API for the frontend. The `/studies` route renders an honest API-gap state.

@@ -17,6 +17,7 @@ export type {
   ProblemDetails,
   ResearchRunListFilters,
   ResearchRunListResponse,
+  ResearchRunProgressResponse,
   ResearchReportResponse,
   ResearchRunResponse,
   ResearchRunSummaryResponse,

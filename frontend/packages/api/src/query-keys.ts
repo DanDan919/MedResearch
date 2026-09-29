@@ -16,6 +16,7 @@ export const queryKeys = {
       return ["research", "list", normalized.page, normalized.pageSize, normalized.status] as const;
     },
     detail: (researchRunId: string) => ["research", researchRunId] as const,
+    progress: (researchRunId: string) => ["research", researchRunId, "progress"] as const,
     report: (researchRunId: string) => ["research", researchRunId, "report"] as const
   }
 };

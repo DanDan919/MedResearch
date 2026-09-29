@@ -144,6 +144,40 @@
         }
       }
     },
+    "/api/research/{researchRunId}/progress": {
+      "get": {
+        "operationId": "getResearchProgress",
+        "parameters": [
+          {
+            "name": "researchRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted research run progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunProgressResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "500": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
     "/api/research/{researchRunId}/report": {
       "get": {
         "operationId": "getResearchReport",
@@ -320,6 +354,124 @@
       "ResearchRunStatus": {
         "type": "string",
         "enum": ["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]
+      },
+      "ResearchRunProgressResponse": {
+        "type": "object",
+        "required": [
+          "researchRunId",
+          "question",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "failureReason",
+          "refreshedAt",
+          "processing",
+          "metrics",
+          "stages"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "researchRunId": { "type": "string", "format": "uuid" },
+          "question": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/ResearchRunStatus" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "startedAt": { "type": ["string", "null"], "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "failureReason": { "type": ["string", "null"] },
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "processing": { "$ref": "#/components/schemas/ResearchRunProcessingProgressResponse" },
+          "metrics": { "$ref": "#/components/schemas/ResearchRunProgressMetricsResponse" },
+          "stages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ResearchRunStageProgressResponse" }
+          }
+        }
+      },
+      "ResearchRunProcessingProgressResponse": {
+        "type": "object",
+        "required": ["leaseState", "leaseExpiresAt", "lastHeartbeatAt", "leaseVersion"],
+        "additionalProperties": false,
+        "properties": {
+          "leaseState": {
+            "type": "string",
+            "enum": ["None", "Active", "Expired", "Terminal"]
+          },
+          "leaseExpiresAt": { "type": ["string", "null"], "format": "date-time" },
+          "lastHeartbeatAt": { "type": ["string", "null"], "format": "date-time" },
+          "leaseVersion": { "type": "integer", "format": "int64" }
+        }
+      },
+      "ResearchRunProgressMetricsResponse": {
+        "type": "object",
+        "required": [
+          "researchPlanCount",
+          "plannedSearchQueryCount",
+          "literatureSearchCount",
+          "literatureSearchSourceCount",
+          "literatureSearchResultCount",
+          "discoveryPathCount",
+          "distinctDiscoveredStudyCount",
+          "currentSourceMaterialCount",
+          "structuredFullTextMaterialCount",
+          "abstractMaterialCount",
+          "evidenceExtractionCount",
+          "completedEvidenceExtractionCount",
+          "skippedEvidenceExtractionCount",
+          "evidenceFindingCount",
+          "evidenceEvaluationCount",
+          "completedEvidenceEvaluationCount",
+          "skippedEvidenceEvaluationCount",
+          "researchReportCount",
+          "researchReportClaimCount"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "researchPlanCount": { "type": "integer" },
+          "plannedSearchQueryCount": { "type": "integer" },
+          "literatureSearchCount": { "type": "integer" },
+          "literatureSearchSourceCount": { "type": "integer" },
+          "literatureSearchResultCount": { "type": "integer" },
+          "discoveryPathCount": { "type": "integer" },
+          "distinctDiscoveredStudyCount": { "type": "integer" },
+          "currentSourceMaterialCount": { "type": "integer" },
+          "structuredFullTextMaterialCount": { "type": "integer" },
+          "abstractMaterialCount": { "type": "integer" },
+          "evidenceExtractionCount": { "type": "integer" },
+          "completedEvidenceExtractionCount": { "type": "integer" },
+          "skippedEvidenceExtractionCount": { "type": "integer" },
+          "evidenceFindingCount": { "type": "integer" },
+          "evidenceEvaluationCount": { "type": "integer" },
+          "completedEvidenceEvaluationCount": { "type": "integer" },
+          "skippedEvidenceEvaluationCount": { "type": "integer" },
+          "researchReportCount": { "type": "integer" },
+          "researchReportClaimCount": { "type": "integer" }
+        }
+      },
+      "ResearchRunStageProgressResponse": {
+        "type": "object",
+        "required": ["stage", "state", "metrics"],
+        "additionalProperties": false,
+        "properties": {
+          "stage": { "$ref": "#/components/schemas/ResearchRunStatus" },
+          "state": {
+            "type": "string",
+            "enum": ["Pending", "Current", "Completed"]
+          },
+          "metrics": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ResearchRunProgressMetricResponse" }
+          }
+        }
+      },
+      "ResearchRunProgressMetricResponse": {
+        "type": "object",
+        "required": ["label", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "value": { "type": "integer" }
+        }
       },
       "ResearchReportResponse": {
         "type": "object",

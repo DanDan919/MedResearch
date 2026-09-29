@@ -29,6 +29,54 @@ public sealed record ResearchRunListResponse(
     int PageSize,
     int TotalCount,
     int TotalPages);
+
+public sealed record ResearchRunProgressResponse(
+    Guid ResearchRunId,
+    string Question,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? CompletedAt,
+    string? FailureReason,
+    DateTimeOffset RefreshedAt,
+    ResearchRunProcessingProgressResponse Processing,
+    ResearchRunProgressMetricsResponse Metrics,
+    IReadOnlyCollection<ResearchRunStageProgressResponse> Stages);
+
+public sealed record ResearchRunProcessingProgressResponse(
+    string LeaseState,
+    DateTimeOffset? LeaseExpiresAt,
+    DateTimeOffset? LastHeartbeatAt,
+    long LeaseVersion);
+
+public sealed record ResearchRunProgressMetricsResponse(
+    int ResearchPlanCount,
+    int PlannedSearchQueryCount,
+    int LiteratureSearchCount,
+    int LiteratureSearchSourceCount,
+    int LiteratureSearchResultCount,
+    int DiscoveryPathCount,
+    int DistinctDiscoveredStudyCount,
+    int CurrentSourceMaterialCount,
+    int StructuredFullTextMaterialCount,
+    int AbstractMaterialCount,
+    int EvidenceExtractionCount,
+    int CompletedEvidenceExtractionCount,
+    int SkippedEvidenceExtractionCount,
+    int EvidenceFindingCount,
+    int EvidenceEvaluationCount,
+    int CompletedEvidenceEvaluationCount,
+    int SkippedEvidenceEvaluationCount,
+    int ResearchReportCount,
+    int ResearchReportClaimCount);
+
+public sealed record ResearchRunStageProgressResponse(
+    string Stage,
+    string State,
+    IReadOnlyCollection<ResearchRunProgressMetricResponse> Metrics);
+
+public sealed record ResearchRunProgressMetricResponse(string Label, int Value);
+
 public sealed record ResearchReportResponse(
     Guid ResearchRunId,
     Guid ResearchReportId,

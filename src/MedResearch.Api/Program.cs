@@ -164,6 +164,29 @@ research.MapGet("/{researchRunId:guid}", async (
     .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
+research.MapGet("/{researchRunId:guid}/progress", async (
+        Guid researchRunId,
+        GetResearchProgressUseCase useCase,
+        CancellationToken cancellationToken) =>
+    {
+        var result = await useCase.ExecuteAsync(researchRunId, cancellationToken);
+
+        if (result is null)
+        {
+            return Results.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Research run not found"
+            });
+        }
+
+        return Results.Ok(ToProgressResponse(result));
+    })
+    .WithName("GetResearchProgress")
+    .Produces<ResearchRunProgressResponse>(StatusCodes.Status200OK)
+    .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+    .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
+
 
 research.MapGet("/{researchRunId:guid}/report", async (
         Guid researchRunId,
@@ -252,6 +275,50 @@ static ResearchReportResponse ToReportResponse(ResearchReportReadModel report)
                 citation.SupportingText,
                 citation.EvidenceDirection.ToString(),
                 citation.Ordinal)).ToArray())).ToArray());
+}
+
+static ResearchRunProgressResponse ToProgressResponse(ResearchRunProgress progress)
+{
+    return new ResearchRunProgressResponse(
+        progress.ResearchRunId,
+        progress.Question,
+        progress.Status,
+        progress.CreatedAt,
+        progress.StartedAt,
+        progress.CompletedAt,
+        progress.FailureReason,
+        progress.RefreshedAt,
+        new ResearchRunProcessingProgressResponse(
+            progress.Processing.LeaseState,
+            progress.Processing.LeaseExpiresAt,
+            progress.Processing.LastHeartbeatAt,
+            progress.Processing.LeaseVersion),
+        new ResearchRunProgressMetricsResponse(
+            progress.Metrics.ResearchPlanCount,
+            progress.Metrics.PlannedSearchQueryCount,
+            progress.Metrics.LiteratureSearchCount,
+            progress.Metrics.LiteratureSearchSourceCount,
+            progress.Metrics.LiteratureSearchResultCount,
+            progress.Metrics.DiscoveryPathCount,
+            progress.Metrics.DistinctDiscoveredStudyCount,
+            progress.Metrics.CurrentSourceMaterialCount,
+            progress.Metrics.StructuredFullTextMaterialCount,
+            progress.Metrics.AbstractMaterialCount,
+            progress.Metrics.EvidenceExtractionCount,
+            progress.Metrics.CompletedEvidenceExtractionCount,
+            progress.Metrics.SkippedEvidenceExtractionCount,
+            progress.Metrics.EvidenceFindingCount,
+            progress.Metrics.EvidenceEvaluationCount,
+            progress.Metrics.CompletedEvidenceEvaluationCount,
+            progress.Metrics.SkippedEvidenceEvaluationCount,
+            progress.Metrics.ResearchReportCount,
+            progress.Metrics.ResearchReportClaimCount),
+        progress.Stages.Select(stage => new ResearchRunStageProgressResponse(
+            stage.Stage,
+            stage.State,
+            stage.Metrics.Select(metric => new ResearchRunProgressMetricResponse(
+                metric.Label,
+                metric.Value)).ToArray())).ToArray());
 }
 public partial class Program
 {

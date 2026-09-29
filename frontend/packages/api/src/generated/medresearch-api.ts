@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/{researchRunId}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getResearchProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research/{researchRunId}/report": {
         parameters: {
             query?: never;
@@ -133,6 +149,65 @@ export interface components {
         };
         /** @enum {string} */
         ResearchRunStatus: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+        ResearchRunProgressResponse: {
+            /** Format: uuid */
+            researchRunId: string;
+            question: string;
+            status: components["schemas"]["ResearchRunStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            failureReason: string | null;
+            /** Format: date-time */
+            refreshedAt: string;
+            processing: components["schemas"]["ResearchRunProcessingProgressResponse"];
+            metrics: components["schemas"]["ResearchRunProgressMetricsResponse"];
+            stages: components["schemas"]["ResearchRunStageProgressResponse"][];
+        };
+        ResearchRunProcessingProgressResponse: {
+            /** @enum {string} */
+            leaseState: "None" | "Active" | "Expired" | "Terminal";
+            /** Format: date-time */
+            leaseExpiresAt: string | null;
+            /** Format: date-time */
+            lastHeartbeatAt: string | null;
+            /** Format: int64 */
+            leaseVersion: number;
+        };
+        ResearchRunProgressMetricsResponse: {
+            researchPlanCount: number;
+            plannedSearchQueryCount: number;
+            literatureSearchCount: number;
+            literatureSearchSourceCount: number;
+            literatureSearchResultCount: number;
+            discoveryPathCount: number;
+            distinctDiscoveredStudyCount: number;
+            currentSourceMaterialCount: number;
+            structuredFullTextMaterialCount: number;
+            abstractMaterialCount: number;
+            evidenceExtractionCount: number;
+            completedEvidenceExtractionCount: number;
+            skippedEvidenceExtractionCount: number;
+            evidenceFindingCount: number;
+            evidenceEvaluationCount: number;
+            completedEvidenceEvaluationCount: number;
+            skippedEvidenceEvaluationCount: number;
+            researchReportCount: number;
+            researchReportClaimCount: number;
+        };
+        ResearchRunStageProgressResponse: {
+            stage: components["schemas"]["ResearchRunStatus"];
+            /** @enum {string} */
+            state: "Pending" | "Current" | "Completed";
+            metrics: components["schemas"]["ResearchRunProgressMetricResponse"][];
+        };
+        ResearchRunProgressMetricResponse: {
+            label: string;
+            value: number;
+        };
         ResearchReportResponse: {
             /** Format: uuid */
             researchRunId: string;
@@ -333,6 +408,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResearchRunResponse"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            500: components["responses"]["Problem"];
+        };
+    };
+    getResearchProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Persisted research run progress */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchRunProgressResponse"];
                 };
             };
             404: components["responses"]["Problem"];

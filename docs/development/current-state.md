@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-09-17
+Date: 2026-09-29
 
 ## Exists Now
 
@@ -34,6 +34,7 @@ Date: 2026-09-17
   - `POST /api/research` creates a `ResearchQuestion` and queued `ResearchRun`.
   - `GET /api/research` retrieves paginated research run history with optional exact status filtering.
   - `GET /api/research/{researchRunId}` retrieves the run state and original question.
+  - `GET /api/research/{researchRunId}/progress` retrieves persisted execution progress, processing lease state, stage states, and run-scoped counters without invented percentages or ETA.
   - `GET /api/research/{researchRunId}/report` retrieves the persisted synthesis report when ready.
   - API endpoints call Application use cases and do not query EF directly.
   - Invalid input, missing runs, and unexpected failures are returned as Problem Details.
@@ -105,6 +106,7 @@ Date: 2026-09-17
   - Persisted ResearchReport synthesis remains narrative and traceable; deterministic common/fixed-effect, REML random-effects Wald pooled ratio results, canonical HKSJ summary-effect inference, and random-effects prediction intervals may be supplied as bounded context, but no automatic model selection, modified/ad-hoc HKSJ, vote counting, formal GRADE, formal RoB, diagnosis, or treatment recommendation is produced.
 - Application persistence boundaries:
   - `IResearchStore` for HTTP create/read use cases.
+  - `IResearchProgressStore` for persisted execution-progress read models.
   - `IResearchRunQueue` for worker claim/progress/failure operations.
   - `IResearchPlanStore` for accepted ResearchPlan persistence and lookup.
   - `IScientificSearchResultStore` for normalized scientific candidates, search provenance, and discovery links.
@@ -168,10 +170,10 @@ Date: 2026-09-17
   - `SynthesisConfidence`
 - Tests:
   - Domain unit tests for question validation, research run lifecycle behavior, and representative invalid transition matrix checks.
-  - Application tests for queued run creation, retrieval miss, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, provider failure propagation, and source-level architecture boundaries for Domain/Application.
+  - Application tests for queued run creation, retrieval miss, progress stage/lease read-model semantics, processing orchestration, planner validation, original-question preservation, planning failure, search behavior, evidence extraction validation, grounding, numeric grounding, skips, deduplication, evidence evaluation validation, source-awareness, no-score enforcement, synthesis context construction, synthesis validation, conflict preservation, insufficient-evidence reports, cancellation, provider failure propagation, and source-level architecture boundaries for Domain/Application.
   - Infrastructure tests for OpenAI Responses API request/response mapping and PubMed parsing/fake HTTP behavior, including request parameters, optional API key handling, batching, retry, cancellation, XML edge cases, and DOI/PMID normalization; Europe PMC fake HTTP behavior, including request parameters, cursor pagination, retry, cancellation, malformed JSON, mapping, deduplication, and PMID/PMCID/DOI normalization.
   - API integration tests using `WebApplicationFactory` and fake stores, so endpoint behavior runs without Docker and does not start hosted services.
-  - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, PMCID identity, hard multi-identifier conflicts, multi-source discovery provenance, extraction deduplication after repeated discovery, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
+  - PostgreSQL integration tests using Testcontainers for research persistence, multiple ResearchRuns per ResearchQuestion, queue semantics, lease recovery, heartbeat, stale-owner fencing, plan/search persistence, multi-search discovery provenance, conservative Study identity edge cases, PMCID identity, hard multi-identifier conflicts, multi-source discovery provenance, extraction deduplication after repeated discovery, persisted progress counters, evidence extraction persistence, evidence evaluation persistence, report persistence, report relationships, idempotency, authoritative citation reconstruction, shared-Study/run-scoped Evidence citation graphs, fresh migration application, current-run corpus loading, and a full fake-provider vertical pipeline. They run against real PostgreSQL when Docker is reachable and are currently skipped locally because the Docker Desktop engine is unavailable. They do not fall back to EF Core InMemory.
   - GitHub Actions CI requires Docker-backed Testcontainers tests with `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` and fails on unexpected skipped tests in required-Docker mode.
 
 ## Environment Status
@@ -293,6 +295,19 @@ Changes from the audit were deliberately test-focused:
 - recorded the verification matrix in `docs/development/milestone-21-verification-ru.md`.
 
 No production behavior, schema, provider, quantitative semantics, or Docker configuration changed in this milestone.
+
+## Frontend F3 Research Execution Observatory
+
+F3 adds a backend-backed progress read model and upgrades `/research/[id]` from a simple status page into a live execution observatory.
+
+- Backend endpoint: `GET /api/research/{researchRunId}/progress`.
+- Application boundary: `GetResearchProgressUseCase` + `IResearchProgressStore`.
+- Infrastructure implementation: `EfResearchProgressStore`, which projects only persisted facts from PostgreSQL.
+- Frontend uses the generated OpenAPI contract, `MedResearchApiClient.getResearchProgress`, TanStack Query polling while non-terminal, and Zod response validation.
+- The page shows pipeline stage states, persisted counters, run timestamps, processing lease state, and safe failure information.
+- It deliberately does not show percentages, ETA, live provider activity, local scientific calculations, or a guessed failed stage.
+- No database schema change was added. Failure stage remains not persisted; failure is displayed as terminal run state with safe failure reason.
+- SourceMaterial is global per Study, so progress counts current source material available for the Studies discovered by the run.
 ## Canonical HKSJ Summary-Effect Inference V1
 
 Milestone 23 adds `HksjSummaryEffectInferenceCalculator` as a deterministic Application read model nested under each successful M22 random-effects result.

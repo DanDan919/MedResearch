@@ -40,6 +40,7 @@ Implemented use cases are:
 
 - `CreateResearchUseCase`: validates and records a research question, creates a linked queued `ResearchRun`, and logs the created run.
 - `GetResearchUseCase`: retrieves a research run projection for API readback.
+- `GetResearchProgressUseCase`: builds a truthful execution-progress read model from persisted run state and counters without estimating percentages, ETA, live provider activity, or a failed stage that is not stored.
 - `ResearchRunProcessor`: claims one queued run and advances it through the existing domain lifecycle.
 - `ResearchPlanner`: sends the current question through a provider-neutral structured LLM boundary, validates the result, and persists an accepted `ResearchPlan`.
 - `ScientificResearchStageExecutor`: performs structured planning during `Planning`, multi-source scientific retrieval during `Searching`, source-grounded abstract evidence extraction during `Extracting`, structured source-aware methodological assessment during `Evaluating`, and traceable report generation during `Synthesizing`.
@@ -47,6 +48,7 @@ Implemented use cases are:
 Application defines ports that reflect current use cases:
 
 - `IResearchStore`: create/read boundary for the HTTP research API.
+- `IResearchProgressStore`: read boundary for persisted execution progress and run-scoped counters.
 - `IResearchRunQueue`: worker-specific boundary for claiming queued runs and persisting progress/failure state.
 - `IStructuredLlmClient`: provider-neutral boundary for strict structured generation.
 - `IResearchPlanStore`: persistence boundary for accepted research plans.
@@ -70,12 +72,15 @@ The API currently exposes:
 
 - `POST /api/research`: accepts a question and returns `201 Created` with the queued research run id. It does not wait for background processing.
 - `GET /api/research/{researchRunId}`: returns the run state and original question, including `Failed` state and safe failure reason when present, or `404` when the run does not exist.
+- `GET /api/research/{researchRunId}/progress`: returns a persisted progress observability read model with run status, timestamps, safe failure reason, lease state, stage states, and persisted counters for planning, searching, source material, extraction, evaluation, and synthesis artifacts. It deliberately does not expose fake percentages, ETA, live external-provider status, or a guessed failed stage.
 - `GET /api/research/{researchRunId}/report`: returns the persisted synthesis report with coverage, limitations, claims, and authoritative citations; returns `404` for unknown runs and `409` when the run exists but no report is ready.
 - `GET /health`: runs standard ASP.NET Core health checks, including the PostgreSQL DbContext check.
 - `GET /health/live`: liveness check that does not depend on PostgreSQL, OpenAI, PubMed, or other external providers.
 - `GET /health/ready`: readiness check that includes PostgreSQL connectivity.
 
 Validation and unexpected failures are returned as Problem Details. Internal exception details are logged but not exposed in server-error responses.
+
+The progress read model is observational. `ResearchRun.Status` remains the authoritative lifecycle value. The stage list is derived from that status plus persisted output counts. For terminal failures the system stores a safe failure reason and terminal timestamp, but it does not currently persist the exact failed stage; the API and frontend therefore show the failure separately instead of inventing a failed stage. SourceMaterial is shared by `Study`, so progress counts current source material available for the Studies discovered by the run.
 
 ## Background Processing
 

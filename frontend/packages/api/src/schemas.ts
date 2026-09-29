@@ -46,6 +46,56 @@ export const researchRunListResponseSchema = z.object({
   totalPages: z.number()
 });
 
+export const researchRunProgressMetricSchema = z.object({
+  label: z.string(),
+  value: z.number()
+});
+
+export const researchRunStageProgressSchema = z.object({
+  stage: researchRunStatusSchema,
+  state: z.enum(["Pending", "Current", "Completed"]),
+  metrics: z.array(researchRunProgressMetricSchema)
+});
+
+export const researchRunProgressResponseSchema = z.object({
+  researchRunId: z.string().uuid(),
+  question: z.string(),
+  status: researchRunStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  failureReason: z.string().nullable(),
+  refreshedAt: z.string(),
+  processing: z.object({
+    leaseState: z.enum(["None", "Active", "Expired", "Terminal"]),
+    leaseExpiresAt: z.string().nullable(),
+    lastHeartbeatAt: z.string().nullable(),
+    leaseVersion: z.number()
+  }),
+  metrics: z.object({
+    researchPlanCount: z.number(),
+    plannedSearchQueryCount: z.number(),
+    literatureSearchCount: z.number(),
+    literatureSearchSourceCount: z.number(),
+    literatureSearchResultCount: z.number(),
+    discoveryPathCount: z.number(),
+    distinctDiscoveredStudyCount: z.number(),
+    currentSourceMaterialCount: z.number(),
+    structuredFullTextMaterialCount: z.number(),
+    abstractMaterialCount: z.number(),
+    evidenceExtractionCount: z.number(),
+    completedEvidenceExtractionCount: z.number(),
+    skippedEvidenceExtractionCount: z.number(),
+    evidenceFindingCount: z.number(),
+    evidenceEvaluationCount: z.number(),
+    completedEvidenceEvaluationCount: z.number(),
+    skippedEvidenceEvaluationCount: z.number(),
+    researchReportCount: z.number(),
+    researchReportClaimCount: z.number()
+  }),
+  stages: z.array(researchRunStageProgressSchema)
+});
+
 export const researchReportCitationSchema = z.object({
   evidenceId: z.string().uuid(),
   studyId: z.string().uuid(),

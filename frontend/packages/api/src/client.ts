@@ -2,6 +2,7 @@ import { normalizeApiBaseUrl } from "./config";
 import { createApiError, MedResearchApiError } from "./errors";
 import {
   createResearchResponseSchema,
+  researchRunProgressResponseSchema,
   researchRunListResponseSchema,
   researchReportResponseSchema,
   researchRunResponseSchema
@@ -13,6 +14,7 @@ import type {
   ResearchReportResponse,
   ResearchRunListFilters,
   ResearchRunListResponse,
+  ResearchRunProgressResponse,
   ResearchRunResponse
 } from "./types";
 
@@ -88,6 +90,21 @@ export class MedResearchApiClient {
     return this.requestJson(
       `/api/research/${encodeURIComponent(researchRunId)}`,
       researchRunResponseSchema.parse,
+      {
+        method: "GET",
+        signal,
+        headers: { Accept: "application/json" }
+      }
+    );
+  }
+
+  public async getResearchProgress(
+    researchRunId: string,
+    signal?: AbortSignal
+  ): Promise<ResearchRunProgressResponse> {
+    return this.requestJson(
+      `/api/research/${encodeURIComponent(researchRunId)}/progress`,
+      researchRunProgressResponseSchema.parse,
       {
         method: "GET",
         signal,

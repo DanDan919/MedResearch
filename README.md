@@ -6,7 +6,7 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities and Europe PMC REST search, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, a truthful persisted progress endpoint for research execution observability, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities and Europe PMC REST search, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
 A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one selected SourceMaterial snapshot and study metadata to the configured OpenAI provider, validates strict structured output, and persists source-grounded evidence with explicit source scope. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, modified/ad-hoc HKSJ, forest plots, formal GRADE, or formal risk-of-bias frameworks. It now includes narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval quantitative synthesis read models for eligible compatible ratio-measure evidence.
 
@@ -152,6 +152,14 @@ GET /api/research/{researchRunId}
 ```
 
 The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
+
+Retrieve persisted execution progress:
+
+```text
+GET /api/research/{researchRunId}/progress
+```
+
+The progress endpoint returns the run status, timestamps, safe failure reason, processing lease state, persisted stage states, and counters for plans, searches, discovery paths, distinct studies, source material, extraction, evidence, evaluation, reports, and claims. It does not return invented percentages, ETA, live provider activity, or guessed failed-stage labels. SourceMaterial is global per Study, so progress counts current source material available for Studies discovered by the run rather than claiming that every source snapshot was acquired uniquely by that run.
 
 Retrieve the persisted synthesis report:
 
