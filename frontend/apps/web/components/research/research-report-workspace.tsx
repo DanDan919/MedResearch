@@ -5,13 +5,14 @@ import { ArrowLeft, ExternalLink, FileText, Printer, ShieldCheck } from "lucide-
 import { MedResearchApiError } from "@medresearch/api";
 import type { ResearchReportResponse } from "@medresearch/api";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@medresearch/ui";
-import { useResearchReport } from "../../lib/api";
+import { useResearchQuantitative, useResearchReport } from "../../lib/api";
 import { ErrorPanel, LoadingPanel } from "../state-panel";
 
 type Citation = ResearchReportResponse["claims"][number]["citations"][number];
 
 export function ResearchReportWorkspace({ researchRunId }: { researchRunId: string }) {
   const query = useResearchReport(researchRunId, true);
+  const quantitativeQuery = useResearchQuantitative(researchRunId, query.isSuccess);
 
   if (query.isLoading) return <LoadingPanel title="Loading report" />;
   if (query.isError || !query.data) return <ReportError error={query.error} />;
@@ -38,6 +39,7 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={report.status === "Completed" ? "success" : "warning"}>{report.status}</Badge>
           <p className="text-xs text-muted-foreground">Generated {formatTimestamp(report.generatedAt)}</p>
+          {quantitativeQuery.data && quantitativeQuery.data.length > 0 ? <Button asChild variant="secondary" size="sm"><Link href={`/research/${researchRunId}/quantitative`}>Quantitative results</Link></Button> : null}
         </div>
       </header>
 

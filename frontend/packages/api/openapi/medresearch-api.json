@@ -697,11 +697,116 @@
           "reportedScaleEffect": { "type": ["number", "null"] },
           "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
           "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "heterogeneityDiagnostics": { "type": ["object", "null"], "additionalProperties": true },
-          "betweenStudyVariance": { "type": ["object", "null"], "additionalProperties": true },
-          "randomEffects": { "type": ["object", "null"], "additionalProperties": true },
+          "heterogeneityDiagnostics": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeHeterogeneityDiagnostics" }, { "type": "null" }] },
+          "betweenStudyVariance": { "oneOf": [{ "$ref": "#/components/schemas/BetweenStudyVarianceEstimate" }, { "type": "null" }] },
+          "randomEffects": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeRandomEffectsSynthesisResult" }, { "type": "null" }] },
           "contributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeSynthesisContribution" } },
           "rejectionReasons": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "QuantitativeHeterogeneityDiagnostics": {
+        "type": "object",
+        "required": ["cochransQ", "degreesOfFreedom", "iSquared", "studyCount", "algorithmVersion"],
+        "additionalProperties": false,
+        "properties": {
+          "cochransQ": { "type": "number" },
+          "degreesOfFreedom": { "type": "integer" },
+          "iSquared": { "type": "number" },
+          "studyCount": { "type": "integer" },
+          "algorithmVersion": { "type": "string" }
+        }
+      },
+      "BetweenStudyVarianceEstimate": {
+        "type": "object",
+        "required": ["tauSquared", "estimator", "status", "algorithmVersion", "studyCount", "converged", "iterationCount", "failureReason"],
+        "additionalProperties": false,
+        "properties": {
+          "tauSquared": { "type": ["number", "null"] },
+          "estimator": { "type": "integer" },
+          "status": { "type": "integer" },
+          "algorithmVersion": { "type": "string" },
+          "studyCount": { "type": "integer" },
+          "converged": { "type": "boolean" },
+          "iterationCount": { "type": "integer" },
+          "failureReason": { "type": ["integer", "null"] }
+        }
+      },
+      "QuantitativeRandomEffectsSynthesisResult": {
+        "type": "object",
+        "required": ["status", "method", "algorithmVersion", "confidenceIntervalMethod", "outputConfidenceLevel", "tauSquared", "tauSquaredEstimator", "tauSquaredAlgorithmVersion", "studyCount", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "hksjInference", "predictionInterval", "contributions", "failureReasons"],
+        "additionalProperties": false,
+        "properties": {
+          "status": { "type": "integer" },
+          "method": { "type": "integer" },
+          "algorithmVersion": { "type": "string" },
+          "confidenceIntervalMethod": { "type": "integer" },
+          "outputConfidenceLevel": { "type": "number" },
+          "tauSquared": { "type": ["number", "null"] },
+          "tauSquaredEstimator": { "type": "integer" },
+          "tauSquaredAlgorithmVersion": { "type": "string" },
+          "studyCount": { "type": "integer" },
+          "analysisScaleEffect": { "type": ["number", "null"] },
+          "analysisScaleVariance": { "type": ["number", "null"] },
+          "analysisScaleStandardError": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "reportedScaleEffect": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "hksjInference": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeHksjInferenceResult" }, { "type": "null" }] },
+          "predictionInterval": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativePredictionIntervalResult" }, { "type": "null" }] },
+          "contributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeSynthesisContribution" } },
+          "failureReasons": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "QuantitativeHksjInferenceResult": {
+        "type": "object",
+        "required": ["status", "confidenceIntervalMethod", "algorithmVersion", "outputConfidenceLevel", "studyCount", "degreesOfFreedom", "varianceAdjustment", "criticalValue", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "failureReasons"],
+        "additionalProperties": false,
+        "properties": {
+          "status": { "type": "integer" },
+          "confidenceIntervalMethod": { "type": "integer" },
+          "algorithmVersion": { "type": "string" },
+          "outputConfidenceLevel": { "type": "number" },
+          "studyCount": { "type": "integer" },
+          "degreesOfFreedom": { "type": ["integer", "null"] },
+          "varianceAdjustment": { "type": ["number", "null"] },
+          "criticalValue": { "type": ["number", "null"] },
+          "analysisScaleEffect": { "type": ["number", "null"] },
+          "analysisScaleVariance": { "type": ["number", "null"] },
+          "analysisScaleStandardError": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "reportedScaleEffect": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
+          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
+          "failureReasons": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "QuantitativePredictionIntervalResult": {
+        "type": "object",
+        "required": ["status", "method", "algorithmVersion", "outputConfidenceLevel", "studyCount", "degreesOfFreedom", "tauSquared", "summaryEffectVariance", "summaryEffectStandardError", "predictionVariance", "predictionStandardError", "criticalValue", "analysisScaleEffect", "analysisScaleLower", "analysisScaleUpper", "reportedScaleEffect", "reportedScaleLower", "reportedScaleUpper", "failureReasons"],
+        "additionalProperties": false,
+        "properties": {
+          "status": { "type": "integer" },
+          "method": { "type": "integer" },
+          "algorithmVersion": { "type": "string" },
+          "outputConfidenceLevel": { "type": "number" },
+          "studyCount": { "type": "integer" },
+          "degreesOfFreedom": { "type": ["integer", "null"] },
+          "tauSquared": { "type": ["number", "null"] },
+          "summaryEffectVariance": { "type": ["number", "null"] },
+          "summaryEffectStandardError": { "type": ["number", "null"] },
+          "predictionVariance": { "type": ["number", "null"] },
+          "predictionStandardError": { "type": ["number", "null"] },
+          "criticalValue": { "type": ["number", "null"] },
+          "analysisScaleEffect": { "type": ["number", "null"] },
+          "analysisScaleLower": { "type": ["number", "null"] },
+          "analysisScaleUpper": { "type": ["number", "null"] },
+          "reportedScaleEffect": { "type": ["number", "null"] },
+          "reportedScaleLower": { "type": ["number", "null"] },
+          "reportedScaleUpper": { "type": ["number", "null"] },
+          "failureReasons": { "type": "array", "items": { "type": "integer" } }
         }
       },
       "QuantitativeSynthesisContribution": {

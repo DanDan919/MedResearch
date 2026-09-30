@@ -352,17 +352,91 @@ export interface components {
             reportedScaleEffect: number | null;
             reportedScaleConfidenceIntervalLower: number | null;
             reportedScaleConfidenceIntervalUpper: number | null;
-            heterogeneityDiagnostics: {
-                [key: string]: unknown;
-            } | null;
-            betweenStudyVariance: {
-                [key: string]: unknown;
-            } | null;
-            randomEffects: {
-                [key: string]: unknown;
-            } | null;
+            heterogeneityDiagnostics: components["schemas"]["QuantitativeHeterogeneityDiagnostics"] | null;
+            betweenStudyVariance: components["schemas"]["BetweenStudyVarianceEstimate"] | null;
+            randomEffects: components["schemas"]["QuantitativeRandomEffectsSynthesisResult"] | null;
             contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
             rejectionReasons: number[];
+        };
+        QuantitativeHeterogeneityDiagnostics: {
+            cochransQ: number;
+            degreesOfFreedom: number;
+            iSquared: number;
+            studyCount: number;
+            algorithmVersion: string;
+        };
+        BetweenStudyVarianceEstimate: {
+            tauSquared: number | null;
+            estimator: number;
+            status: number;
+            algorithmVersion: string;
+            studyCount: number;
+            converged: boolean;
+            iterationCount: number;
+            failureReason: number | null;
+        };
+        QuantitativeRandomEffectsSynthesisResult: {
+            status: number;
+            method: number;
+            algorithmVersion: string;
+            confidenceIntervalMethod: number;
+            outputConfidenceLevel: number;
+            tauSquared: number | null;
+            tauSquaredEstimator: number;
+            tauSquaredAlgorithmVersion: string;
+            studyCount: number;
+            analysisScaleEffect: number | null;
+            analysisScaleVariance: number | null;
+            analysisScaleStandardError: number | null;
+            analysisScaleConfidenceIntervalLower: number | null;
+            analysisScaleConfidenceIntervalUpper: number | null;
+            reportedScaleEffect: number | null;
+            reportedScaleConfidenceIntervalLower: number | null;
+            reportedScaleConfidenceIntervalUpper: number | null;
+            hksjInference: components["schemas"]["QuantitativeHksjInferenceResult"] | null;
+            predictionInterval: components["schemas"]["QuantitativePredictionIntervalResult"] | null;
+            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
+            failureReasons: number[];
+        };
+        QuantitativeHksjInferenceResult: {
+            status: number;
+            confidenceIntervalMethod: number;
+            algorithmVersion: string;
+            outputConfidenceLevel: number;
+            studyCount: number;
+            degreesOfFreedom: number | null;
+            varianceAdjustment: number | null;
+            criticalValue: number | null;
+            analysisScaleEffect: number | null;
+            analysisScaleVariance: number | null;
+            analysisScaleStandardError: number | null;
+            analysisScaleConfidenceIntervalLower: number | null;
+            analysisScaleConfidenceIntervalUpper: number | null;
+            reportedScaleEffect: number | null;
+            reportedScaleConfidenceIntervalLower: number | null;
+            reportedScaleConfidenceIntervalUpper: number | null;
+            failureReasons: number[];
+        };
+        QuantitativePredictionIntervalResult: {
+            status: number;
+            method: number;
+            algorithmVersion: string;
+            outputConfidenceLevel: number;
+            studyCount: number;
+            degreesOfFreedom: number | null;
+            tauSquared: number | null;
+            summaryEffectVariance: number | null;
+            summaryEffectStandardError: number | null;
+            predictionVariance: number | null;
+            predictionStandardError: number | null;
+            criticalValue: number | null;
+            analysisScaleEffect: number | null;
+            analysisScaleLower: number | null;
+            analysisScaleUpper: number | null;
+            reportedScaleEffect: number | null;
+            reportedScaleLower: number | null;
+            reportedScaleUpper: number | null;
+            failureReasons: number[];
         };
         QuantitativeSynthesisContribution: {
             /** Format: uuid */

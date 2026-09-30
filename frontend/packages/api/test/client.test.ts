@@ -70,6 +70,19 @@ describe("MedResearchApiClient research progress", () => {
   });
 });
 
+describe("MedResearchApiClient quantitative results", () => {
+  it("reads the persisted artifact endpoint with the run-scoped path", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([quantitativeArtifactResponse()]));
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test", fetch: fetchMock });
+
+    const result = await client.getQuantitativeSynthesisArtifacts("11111111-1111-4111-8111-111111111111");
+
+    expect(result).toHaveLength(1);
+    expect(result[0].result.randomEffects?.hksjInference?.confidenceIntervalMethod).toBe(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe("https://api.example.test/api/research/11111111-1111-4111-8111-111111111111/quantitative");
+  });
+});
+
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -123,5 +136,92 @@ function progressResponse() {
       { stage: "Synthesizing", state: "Pending", metrics: [{ label: "Reports", value: 0 }] },
       { stage: "Completed", state: "Pending", metrics: [{ label: "Reports", value: 0 }] }
     ]
+  };
+}
+
+function quantitativeArtifactResponse() {
+  const contribution = {
+    evidenceId: "44444444-4444-4444-8444-444444444444",
+    studyId: "55555555-5555-4555-8555-555555555555",
+    evidenceExtractionId: "66666666-6666-4666-8666-666666666666",
+    sourceMaterialId: "77777777-7777-4777-8777-777777777777",
+    analysisScaleEffect: 0.2,
+    analysisScaleVariance: 0.1,
+    analysisScaleStandardError: 0.316,
+    weight: 10,
+    normalizedWeight: 1
+  };
+  return {
+    artifactId: "22222222-2222-4222-8222-222222222222",
+    persistedAt: "2026-09-29T12:05:00Z",
+    snapshotFingerprint: "a".repeat(64),
+    result: {
+      researchRunId: "11111111-1111-4111-8111-111111111111",
+      groupKey: "memory|adult|control|trial",
+      outcomeGroupKey: "memory",
+      populationCompatibilityKey: "adult",
+      comparatorCompatibilityKey: "control",
+      studyDesignCompatibilityKey: "trial",
+      effectMeasureType: 1,
+      status: 1,
+      method: 0,
+      algorithmVersion: "fixed-effect-inverse-variance-v1",
+      outputConfidenceLevel: 0.95,
+      evidenceCount: 1,
+      uniqueStudyCount: 1,
+      analysisScaleEffect: 0.2,
+      analysisScaleVariance: 0.1,
+      analysisScaleStandardError: 0.316,
+      analysisScaleConfidenceIntervalLower: -0.4,
+      analysisScaleConfidenceIntervalUpper: 0.8,
+      reportedScaleEffect: 1.22,
+      reportedScaleConfidenceIntervalLower: 0.67,
+      reportedScaleConfidenceIntervalUpper: 2.22,
+      heterogeneityDiagnostics: null,
+      betweenStudyVariance: null,
+      randomEffects: {
+        status: 1,
+        method: 1,
+        algorithmVersion: "random-effects-inverse-variance-v1",
+        confidenceIntervalMethod: 0,
+        outputConfidenceLevel: 0.95,
+        tauSquared: 0,
+        tauSquaredEstimator: 0,
+        tauSquaredAlgorithmVersion: "reml-tau-squared-v1",
+        studyCount: 1,
+        analysisScaleEffect: 0.2,
+        analysisScaleVariance: 0.1,
+        analysisScaleStandardError: 0.316,
+        analysisScaleConfidenceIntervalLower: -0.4,
+        analysisScaleConfidenceIntervalUpper: 0.8,
+        reportedScaleEffect: 1.22,
+        reportedScaleConfidenceIntervalLower: 0.67,
+        reportedScaleConfidenceIntervalUpper: 2.22,
+        hksjInference: {
+          status: 0,
+          confidenceIntervalMethod: 1,
+          algorithmVersion: "hksj-v1",
+          outputConfidenceLevel: 0.95,
+          studyCount: 1,
+          degreesOfFreedom: null,
+          varianceAdjustment: null,
+          criticalValue: null,
+          analysisScaleEffect: null,
+          analysisScaleVariance: null,
+          analysisScaleStandardError: null,
+          analysisScaleConfidenceIntervalLower: null,
+          analysisScaleConfidenceIntervalUpper: null,
+          reportedScaleEffect: null,
+          reportedScaleConfidenceIntervalLower: null,
+          reportedScaleConfidenceIntervalUpper: null,
+          failureReasons: [1]
+        },
+        predictionInterval: null,
+        contributions: [contribution],
+        failureReasons: []
+      },
+      contributions: [contribution],
+      rejectionReasons: []
+    }
   };
 }

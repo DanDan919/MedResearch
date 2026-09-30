@@ -15,6 +15,7 @@
 - PubMed and Europe PMC request pacing is conservative and local to one process. There is no distributed rate limiter across multiple API instances.
 - PubMed History Server retrieval is deferred while retrieval remains bounded to small direct PMID batches.
 - Europe PMC live smoke testing is opt-in and outside normal CI, so normal CI proves deterministic adapter behavior but not current live provider availability.
+- F7 quantitative workspace is intentionally limited to the F6 snapshot lineage IDs. Study titles/identifiers and contribution-level confidence intervals are not in that artifact; a future human-readable provenance view needs a separately designed read model rather than frontend joins or per-contribution requests.
 - Europe PMC provider-record identity is retained as provenance but is not yet modeled as a first-class unique identifier for records that lack PMID, PMCID, and DOI.
 - `ResearchPlannerPrompt`, `EvidenceExtractorPrompt`, `EvidenceEvaluationPrompt`, and `ResearchSynthesisPrompt` are versioned but still embedded in code. Move prompts to a resource/template mechanism when prompt review, localization, or runtime prompt experiments become real needs.
 - Study identity normalization is intentionally conservative. PMID, PMCID, and normalized DOI unique indexes deduplicate reported identifiers, but provider-record-only identity, conflicting stable identifier graphs, and studies without stable identifiers are not semantically merged.

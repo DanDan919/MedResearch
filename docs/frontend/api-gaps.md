@@ -36,7 +36,13 @@ Still intentionally not exposed by this endpoint:
 - a standalone provenance explorer for every search/discovery path;
 - raw SourceMaterial content or full-text browsing;
 - an automatic Evidence-to-EvidenceEvaluation projection when no direct report citation association exists;
-- quantitative result read models beyond the report contract already provided by the backend.
+- a full Evidence & Provenance Explorer; F7 only exposes quantitative contribution lineage IDs already present in the F6 artifact.
+
+## Resolved Quantitative Results Projection
+
+F6 provides `GET /api/research/{researchRunId}/quantitative`. F7 consumes it directly and renders persisted per-group common/fixed, random-effects, heterogeneity, HKSJ, prediction, contribution, and reproducibility fields.
+
+The F6 artifact does not include publication titles, PMID/PMCID/DOI, author metadata, or contribution-level confidence intervals. F7 keeps those values unavailable instead of joining every contribution or calculating missing intervals in the browser. A future human-readable provenance view needs a dedicated bounded read model.
 
 ## Missing OpenAPI CI Source Of Truth
 

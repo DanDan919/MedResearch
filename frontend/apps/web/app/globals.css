@@ -75,6 +75,10 @@ a {
     display: none !important;
   }
 
+  .quantitative-navigation {
+    display: none !important;
+  }
+
   .report-workspace {
     color: #000;
   }
@@ -84,6 +88,14 @@ a {
   }
 
   .report-workspace details:not([open]) > *:not(summary) {
+    display: block;
+  }
+
+  .quantitative-workspace {
+    color: #000;
+  }
+
+  .quantitative-workspace details:not([open]) > *:not(summary) {
     display: block;
   }
 }

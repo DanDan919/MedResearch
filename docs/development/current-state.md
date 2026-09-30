@@ -360,3 +360,9 @@ F6 makes M17-M24 quantitative results durable without changing their formulas. `
 - Artifact persistence is transactional and idempotent on `(ResearchRunId, GroupKey)` plus fingerprint. A different retry result cannot overwrite an existing artifact.
 - `GET /api/research/{researchRunId}/quantitative` returns the machine-readable artifact read model without raw source text, prompts, credentials, or processing lease data.
 - No quantitative frontend workspace was added; the generated API contract is ready for a later client milestone.
+
+## F7 Quantitative Results Workspace
+
+F7 adds `/research/{id}/quantitative` as a frontend read-only workspace over the persisted F6 artifact endpoint. It supports multiple returned groups, summary Common/Fixed and Random Effects, Q/df/I²/tau², Wald versus HKSJ inference, prediction intervals, a presentation-only SVG contribution plot, exact persisted contribution values, lineage IDs, artifact fingerprint, and algorithm metadata.
+
+The frontend does not calculate any scientific quantity. It does not derive contribution confidence intervals from SE, calculate weights, exponentiate analysis-scale values, classify heterogeneity, choose a model, or make clinical recommendations. Study-level titles, identifiers, authors, and contribution-level CIs are not present in the F6 snapshot and remain explicitly unavailable. Report navigation exposes the quantitative link only when the run-scoped endpoint returns a non-empty artifact list.

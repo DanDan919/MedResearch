@@ -552,3 +552,11 @@ For OR/RR/HR groups, `theta_i` remains the normalized natural-log effect and rep
 The result is nested under `QuantitativeSynthesisResult.RandomEffects` and projected into `SynthesisContext` and the synthesis prompt. The existing fixed/common-effect result remains the outer result so M17 consumers continue to see the same method, weights, pooled estimate, and confidence interval. If M19 tau-squared is `NotEstimated`, the random-effects result is explicitly `NotSynthesizable`. If `tau² = 0`, random-effects weights and Wald synthesis collapse to the common/fixed-effect inverse-variance values for the same contribution population.
 
 M22 deliberately stopped before HKSJ. M23 implements canonical HKSJ summary-effect inference beside the Wald result. M24 implements a Cochrane-style random-effects prediction interval beside Wald and HKSJ. Modified/ad-hoc HKSJ, tau-squared confidence intervals, automatic model selection, p-values, subgroup analysis, meta-regression, publication-bias methods, forest plots, and broader effect families remain out of scope.
+
+## Quantitative Results Workspace V1
+
+F7 adds a frontend read-only workspace over the immutable F6 artifact endpoint. The route remains ResearchRun-scoped and TanStack Query keys include the run ID. Multiple artifact groups are selected explicitly; an empty artifact response is not treated as a zero estimate.
+
+The UI presents persisted common/fixed and random-effects outputs, heterogeneity diagnostics, tau-squared state, Wald/HKSJ inference, prediction intervals, contribution snapshots, lineage IDs, fingerprints, and algorithm versions. It does not load raw SourceMaterial, issue one request per contribution, or derive missing study confidence intervals.
+
+The SVG forest plot maps persisted analysis-scale numbers to screen coordinates only. It does not calculate effects, exponentiate values, calculate weights, infer a null line from an unknown display contract, or classify heterogeneity. F6 currently does not include publication titles/identifiers or study-level intervals in the quantitative snapshot; F7 therefore renders lineage IDs and explicit unavailable states rather than joining or inventing metadata.

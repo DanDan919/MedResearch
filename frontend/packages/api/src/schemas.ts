@@ -189,11 +189,137 @@ export const researchReportResponseSchema = z.object({
   claims: z.array(researchReportClaimSchema)
 });
 
+const quantitativeSynthesisContributionSchema = z.object({
+  evidenceId: z.string().uuid(),
+  studyId: z.string().uuid(),
+  evidenceExtractionId: z.string().uuid(),
+  sourceMaterialId: z.string().uuid(),
+  analysisScaleEffect: z.number(),
+  analysisScaleVariance: z.number(),
+  analysisScaleStandardError: z.number(),
+  weight: z.number(),
+  normalizedWeight: z.number()
+});
+
+const quantitativeHeterogeneityDiagnosticsSchema = z.object({
+  cochransQ: z.number(),
+  degreesOfFreedom: z.number().int(),
+  iSquared: z.number(),
+  studyCount: z.number().int(),
+  algorithmVersion: z.string()
+});
+
+const betweenStudyVarianceEstimateSchema = z.object({
+  tauSquared: z.number().nullable(),
+  estimator: z.number().int(),
+  status: z.number().int(),
+  algorithmVersion: z.string(),
+  studyCount: z.number().int(),
+  converged: z.boolean(),
+  iterationCount: z.number().int(),
+  failureReason: z.number().int().nullable()
+});
+
+const quantitativeHksjInferenceSchema = z.object({
+  status: z.number().int(),
+  confidenceIntervalMethod: z.number().int(),
+  algorithmVersion: z.string(),
+  outputConfidenceLevel: z.number(),
+  studyCount: z.number().int(),
+  degreesOfFreedom: z.number().int().nullable(),
+  varianceAdjustment: z.number().nullable(),
+  criticalValue: z.number().nullable(),
+  analysisScaleEffect: z.number().nullable(),
+  analysisScaleVariance: z.number().nullable(),
+  analysisScaleStandardError: z.number().nullable(),
+  analysisScaleConfidenceIntervalLower: z.number().nullable(),
+  analysisScaleConfidenceIntervalUpper: z.number().nullable(),
+  reportedScaleEffect: z.number().nullable(),
+  reportedScaleConfidenceIntervalLower: z.number().nullable(),
+  reportedScaleConfidenceIntervalUpper: z.number().nullable(),
+  failureReasons: z.array(z.number().int())
+});
+
+const quantitativePredictionIntervalSchema = z.object({
+  status: z.number().int(),
+  method: z.number().int(),
+  algorithmVersion: z.string(),
+  outputConfidenceLevel: z.number(),
+  studyCount: z.number().int(),
+  degreesOfFreedom: z.number().int().nullable(),
+  tauSquared: z.number().nullable(),
+  summaryEffectVariance: z.number().nullable(),
+  summaryEffectStandardError: z.number().nullable(),
+  predictionVariance: z.number().nullable(),
+  predictionStandardError: z.number().nullable(),
+  criticalValue: z.number().nullable(),
+  analysisScaleEffect: z.number().nullable(),
+  analysisScaleLower: z.number().nullable(),
+  analysisScaleUpper: z.number().nullable(),
+  reportedScaleEffect: z.number().nullable(),
+  reportedScaleLower: z.number().nullable(),
+  reportedScaleUpper: z.number().nullable(),
+  failureReasons: z.array(z.number().int())
+});
+
+const quantitativeRandomEffectsSchema = z.object({
+  status: z.number().int(),
+  method: z.number().int(),
+  algorithmVersion: z.string(),
+  confidenceIntervalMethod: z.number().int(),
+  outputConfidenceLevel: z.number(),
+  tauSquared: z.number().nullable(),
+  tauSquaredEstimator: z.number().int(),
+  tauSquaredAlgorithmVersion: z.string(),
+  studyCount: z.number().int(),
+  analysisScaleEffect: z.number().nullable(),
+  analysisScaleVariance: z.number().nullable(),
+  analysisScaleStandardError: z.number().nullable(),
+  analysisScaleConfidenceIntervalLower: z.number().nullable(),
+  analysisScaleConfidenceIntervalUpper: z.number().nullable(),
+  reportedScaleEffect: z.number().nullable(),
+  reportedScaleConfidenceIntervalLower: z.number().nullable(),
+  reportedScaleConfidenceIntervalUpper: z.number().nullable(),
+  hksjInference: quantitativeHksjInferenceSchema.nullable(),
+  predictionInterval: quantitativePredictionIntervalSchema.nullable(),
+  contributions: z.array(quantitativeSynthesisContributionSchema),
+  failureReasons: z.array(z.number().int())
+});
+
+const quantitativeSynthesisResultSchema = z.object({
+  researchRunId: z.string().uuid(),
+  groupKey: z.string(),
+  outcomeGroupKey: z.string(),
+  populationCompatibilityKey: z.string(),
+  comparatorCompatibilityKey: z.string(),
+  studyDesignCompatibilityKey: z.string(),
+  effectMeasureType: z.number().int(),
+  status: z.number().int(),
+  method: z.number().int(),
+  algorithmVersion: z.string(),
+  outputConfidenceLevel: z.number(),
+  evidenceCount: z.number().int(),
+  uniqueStudyCount: z.number().int(),
+  analysisScaleEffect: z.number().nullable(),
+  analysisScaleVariance: z.number().nullable(),
+  analysisScaleStandardError: z.number().nullable(),
+  analysisScaleConfidenceIntervalLower: z.number().nullable(),
+  analysisScaleConfidenceIntervalUpper: z.number().nullable(),
+  reportedScaleEffect: z.number().nullable(),
+  reportedScaleConfidenceIntervalLower: z.number().nullable(),
+  reportedScaleConfidenceIntervalUpper: z.number().nullable(),
+  heterogeneityDiagnostics: quantitativeHeterogeneityDiagnosticsSchema.nullable(),
+  betweenStudyVariance: betweenStudyVarianceEstimateSchema.nullable(),
+  randomEffects: quantitativeRandomEffectsSchema.nullable(),
+  contributions: z.array(quantitativeSynthesisContributionSchema),
+  rejectionReasons: z.array(z.number().int())
+});
+
 export const quantitativeSynthesisArtifactResponseSchema = z.object({
   artifactId: z.string().uuid(),
   persistedAt: z.string(),
   snapshotFingerprint: z.string(),
-  result: z.record(z.string(), z.unknown())
+  result: quantitativeSynthesisResultSchema
 });
 
 export const problemDetailsSchema = z
