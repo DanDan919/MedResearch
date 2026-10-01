@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
@@ -10,16 +11,21 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
 {
     private readonly MedResearchDbContext _dbContext;
     private readonly SourceAcquisitionOptions _sourceOptions;
+    private readonly IResearchRunWriteFence? _writeFence;
 
     public EfEvidenceExtractionStore(MedResearchDbContext dbContext)
-        : this(dbContext, new SourceAcquisitionOptions())
+        : this(dbContext, new SourceAcquisitionOptions(), null)
     {
     }
 
-    public EfEvidenceExtractionStore(MedResearchDbContext dbContext, SourceAcquisitionOptions sourceOptions)
+    public EfEvidenceExtractionStore(
+        MedResearchDbContext dbContext,
+        SourceAcquisitionOptions sourceOptions,
+        IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
         _sourceOptions = sourceOptions;
+        _writeFence = writeFence;
     }
 
     public async Task<EvidenceExtractionWorkItemSet> FindStudiesForExtractionAsync(
@@ -154,6 +160,10 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
         CancellationToken cancellationToken)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null)
+        {
+            await _writeFence.AssertOwnedAsync(result.ResearchRunId, cancellationToken);
+        }
 
         if (result.SourceMaterialId.HasValue)
         {

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using MedResearch.Application.Research.Quantitative;
+using MedResearch.Application.Research.Processing;
+using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -10,10 +12,14 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
 {
     private static readonly JsonSerializerOptions JsonOptions = new();
     private readonly MedResearchDbContext _dbContext;
+    private readonly IResearchRunWriteFence? _writeFence;
 
-    public EfQuantitativeSynthesisArtifactStore(MedResearchDbContext dbContext)
+    public EfQuantitativeSynthesisArtifactStore(
+        MedResearchDbContext dbContext,
+        IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
+        _writeFence = writeFence;
     }
 
     public async Task PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
@@ -40,6 +46,11 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
 
         try
         {
+            if (_writeFence is not null)
+            {
+                await _writeFence.AssertOwnedAsync(readiness.ResearchRunId, cancellationToken);
+            }
+
             var groupKeys = snapshots.Select(snapshot => snapshot.Result.GroupKey).ToArray();
             var existing = await _dbContext.QuantitativeSynthesisArtifacts
                 .Where(artifact => artifact.ResearchRunId == readiness.ResearchRunId && groupKeys.Contains(artifact.GroupKey))
@@ -107,14 +118,32 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
             .ThenBy(artifact => artifact.Id)
             .ToArrayAsync(cancellationToken);
 
-        return entities
-            .Select(entity => new QuantitativeSynthesisArtifactReadModel(
+        var artifactIds = entities.Select(entity => entity.Id).ToArray();
+        var contributionRows = artifactIds.Length == 0
+            ? []
+            : await _dbContext.QuantitativeSynthesisContributionSnapshots
+                .AsNoTracking()
+                .Where(snapshot => artifactIds.Contains(snapshot.ArtifactId))
+                .OrderBy(snapshot => snapshot.ArtifactId)
+                .ThenBy(snapshot => snapshot.AnalysisMethod)
+                .ThenBy(snapshot => snapshot.Ordinal)
+                .ToArrayAsync(cancellationToken);
+
+        var readModels = new List<QuantitativeSynthesisArtifactReadModel>(entities.Length);
+        foreach (var entity in entities)
+        {
+            var result = JsonSerializer.Deserialize<QuantitativeSynthesisResult>(entity.SnapshotJson, JsonOptions)
+                ?? throw new InvalidOperationException("Persisted quantitative synthesis snapshot is invalid.");
+
+            ValidateRelationalSnapshot(entity, result, contributionRows.Where(row => row.ArtifactId == entity.Id).ToArray(), researchRunId);
+            readModels.Add(new QuantitativeSynthesisArtifactReadModel(
                 entity.Id,
                 entity.PersistedAt,
                 entity.SnapshotFingerprint,
-                JsonSerializer.Deserialize<QuantitativeSynthesisResult>(entity.SnapshotJson, JsonOptions)
-                    ?? throw new InvalidOperationException("Persisted quantitative synthesis snapshot is invalid.")))
-            .ToArray();
+                result));
+        }
+
+        return readModels;
     }
 
     private async Task ValidateLineageAsync(
@@ -158,13 +187,17 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
 
             if (!extractions.TryGetValue(contribution.EvidenceExtractionId, out var extraction)
                 || extraction.ResearchRunId != researchRunId
-                || extraction.StudyId != contribution.StudyId)
+                || extraction.StudyId != contribution.StudyId
+                || extraction.SourceMaterialId != contribution.SourceMaterialId
+                || extraction.Status != EvidenceExtractionStatus.Completed
+                || !extraction.GroundingValidated)
             {
                 throw new InvalidOperationException("Quantitative contribution extraction does not belong to the analyzed research run and lineage.");
             }
 
             if (!sourceMaterials.TryGetValue(contribution.SourceMaterialId, out var sourceMaterial)
-                || sourceMaterial.StudyId != contribution.StudyId)
+                || sourceMaterial.StudyId != contribution.StudyId
+                || !item.GroundingValidated)
             {
                 throw new InvalidOperationException("Quantitative contribution source material does not belong to the cited Study.");
             }
@@ -203,9 +236,9 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
         IReadOnlyCollection<QuantitativeSynthesisContribution> contributions)
     {
         foreach (var item in contributions
-            .Select((contribution, ordinal) => (contribution, ordinal))
-            .OrderBy(item => item.contribution.StudyId)
-            .ThenBy(item => item.contribution.EvidenceId))
+            .OrderBy(contribution => contribution.StudyId)
+            .ThenBy(contribution => contribution.EvidenceId)
+            .Select((contribution, ordinal) => (contribution, ordinal)))
         {
             _dbContext.QuantitativeSynthesisContributionSnapshots.Add(new QuantitativeSynthesisContributionSnapshotEntity
             {
@@ -222,6 +255,77 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
                 Weight = item.contribution.Weight,
                 NormalizedWeight = item.contribution.NormalizedWeight
             });
+        }
+    }
+
+    private static void ValidateRelationalSnapshot(
+        QuantitativeSynthesisArtifactEntity entity,
+        QuantitativeSynthesisResult result,
+        IReadOnlyCollection<QuantitativeSynthesisContributionSnapshotEntity> rows,
+        Guid researchRunId)
+    {
+        if (result.ResearchRunId != researchRunId
+            || result.ResearchRunId != entity.ResearchRunId
+            || !string.Equals(result.GroupKey, entity.GroupKey, StringComparison.Ordinal)
+            || !string.Equals(QuantitativeSynthesisArtifactSnapshot.ComputeFingerprint(result), entity.SnapshotFingerprint, StringComparison.Ordinal)
+            || result.Status != entity.Status
+            || !string.Equals(result.AlgorithmVersion, entity.AlgorithmVersion, StringComparison.Ordinal)
+            || result.OutputConfidenceLevel != entity.OutputConfidenceLevel
+            || result.EvidenceCount != entity.EvidenceCount
+            || result.UniqueStudyCount != entity.UniqueStudyCount)
+        {
+            throw new InvalidOperationException("Persisted quantitative synthesis JSON is inconsistent with its relational snapshot.");
+        }
+
+        ValidateContributionRows(rows, "fixed-effect", result.Contributions);
+        ValidateContributionRows(rows, "random-effects", result.RandomEffects?.Contributions ?? []);
+
+        var expectedMethods = result.RandomEffects is null
+            ? new[] { "fixed-effect" }
+            : new[] { "fixed-effect", "random-effects" };
+        if (rows.Select(row => row.AnalysisMethod).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)
+            .SequenceEqual(expectedMethods.OrderBy(value => value, StringComparer.Ordinal), StringComparer.Ordinal) is false)
+        {
+            throw new InvalidOperationException("Persisted quantitative contribution snapshot methods are inconsistent with the JSON snapshot.");
+        }
+    }
+
+    private static void ValidateContributionRows(
+        IReadOnlyCollection<QuantitativeSynthesisContributionSnapshotEntity> rows,
+        string analysisMethod,
+        IReadOnlyCollection<QuantitativeSynthesisContribution> contributions)
+    {
+        var actual = rows
+            .Where(row => string.Equals(row.AnalysisMethod, analysisMethod, StringComparison.Ordinal))
+            .OrderBy(row => row.Ordinal)
+            .ToArray();
+        var expected = contributions
+            .OrderBy(contribution => contribution.StudyId)
+            .ThenBy(contribution => contribution.EvidenceId)
+            .ToArray();
+
+        if (actual.Length != expected.Length)
+        {
+            throw new InvalidOperationException("Persisted quantitative contribution count is inconsistent with the JSON snapshot.");
+        }
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var row = actual[index];
+            var contribution = expected[index];
+            if (row.Ordinal != index
+                || row.EvidenceId != contribution.EvidenceId
+                || row.StudyId != contribution.StudyId
+                || row.EvidenceExtractionId != contribution.EvidenceExtractionId
+                || row.SourceMaterialId != contribution.SourceMaterialId
+                || row.AnalysisScaleEffect != contribution.AnalysisScaleEffect
+                || row.AnalysisScaleVariance != contribution.AnalysisScaleVariance
+                || row.AnalysisScaleStandardError != contribution.AnalysisScaleStandardError
+                || row.Weight != contribution.Weight
+                || row.NormalizedWeight != contribution.NormalizedWeight)
+            {
+                throw new InvalidOperationException("Persisted quantitative contribution lineage is inconsistent with the JSON snapshot.");
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Synthesis;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,12 @@ namespace MedResearch.Infrastructure.Synthesis.Persistence;
 public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchReportStore
 {
     private readonly MedResearchDbContext _dbContext;
+    private readonly IResearchRunWriteFence? _writeFence;
 
-    public EfResearchSynthesisStore(MedResearchDbContext dbContext)
+    public EfResearchSynthesisStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
+        _writeFence = writeFence;
     }
 
     public async Task<SynthesisCorpusSnapshot> LoadCorpusAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -221,6 +224,10 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
     public async Task PersistReportAsync(ResearchSynthesisResult result, CancellationToken cancellationToken)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null)
+        {
+            await _writeFence.AssertOwnedAsync(result.ResearchRunId, cancellationToken);
+        }
 
         var existingReport = await _dbContext.ResearchReports
             .SingleOrDefaultAsync(report => report.ResearchRunId == result.ResearchRunId && report.PromptVersion == result.PromptVersion, cancellationToken);
@@ -229,6 +236,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             await transaction.CommitAsync(cancellationToken);
             return;
         }
+
+        await ValidateReportCitationsAsync(result, cancellationToken);
 
         var reportId = Guid.NewGuid();
         var report = new ResearchReport(
@@ -289,6 +298,63 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task ValidateReportCitationsAsync(
+        ResearchSynthesisResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.Claims.Any(claim => claim.EvidenceIds.Count == 0))
+        {
+            throw new InvalidOperationException("Every persisted research report claim must cite at least one Evidence row.");
+        }
+
+        var evidenceIds = result.Claims
+            .SelectMany(claim => claim.EvidenceIds)
+            .Distinct()
+            .ToArray();
+        if (evidenceIds.Length == 0)
+        {
+            return;
+        }
+
+        var evidence = await _dbContext.Evidence
+            .AsNoTracking()
+            .Where(item => evidenceIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+        var extractionIds = evidence.Values.Select(item => item.EvidenceExtractionId).Distinct().ToArray();
+        var extractions = await _dbContext.EvidenceExtractions
+            .AsNoTracking()
+            .Where(item => extractionIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+        var sourceMaterialIds = extractions.Values
+            .Where(item => item.SourceMaterialId.HasValue)
+            .Select(item => item.SourceMaterialId!.Value)
+            .Distinct()
+            .ToArray();
+        var sourceMaterials = await _dbContext.SourceMaterials
+            .AsNoTracking()
+            .Where(item => sourceMaterialIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+        foreach (var evidenceId in evidenceIds)
+        {
+            if (!evidence.TryGetValue(evidenceId, out var item)
+                || item.ResearchRunId != result.ResearchRunId
+                || !item.GroundingValidated
+                || !extractions.TryGetValue(item.EvidenceExtractionId, out var extraction)
+                || extraction.ResearchRunId != result.ResearchRunId
+                || extraction.StudyId != item.StudyId
+                || extraction.Status != EvidenceExtractionStatus.Completed
+                || !extraction.GroundingValidated
+                || !extraction.SourceMaterialId.HasValue
+                || !sourceMaterials.TryGetValue(extraction.SourceMaterialId.Value, out var sourceMaterial)
+                || sourceMaterial.StudyId != item.StudyId)
+            {
+                throw new InvalidOperationException(
+                    $"Research report citation {evidenceId} does not resolve to grounded, same-run Evidence and SourceMaterial lineage.");
+            }
+        }
     }
 
     public async Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -354,7 +420,11 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             .Where(item => item.Evidence.ResearchRunId == reportEntity.ResearchRunId
                 && item.Extraction.ResearchRunId == reportEntity.ResearchRunId
                 && item.Extraction.StudyId == item.Evidence.StudyId
-                && (item.SourceMaterial == null || item.SourceMaterial.StudyId == item.Study.Id))
+                && item.Evidence.GroundingValidated
+                && item.Extraction.Status == EvidenceExtractionStatus.Completed
+                && item.Extraction.GroundingValidated
+                && item.SourceMaterial != null
+                && item.SourceMaterial.StudyId == item.Study.Id)
             .OrderBy(item => item.ResearchReportClaimId)
             .ThenBy(item => item.Ordinal)
             .ToArrayAsync(cancellationToken);

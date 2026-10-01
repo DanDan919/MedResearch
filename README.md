@@ -151,7 +151,7 @@ Retrieve the current run state:
 GET /api/research/{researchRunId}
 ```
 
-The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
+The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Stage stores also fence writes by the claimed worker id and lease version, so a stale worker cannot persist stage output after ownership transfer. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
 
 Retrieve persisted execution progress:
 
@@ -221,7 +221,7 @@ When no validated evidence exists, MedResearch creates an explicit `Insufficient
 
 ## CI
 
-GitHub Actions runs on Ubuntu with Docker available. The workflow restores, builds, runs the full test suite with Testcontainers required, fails if Docker-required CI reports skipped tests, checks for pending EF model changes, validates Docker Compose, and uploads TRX test results for diagnostics. The Testcontainers fixture applies EF migrations to a fresh PostgreSQL database before PostgreSQL integration tests execute.
+GitHub Actions runs on Ubuntu with Docker available. The workflow restores, builds, runs the full test suite with Testcontainers required, fails if Docker-required CI reports skipped tests, checks for pending EF model changes, validates Docker Compose, and uploads TRX test results for diagnostics. The Testcontainers fixture applies EF migrations to a fresh PostgreSQL database before PostgreSQL integration tests execute. F8 additionally verifies stale stage writers, exact quantitative source lineage, report citation scope, and relational/JSON artifact consistency.
 
 The CI workflow also validates the frontend workspace with deterministic pnpm install, OpenAPI type generation, lint, typecheck, unit/component tests, and a production web build. Normal CI does not run live provider checks and does not require OpenAI, PubMed, Europe PMC, or frontend secrets.
 

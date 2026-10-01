@@ -341,6 +341,8 @@ persist each lifecycle transition separately
 
 The worker does not hold a database lock for the full pipeline, which keeps the design compatible with external LLM and scientific API operations. Reclaimable statuses are `Planning`, `Searching`, `Extracting`, `Evaluating`, and `Synthesizing`; `Completed`, `Failed`, and `Cancelled` are never reclaimed. Terminal states clear active lease metadata.
 
+Lifecycle fencing extends to stage output. The scoped worker claim is attached to `IResearchRunWriteFence`; each EF stage store checks the current owner, lease version, active status, and expiry under a short PostgreSQL `FOR UPDATE` transaction before saving. This prevents a slow worker from persisting plan/search/source/evidence/evaluation/quantitative/report output after a newer worker reclaimed the run. The fence is not held across provider I/O and does not protect direct SQL that bypasses application stores.
+
 ## Failure And Cancellation
 
 If processing fails, Application logs the full exception internally and asks Infrastructure to persist the run as `Failed` with a safe failure reason. The API can then observe the failed state through `GET /api/research/{researchRunId}`.

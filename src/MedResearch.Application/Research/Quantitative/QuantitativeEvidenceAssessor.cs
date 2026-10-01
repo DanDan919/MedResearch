@@ -343,12 +343,19 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
 
     private static string BuildGroupKey(QuantitativeEvidenceAssessment assessment)
     {
-        return string.Join('|',
+        var components = new[]
+        {
             assessment.OutcomeGroupKey,
-            assessment.PopulationCompatibilityKey,
-            assessment.ComparatorCompatibilityKey,
-            assessment.StudyDesignCompatibilityKey,
-            assessment.EffectMeasureType.ToString());
+            assessment.PopulationCompatibilityKey ?? string.Empty,
+            assessment.ComparatorCompatibilityKey ?? string.Empty,
+            assessment.StudyDesignCompatibilityKey ?? string.Empty,
+            assessment.EffectMeasureType.ToString()
+        };
+
+        // Compatibility keys are untrusted normalized text. Length-prefixing prevents
+        // delimiter collisions from combining otherwise incompatible evidence groups.
+        return string.Join('|', components.Select(component =>
+            $"{component.Length.ToString(CultureInfo.InvariantCulture)}:{component}"));
     }
 
     private static string? NormalizeCompatibilityKey(string? value)

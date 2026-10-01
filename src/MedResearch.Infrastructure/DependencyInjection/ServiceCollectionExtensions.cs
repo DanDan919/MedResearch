@@ -47,6 +47,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearchProgressStore, EfResearchProgressStore>();
         services.AddScoped<IResearchRunQueue>(provider =>
             new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
+        services.AddScoped<IResearchRunWriteFence, PostgreSqlResearchRunWriteFence>();
         services.AddScoped<IResearchPlanStore, EfResearchPlanStore>();
 
         var researchPlanningOptions = CreateResearchPlanningOptions(configuration);

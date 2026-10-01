@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Evaluation;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,12 @@ namespace MedResearch.Infrastructure.Evaluation.Persistence;
 public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
 {
     private readonly MedResearchDbContext _dbContext;
+    private readonly IResearchRunWriteFence? _writeFence;
 
-    public EfEvidenceEvaluationStore(MedResearchDbContext dbContext)
+    public EfEvidenceEvaluationStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
+        _writeFence = writeFence;
     }
 
     public async Task<EvidenceEvaluationWorkItemSet> FindStudiesForEvaluationAsync(
@@ -153,6 +156,10 @@ public sealed class EfEvidenceEvaluationStore : IEvidenceEvaluationStore
         CancellationToken cancellationToken)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null)
+        {
+            await _writeFence.AssertOwnedAsync(result.ResearchRunId, cancellationToken);
+        }
 
         var existingEvaluation = await _dbContext.EvidenceEvaluations
             .SingleOrDefaultAsync(evaluation =>

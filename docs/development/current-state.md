@@ -1,5 +1,11 @@
 # Current State
 
+## F8 adversarial verification
+
+The F8 audit is recorded in `docs/audits/f8-full-system-adversarial-verification-ru.md`. It found and fixed a stage-write fencing gap: the existing lease version previously protected ResearchRun lifecycle updates but not every scientific persistence store. Production DI now attaches a PostgreSQL `IResearchRunWriteFence` to the worker scope, and stage stores check owner/version, active status, and lease expiry inside their own short write transactions. No transaction spans external provider calls.
+
+F8 also hardens quantitative exact SourceMaterial lineage, collision-safe compatibility GroupKeys, report-store citation validation, and consistency checks between persisted quantitative JSON and relational contribution snapshots. These changes add no schema migration or new scientific capability. Docker-backed regression tests remain authoritative in CI when local Docker is unavailable.
+
 Date: 2026-09-29
 
 The F5 full-system adversarial verification is recorded in

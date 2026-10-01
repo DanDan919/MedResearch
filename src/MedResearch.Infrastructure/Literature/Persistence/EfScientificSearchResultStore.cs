@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Literature;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Literature.Identity;
 using MedResearch.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
 {
     private readonly MedResearchDbContext _dbContext;
     private readonly ILogger<EfScientificSearchResultStore> _logger;
+    private readonly IResearchRunWriteFence? _writeFence;
 
     public EfScientificSearchResultStore(MedResearchDbContext dbContext)
         : this(dbContext, NullLogger<EfScientificSearchResultStore>.Instance)
@@ -20,10 +22,12 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
 
     public EfScientificSearchResultStore(
         MedResearchDbContext dbContext,
-        ILogger<EfScientificSearchResultStore> logger)
+        ILogger<EfScientificSearchResultStore> logger,
+        IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _writeFence = writeFence;
     }
 
     public async Task<ScientificSearchPersistenceResult> PersistSearchResultsAsync(
@@ -31,6 +35,10 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         CancellationToken cancellationToken)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null)
+        {
+            await _writeFence.AssertOwnedAsync(request.ResearchRunId, cancellationToken);
+        }
 
         var persistedCount = 0;
         var duplicateCount = 0;

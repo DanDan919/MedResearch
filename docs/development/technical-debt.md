@@ -1,5 +1,12 @@
 # Technical Debt
 
+## F8 audit follow-up
+
+- Report rows do not yet persist the quantitative artifact id/fingerprint used during synthesis; the relationship is currently implicit in the same synthesis execution.
+- Same-run report citation integrity and SourceMaterial current-version uniqueness are protected by application transactions/advisory locks rather than universal composite constraints or triggers.
+- Numeric grounding proves source-token presence, not semantic association between a token and a reported statistic.
+- Authentication and authorization are outside the current local-development API scope and must be designed before public deployment.
+
 ## Current
 
 - Production migration strategy is not decided. Docker Compose uses config-gated startup migrations for local development only.

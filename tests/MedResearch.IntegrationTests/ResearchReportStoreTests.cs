@@ -290,6 +290,25 @@ public sealed class ResearchReportStoreTests
         Assert.DoesNotContain(claimReadModel.Citations, item => item.EvidenceId == first.EvidenceIds[0]);
     }
 
+    [SkippableFact]
+    public async Task PersistReportAsync_RejectsCrossRunEvidenceCitationBeforeWritingReport()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var first = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        var second = await SeedRunWithEvidenceAsync(evidenceCount: 1);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchSynthesisStore(context);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.PersistReportAsync(
+                CreateCompletedResult(second.RunId, first.EvidenceIds),
+                CancellationToken.None));
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        Assert.Empty(await verification.ResearchReports.Where(report => report.ResearchRunId == second.RunId).ToArrayAsync());
+    }
+
     private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount)
     {
         await using var context = _fixture.CreateDbContext();

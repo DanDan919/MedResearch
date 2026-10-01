@@ -1,5 +1,7 @@
 using MedResearch.Application.Research.Quantitative;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
+using MedResearch.Infrastructure.Research.Processing;
 using MedResearch.Infrastructure.Synthesis.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -86,6 +88,133 @@ public sealed class QuantitativeSynthesisArtifactStoreTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => store.PersistAsync(
             new QuantitativeSynthesisReadiness(otherRunId, [result], 1, 0, result.AlgorithmVersion),
             CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task RejectsContributionWhoseSourceMaterialDiffersFromExtractionSnapshot()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedAsync();
+        Guid otherSourceMaterialId;
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var other = SourceMaterial.Create(
+                seed.StudyId,
+                SourceMaterialType.StructuredFullText,
+                "EuropePMC",
+                "other-source",
+                "fixture",
+                "different source text",
+                1,
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                null,
+                SourceMaterialAccessStatus.OpenAccess,
+                false,
+                []);
+            context.SourceMaterials.Add(other);
+            await context.SaveChangesAsync();
+            otherSourceMaterialId = other.Id;
+        }
+
+        var result = CreateResult(seed.RunId, new QuantitativeSynthesisContribution(
+            seed.EvidenceId,
+            seed.StudyId,
+            seed.ExtractionId,
+            otherSourceMaterialId,
+            0.25d,
+            0.5d,
+            Math.Sqrt(0.5d),
+            2d,
+            1d));
+
+        await using var storeContext = _fixture.CreateDbContext();
+        var store = new EfQuantitativeSynthesisArtifactStore(storeContext);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.PersistAsync(
+            new QuantitativeSynthesisReadiness(seed.RunId, [result], 1, 0, result.AlgorithmVersion),
+            CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task RejectsRelationalContributionDriftWhenReadingArtifact()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedAsync();
+        var contribution = new QuantitativeSynthesisContribution(
+            seed.EvidenceId,
+            seed.StudyId,
+            seed.ExtractionId,
+            seed.SourceMaterialId,
+            0.25d,
+            0.5d,
+            Math.Sqrt(0.5d),
+            2d,
+            1d);
+        var result = CreateResult(seed.RunId, contribution);
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            await new EfQuantitativeSynthesisArtifactStore(context).PersistAsync(
+                new QuantitativeSynthesisReadiness(seed.RunId, [result], 1, 0, result.AlgorithmVersion),
+                CancellationToken.None);
+        }
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var row = await context.QuantitativeSynthesisContributionSnapshots.SingleAsync();
+            row.NormalizedWeight += 0.25d;
+            await context.SaveChangesAsync();
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new EfQuantitativeSynthesisArtifactStore(verification)
+            .FindByResearchRunIdAsync(seed.RunId, CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task StaleWorkerCannotPersistArtifactAfterLeaseOwnershipChanges()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedAsync();
+        var now = DateTimeOffset.UtcNow;
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var run = await context.ResearchRuns.SingleAsync(item => item.Id == seed.RunId);
+            run.StartPlanning(now);
+            run.AssignLease("worker-a", now, now.AddMinutes(5), 1);
+            await context.SaveChangesAsync();
+        }
+
+        var contribution = new QuantitativeSynthesisContribution(
+            seed.EvidenceId,
+            seed.StudyId,
+            seed.ExtractionId,
+            seed.SourceMaterialId,
+            0.25d,
+            0.5d,
+            Math.Sqrt(0.5d),
+            2d,
+            1d);
+        var result = CreateResult(seed.RunId, contribution);
+        var readiness = new QuantitativeSynthesisReadiness(seed.RunId, [result], 1, 0, result.AlgorithmVersion);
+
+        await using var workerContext = _fixture.CreateDbContext();
+        var runSnapshot = await workerContext.ResearchRuns.AsNoTracking().SingleAsync(item => item.Id == seed.RunId);
+        var fence = new PostgreSqlResearchRunWriteFence(workerContext);
+        fence.Attach(new ClaimedResearchRun(runSnapshot, "Does the intervention change the outcome?", "worker-a", 1, now.AddMinutes(5), false));
+        var store = new EfQuantitativeSynthesisArtifactStore(workerContext, fence);
+
+        await using (var takeoverContext = _fixture.CreateDbContext())
+        {
+            var run = await takeoverContext.ResearchRuns.SingleAsync(item => item.Id == seed.RunId);
+            run.AssignLease("worker-b", now, now.AddMinutes(5), 2);
+            await takeoverContext.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<ResearchRunLeaseLostException>(() => store.PersistAsync(readiness, CancellationToken.None));
+        await using var verification = _fixture.CreateDbContext();
+        Assert.Empty(await verification.QuantitativeSynthesisArtifacts.Where(item => item.ResearchRunId == seed.RunId).ToArrayAsync());
     }
 
     private async Task<Seed> SeedAsync()

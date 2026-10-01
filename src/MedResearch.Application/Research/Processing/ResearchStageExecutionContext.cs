@@ -7,4 +7,5 @@ public sealed record ResearchStageExecutionContext(
     Guid ResearchQuestionId,
     ResearchRunStatus Stage,
     string ResearchQuestion,
-    string WorkerInstanceId);
+    string WorkerInstanceId,
+    long LeaseVersion = 0);

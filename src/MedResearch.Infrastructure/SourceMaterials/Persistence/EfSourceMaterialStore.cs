@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.SourceMaterials;
+using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,12 @@ namespace MedResearch.Infrastructure.SourceMaterials.Persistence;
 public sealed class EfSourceMaterialStore : ISourceMaterialStore
 {
     private readonly MedResearchDbContext _dbContext;
+    private readonly IResearchRunWriteFence? _writeFence;
 
-    public EfSourceMaterialStore(MedResearchDbContext dbContext)
+    public EfSourceMaterialStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null)
     {
         _dbContext = dbContext;
+        _writeFence = writeFence;
     }
 
     public async Task<SourceMaterialAcquisitionStudySet> FindStudiesForSourceAcquisitionAsync(
@@ -77,6 +80,10 @@ public sealed class EfSourceMaterialStore : ISourceMaterialStore
         }
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null)
+        {
+            await _writeFence.AssertStudyBelongsToRunAsync(studyId, cancellationToken);
+        }
 
         var content = SourceMaterial.NormalizeContent(candidate.Content);
         var contentHash = SourceMaterial.ComputeContentHash(content);

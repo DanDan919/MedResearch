@@ -1,5 +1,11 @@
 # Problems
 
+## 2026-10-01 F8: stale stage writers and artifact/report trust boundaries
+
+Adversarial inspection found that queue lifecycle fencing did not automatically fence stage stores: a slow worker with an old lease could reach plan, search, source, Evidence, quantitative artifact, or report persistence after a reclaim. The same audit found that quantitative contributions did not require the exact SourceMaterial selected by their EvidenceExtraction, and that direct report persistence trusted EvidenceIds more than the Application validator did.
+
+The fix is a scoped PostgreSQL write fence using the existing lease owner/version columns and a short `FOR UPDATE` check inside each stage write transaction. Quantitative persistence now checks exact extraction SourceMaterialId and grounded completed lineage. Report persistence validates same-run grounded Evidence -> Extraction -> SourceMaterial -> Study lineage before adding citation links. PostgreSQL regression tests cover stale artifact writes and cross-run report citations; they are skipped locally only when Docker is unavailable and must run in strict CI.
+
 ## 2026-08-30
 
 Date: 2026-08-30

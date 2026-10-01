@@ -145,6 +145,42 @@ public sealed class QuantitativeEvidenceAssessorTests
     }
 
     [Fact]
+    public async Task Assess_DoesNotMergeCompatibilityKeysThatOnlyCollideOnTheLegacyDelimiter()
+    {
+        var runId = Guid.NewGuid();
+        var first = CreateEvidence(
+            runId,
+            Guid.NewGuid(),
+            "a|b",
+            "Odds Ratio",
+            1.4m,
+            1.1m,
+            1.8m,
+            confidenceLevel: 0.95m,
+            population: "c",
+            comparator: "d",
+            studyDesign: "e");
+        var second = CreateEvidence(
+            runId,
+            Guid.NewGuid(),
+            "a",
+            "Odds Ratio",
+            1.4m,
+            1.1m,
+            1.8m,
+            confidenceLevel: 0.95m,
+            population: "b|c",
+            comparator: "d",
+            studyDesign: "e");
+
+        var readiness = new QuantitativeEvidenceAssessor().Assess(await BuildCorpusAsync(runId, [first, second]));
+
+        Assert.Equal(2, readiness.CompatibleGroups.Count);
+        var groupKeys = readiness.CompatibleGroups.Select(group => group.GroupKey).ToArray();
+        Assert.NotEqual(groupKeys[0], groupKeys[1]);
+    }
+
+    [Fact]
     public async Task Assess_SourceTruncationIsLimitationMetadataNotAutomaticIneligibility()
     {
         var runId = Guid.NewGuid();
@@ -227,7 +263,10 @@ public sealed class QuantitativeEvidenceAssessorTests
         decimal? confidenceLevel = null,
         decimal? pValue = null,
         int? sampleSize = 120,
-        bool sourceWasTruncated = false)
+        bool sourceWasTruncated = false,
+        string population = "adults with depressive symptoms",
+        string comparator = "placebo",
+        string studyDesign = "randomized controlled trial")
     {
         return new SynthesisEvidenceContext(
             Guid.NewGuid(),
@@ -240,10 +279,10 @@ public sealed class QuantitativeEvidenceAssessorTests
             EvidenceDirection.Positive,
             EvidenceSourceScope.Abstract,
             DateTimeOffset.UtcNow,
-            "adults with depressive symptoms",
+            population,
             "intervention",
-            "placebo",
-            "randomized controlled trial",
+            comparator,
+            studyDesign,
             sampleSize,
             effectMeasure,
             effectValue,

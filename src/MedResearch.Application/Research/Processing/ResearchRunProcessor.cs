@@ -11,15 +11,18 @@ public sealed class ResearchRunProcessor
     private readonly IResearchRunQueue _researchRunQueue;
     private readonly IResearchStageExecutor _stageExecutor;
     private readonly ILogger<ResearchRunProcessor> _logger;
+    private readonly IResearchRunWriteFence? _writeFence;
 
     public ResearchRunProcessor(
         IResearchRunQueue researchRunQueue,
         IResearchStageExecutor stageExecutor,
-        ILogger<ResearchRunProcessor> logger)
+        ILogger<ResearchRunProcessor> logger,
+        IResearchRunWriteFence? writeFence = null)
     {
         _researchRunQueue = researchRunQueue;
         _stageExecutor = stageExecutor;
         _logger = logger;
+        _writeFence = writeFence;
     }
 
     public async Task<bool> ProcessNextQueuedRunAsync(
@@ -58,6 +61,7 @@ public sealed class ResearchRunProcessor
         }
 
         var run = claimedRun.Run;
+        _writeFence?.Attach(claimedRun);
 
         _logger.LogInformation(
             claimedRun.WasReclaimed
@@ -141,6 +145,10 @@ public sealed class ResearchRunProcessor
 
             return true;
         }
+        finally
+        {
+            _writeFence?.Clear();
+        }
     }
 
     public Task<bool> ProcessNextQueuedRunAsync(string workerInstanceId, CancellationToken cancellationToken)
@@ -195,7 +203,8 @@ public sealed class ResearchRunProcessor
                 claimedRun.Run.ResearchQuestionId,
                 stage,
                 claimedRun.ResearchQuestion,
-                workerInstanceId),
+                workerInstanceId,
+                claimedRun.LeaseVersion),
             stageCancellation.Token);
         var heartbeatTask = RunHeartbeatLoopAsync(claimedRun, leaseDuration, heartbeatInterval, stageCancellation.Token);
 
