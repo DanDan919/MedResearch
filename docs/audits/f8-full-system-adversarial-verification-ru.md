@@ -85,7 +85,7 @@ GET /api/research/{id}/quantitative
 | Completed/Failed/Cancelled reclaim | VERIFIED: queue tests и status policy |
 | два worker claim одного run | VERIFIED: existing PostgreSQL concurrency tests |
 | stale queue progress/failure/release | VERIFIED: owner + lease version predicates |
-| stale worker после передачи lease пишет artifact/report | PARTIAL -> исправлено scoped write fence, новые real-PostgreSQL tests ожидают CI |
+| stale worker после передачи lease пишет artifact/report | VERIFIED: scoped write fence и новые real-PostgreSQL tests прошли в CI |
 | lease transfer во время stage transaction | VERIFIED по конструкции fence: row lock и owner/version проверяются в той же транзакции |
 | heartbeat остаётся вне stage transaction | VERIFIED: queue использует отдельный context; pipeline не держит lock через network I/O |
 
@@ -118,7 +118,7 @@ F8 hardening:
 - ordinal назначается после canonical sort, а не до него;
 - artifact JSON должен содержать запрошенный run id и GroupKey.
 
-Immutability/idempotency по `(ResearchRunId, GroupKey, SnapshotFingerprint)` и exact lineage имеют **VERIFIED**-семантику на store boundary; real PostgreSQL tamper/retry regression ожидает CI.
+Immutability/idempotency по `(ResearchRunId, GroupKey, SnapshotFingerprint)` и exact lineage имеют **VERIFIED**-семантику на store boundary; real PostgreSQL tamper/retry regression прошёл в CI.
 
 Отдельный риск: ResearchReport пока не хранит artifact id/fingerprint. Связь artifact и narrative report логически выполняется в одном synthesis call, но не является persisted foreign-key lineage. Статус **PARTIAL**.
 
@@ -149,7 +149,7 @@ Production changes:
 - `StaleWorkerCannotPersistArtifactAfterLeaseOwnershipChanges`;
 - `PersistReportAsync_RejectsCrossRunEvidenceCitationBeforeWritingReport`.
 
-Unit test новая группа: **10 passed**. Local Docker-backed tests: **5 quantitative и 10 report tests skipped**, потому что Docker Desktop engine недоступен. CI должен выполнить их с `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`; до этого нельзя заявлять окончательную runtime confidence.
+Unit test новая группа: **10 passed**. Local Docker-backed tests: **5 quantitative и 10 report tests skipped**, потому что Docker Desktop engine недоступен. В CI `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` и весь PostgreSQL-backed Integration suite выполнился без required skips.
 
 Полный локальный .NET запуск после финальной сборки: Domain **26 passed / 0 failed / 0 skipped**, Application **163 / 0 / 0**, Infrastructure **65 / 0 / 0**, Integration **17 / 0 / 75**; всего **271 passed, 0 failed, 75 skipped**. `dotnet ef migrations has-pending-model-changes` прошёл, pending model changes нет. `docker compose config` прошёл. `docker info` подтвердил наличие CLI, но завершился ошибкой подключения к `desktop-linux` daemon, поэтому PostgreSQL/Testcontainers skips ожидаемы.
 
@@ -169,8 +169,10 @@ Frontend повторно проверен независимо от F8 producti
 
 Ни один из этих пунктов не является основанием для добавления нового провайдера, RAG, embeddings или распределённой инфраструктуры в F8.
 
-## 12. Итоговый статус F8
+## 12. CI verification и итоговый статус F8
 
-**PARTIAL до зелёного CI:** production fixes и adversarial tests внесены, local build/unit tests проходят, но Docker-backed PostgreSQL tests в этой среде недоступны. После CI нужно подтвердить zero failures и zero required skips, затем обновить этот отчёт фактическими run id и counts. Если CI красный, milestone не считается завершённым.
+GitHub Actions run **36833003390** для commit `468dc7a1436e7579656375d82a7993d0abc080a1` завершился **success**: [Build and test](https://github.com/DanDan919/MedResearch/actions/runs/36833003390/job/110273698265) и [Frontend](https://github.com/DanDan919/MedResearch/actions/runs/36833003390/job/110273698489). Check annotations/TRX: Domain **26/26 passed**, Application **163/163**, Infrastructure **65/65**, Integration/PostgreSQL **92/92**, везде **0 failed, 0 skipped**. Docker info, fresh Testcontainers PostgreSQL/migrations, EF pending-model check и Compose config прошли. Live OpenAI/PubMed/Europe PMC не вызывались.
+
+После CI production fixes, adversarial tests и документация считаются **VERIFIED** в целевом CI runtime. Локальные Docker skips остаются честным ограничением среды, а не CI loophole.
 
 Следующий разумный milestone после закрытия F8: отдельное threat-model/API authorization hardening, а не новый scientific provider.
