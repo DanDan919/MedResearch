@@ -151,7 +151,7 @@ Retrieve the current run state:
 GET /api/research/{researchRunId}
 ```
 
-The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Stage stores also fence writes by the claimed worker id and lease version, so a stale worker cannot persist stage output after ownership transfer. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
+The lease-backed background worker may move the run through `Planning`, `Searching`, `Extracting`, `Evaluating`, `Synthesizing`, and `Completed`. If a worker disappears mid-run, another worker can reclaim an expired in-progress lease and retry from the persisted current stage. Matching persisted plans are reused during Planning recovery, and successful Searching executions are reused by the run/plan/source/query execution key. Stage stores also fence writes by the claimed worker id and lease version, so a stale worker cannot persist stage output after ownership transfer. Invalid questions, missing runs, not-ready reports, and server failures use ASP.NET Core Problem Details responses.
 
 Retrieve persisted execution progress:
 
@@ -185,7 +185,7 @@ The prompt version is `research-planner-v1`. The planner is allowed to produce q
 ResearchQuestion -> ResearchPlan -> SearchQueries -> source-specific searches -> normalized Study candidates -> Study identity resolution -> ResearchStudyDiscovery -> PostgreSQL
 ```
 
-Each planned query is executed once per enabled source. One query against PubMed and Europe PMC therefore creates two `LiteratureSearch` provenance rows, not one merged search. Each discovered publication creates a `ResearchStudyDiscovery` for that specific search execution. The same canonical `Study` can have multiple discovery paths in one run, while downstream extraction, evaluation, and synthesis deduplicate study work by `StudyId` within the run.
+Each planned query is executed once per enabled source. One query against PubMed and Europe PMC therefore creates two `LiteratureSearch` provenance rows, not one merged search. A successful execution is idempotent for `(ResearchRunId, ResearchPlanId, Source, Query)`, so sequential recovery does not repeat an already persisted provider search. Each discovered publication creates a `ResearchStudyDiscovery` for that specific search execution. The same canonical `Study` can have multiple discovery paths in one run, while downstream extraction, evaluation, and synthesis deduplicate study work by `StudyId` within the run.
 
 PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, followed by batched EFetch XML. Requests include configured `tool`/`email` identification and optional `api_key`; ESearch and EFetch share one local token-bucket limiter. PubMed History Server retrieval remains deliberately deferred while `MaxResultsPerQuery` is small and direct ID batching is sufficient.
 
@@ -193,7 +193,7 @@ Europe PMC uses the official Articles REST `/search` endpoint with `format=json`
 
 Study identity is deterministic over normalized PMID, PMCID, and DOI. Missing metadata stays missing. Existing non-null metadata is not overwritten by null incoming values. New non-conflicting identifiers and metadata may enrich an existing Study. If an incoming candidate's stable identifiers point to different persisted Studies, MedResearch treats it as a hard identity conflict, logs bounded diagnostics, preserves existing Studies, skips the ambiguous discovery, and continues processing other candidates.
 
-Both adapters use HttpClientFactory, bounded timeouts, cancellation tokens, local rate limiting, and bounded retries for transient provider failures. Zero-result searches are successful scientific searches and are persisted as zero-result `LiteratureSearch` rows; provider failures, malformed successful payloads, cancellation, and local configuration errors remain distinct operational outcomes.
+Both adapters use HttpClientFactory, bounded timeouts, cancellation tokens, local rate limiting, and bounded retries for transient provider failures. Zero-result searches are successful scientific searches and are persisted as zero-result `LiteratureSearch` rows; provider failures, malformed successful payloads, cancellation, and local configuration errors remain distinct operational outcomes. Provider failures are currently logged rather than persisted as failed `LiteratureSearch` status rows.
 
 ## Evidence Extraction
 

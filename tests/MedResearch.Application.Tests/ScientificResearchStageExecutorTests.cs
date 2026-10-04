@@ -611,9 +611,9 @@ public sealed class ScientificResearchStageExecutorTests
 
         public List<Guid> FindRequests { get; } = [];
 
-        public Task SaveResearchPlanAsync(ResearchPlan researchPlan, CancellationToken cancellationToken)
+        public Task<ResearchPlan> SaveResearchPlanAsync(ResearchPlan researchPlan, CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(researchPlan);
         }
 
         public Task<ResearchPlan?> FindByResearchRunIdAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -709,6 +709,20 @@ public sealed class ScientificResearchStageExecutorTests
     private sealed class RecordingSearchResultStore : IScientificSearchResultStore
     {
         public List<ScientificSearchPersistenceRequest> Requests { get; } = [];
+
+        public Task<bool> HasPersistedSearchAsync(
+            Guid researchRunId,
+            Guid researchPlanId,
+            string source,
+            string query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Requests.Any(request =>
+                request.ResearchRunId == researchRunId
+                && request.ResearchPlanId == researchPlanId
+                && request.Source == source
+                && request.Query == query));
+        }
 
         public Task<ScientificSearchPersistenceResult> PersistSearchResultsAsync(
             ScientificSearchPersistenceRequest request,

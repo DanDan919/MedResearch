@@ -70,3 +70,9 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 - quantitative UI, forest plots, and broader report composition over the persisted quantitative artifact;
 - nuanced interpretation guidance beyond numeric diagnostics and limitations.
 - tau-squared confidence intervals, modified/ad-hoc HKSJ, prediction interval selection/recommendation, prediction intervals for unsupported effect families, and tau-based I-squared replacement are intentionally deferred.
+
+## F9 Recovery and CI Follow-up
+
+- Planning and successful search execution retries are now idempotent for the current run/plan contract. Failed provider attempts in a partial multi-source search are still operationally logged rather than persisted as first-class LiteratureSearch status records.
+- Local Docker unavailability still prevents execution of PostgreSQL/Testcontainers tests. The GitHub Actions workflow remains the authoritative runtime check and now includes the deterministic Playwright browser suite.
+- No authentication/authorization boundary was added by F9; API access remains an application deployment concern.

@@ -38,6 +38,35 @@ public sealed class ResearchPlannerTests
     }
 
     [Fact]
+    public async Task GenerateAndPersistPlanAsync_ReusesExistingPlanAfterRecoveryWithoutCallingLlm()
+    {
+        var existing = new ResearchPlan(
+            Guid.NewGuid(),
+            ResearchRunId,
+            ResearchQuestionId,
+            Question,
+            "adults",
+            "chronic sleep deprivation",
+            "normal or adequate sleep",
+            ["working memory performance"],
+            ["observational study", "experimental study"],
+            ["\"chronic sleep deprivation\" AND \"working memory\" AND adults"],
+            ["animal studies"],
+            "FakeLLM",
+            "fake-planner-model",
+            ResearchPlannerPrompt.Version,
+            DateTimeOffset.UtcNow);
+        var provider = new FakeStructuredLlmClient(CreateValidDraft(), new StructuredLlmException("must not be called"));
+        var store = new RecordingResearchPlanStore { SavedPlan = existing };
+        var planner = CreatePlanner(provider, store);
+
+        var plan = await planner.GenerateAndPersistPlanAsync(ResearchRunId, ResearchQuestionId, Question, CancellationToken.None);
+
+        Assert.Same(existing, plan);
+        Assert.Null(provider.Request);
+    }
+
+    [Fact]
     public async Task GenerateAndPersistPlanAsync_RejectsEmptySearchQueries()
     {
         await AssertInvalidAsync(CreateValidDraft() with { SearchQueries = [] });
@@ -212,12 +241,12 @@ public sealed class ResearchPlannerTests
 
     private sealed class RecordingResearchPlanStore : IResearchPlanStore
     {
-        public ResearchPlan? SavedPlan { get; private set; }
+        public ResearchPlan? SavedPlan { get; set; }
 
-        public Task SaveResearchPlanAsync(ResearchPlan researchPlan, CancellationToken cancellationToken)
+        public Task<ResearchPlan> SaveResearchPlanAsync(ResearchPlan researchPlan, CancellationToken cancellationToken)
         {
             SavedPlan = researchPlan;
-            return Task.CompletedTask;
+            return Task.FromResult(researchPlan);
         }
 
         public Task<ResearchPlan?> FindByResearchRunIdAsync(Guid researchRunId, CancellationToken cancellationToken)

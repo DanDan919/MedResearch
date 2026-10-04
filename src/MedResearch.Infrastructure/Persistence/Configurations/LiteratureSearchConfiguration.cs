@@ -65,5 +65,15 @@ internal sealed class LiteratureSearchConfiguration : IEntityTypeConfiguration<L
 
         builder.HasIndex(search => search.ResearchPlanId)
             .HasDatabaseName("ix_literature_searches_research_plan_id");
+
+        builder.HasIndex(search => new
+            {
+                search.ResearchRunId,
+                search.ResearchPlanId,
+                search.Source,
+                search.Query
+            })
+            .HasDatabaseName("ux_literature_searches_execution_key")
+            .IsUnique();
     }
 }

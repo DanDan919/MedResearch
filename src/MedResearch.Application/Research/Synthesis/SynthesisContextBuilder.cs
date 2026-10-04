@@ -116,8 +116,8 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             .OrderBy(source => source, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var sourceScopes = selectedEvidence.Select(evidence => evidence.SourceScope).Distinct().ToArray();
-        var usesAbstractOnly = selectedEvidence.Length == 0
-            || sourceScopes.All(scope => scope == EvidenceSourceScope.Abstract);
+        var usesAbstractOnly = selectedEvidence.Length > 0
+            && sourceScopes.All(scope => scope == EvidenceSourceScope.Abstract);
 
         var completedExtractions = snapshot.Extractions
             .Where(extraction => extraction.Status == EvidenceExtractionStatus.Completed)

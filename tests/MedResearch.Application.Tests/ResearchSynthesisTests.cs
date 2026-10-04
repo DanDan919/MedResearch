@@ -29,6 +29,15 @@ public sealed class SynthesisContextBuilderTests
     }
 
     [Fact]
+    public async Task BuildAsync_DoesNotCallEmptyEvidenceAbstractOnly()
+    {
+        var runId = Guid.NewGuid();
+        var context = await CreateBuilder(CreateSnapshot(runId, [])).BuildAsync(runId, CancellationToken.None);
+
+        Assert.False(context.SourceCoverage.UsesAbstractLevelEvidenceOnly);
+    }
+
+    [Fact]
     public async Task BuildAsync_RejectsEvidenceFromAnotherRun()
     {
         var runId = Guid.NewGuid();

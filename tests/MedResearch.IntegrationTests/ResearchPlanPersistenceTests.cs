@@ -51,6 +51,29 @@ public sealed class ResearchPlanPersistenceTests
     }
 
     [SkippableFact]
+    public async Task SaveResearchPlanAsync_ReusesEquivalentPlanAfterRetry()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedResearchRunAsync("Does chronic sleep deprivation impair working memory in adults?");
+        var firstPlan = CreatePlan(seed.RunId, seed.QuestionId, seed.QuestionText, ["sleep query one"]);
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchPlanStore(context);
+            await store.SaveResearchPlanAsync(firstPlan, CancellationToken.None);
+        }
+
+        var retryPlan = CreatePlan(seed.RunId, seed.QuestionId, seed.QuestionText, ["sleep query one"]);
+        await using var retryContext = _fixture.CreateDbContext();
+        var retryStore = new EfResearchPlanStore(retryContext);
+        var persisted = await retryStore.SaveResearchPlanAsync(retryPlan, CancellationToken.None);
+
+        Assert.Equal(firstPlan.Id, persisted.Id);
+        Assert.Equal(1, await retryContext.ResearchPlans.CountAsync(plan => plan.ResearchRunId == seed.RunId, CancellationToken.None));
+    }
+
+    [SkippableFact]
     public async Task LiteratureSearches_CanReferenceQueriesOriginatingFromResearchPlan()
     {
         SkipIfPostgreSqlUnavailable();
@@ -84,6 +107,40 @@ public sealed class ResearchPlanPersistenceTests
         Assert.Equal(2, searches.Length);
         Assert.Equal(["sleep query one", "sleep query two"], searches.Select(search => search.Query).ToArray());
         Assert.All(searches, search => Assert.Equal(seed.RunId, search.ResearchRunId));
+    }
+
+    [SkippableFact]
+    public async Task LiteratureSearches_ReusesEquivalentExecutionKeyAfterRetry()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var seed = await SeedResearchRunAsync("Does chronic sleep deprivation impair working memory in adults?");
+        var plan = CreatePlan(seed.RunId, seed.QuestionId, seed.QuestionText, ["sleep query one"]);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.ResearchPlans.Add(plan);
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        var firstSearchId = Guid.NewGuid();
+        var retrySearchId = Guid.NewGuid();
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfScientificSearchResultStore(context);
+            await store.PersistSearchResultsAsync(
+                CreateSearchRequest(firstSearchId, seed.RunId, plan.Id, "sleep query one"),
+                CancellationToken.None);
+            var retryResult = await store.PersistSearchResultsAsync(
+                CreateSearchRequest(retrySearchId, seed.RunId, plan.Id, "sleep query one"),
+                CancellationToken.None);
+
+            Assert.Equal(firstSearchId, retryResult.SearchExecutionId);
+        }
+
+        await using var verificationContext = _fixture.CreateDbContext();
+        Assert.Equal(1, await verificationContext.LiteratureSearches.CountAsync(
+            search => search.ResearchRunId == seed.RunId && search.ResearchPlanId == plan.Id,
+            CancellationToken.None));
     }
 
     private async Task<SeededRun> SeedResearchRunAsync(string questionText)

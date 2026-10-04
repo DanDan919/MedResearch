@@ -48,6 +48,14 @@ jobs:
         working-directory: frontend
         run: pnpm test
 
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright browser tests
+        working-directory: frontend
+        run: pnpm test:e2e
+
       - name: Build web frontend
         working-directory: frontend
         run: pnpm build

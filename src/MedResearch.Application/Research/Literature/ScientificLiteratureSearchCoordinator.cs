@@ -59,6 +59,23 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
         foreach (var source in _sources)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (await _searchResultStore.HasPersistedSearchAsync(
+                    researchRunId,
+                    researchPlanId,
+                    source.SourceName,
+                    query,
+                    cancellationToken))
+            {
+                successfulSources++;
+                _logger.LogInformation(
+                    "ScientificSearchReused. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; Query: {Query}",
+                    researchRunId,
+                    researchPlanId,
+                    source.SourceName,
+                    query);
+                continue;
+            }
+
             var searchExecutionId = Guid.NewGuid();
             var stopwatch = Stopwatch.StartNew();
 

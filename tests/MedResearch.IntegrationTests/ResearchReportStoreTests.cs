@@ -378,7 +378,7 @@ public sealed class ResearchReportStoreTests
     private static ResearchSynthesisResult CreateCompletedResult(Guid runId, IReadOnlyCollection<Guid> evidenceIds)
     {
         var statistics = new SynthesisCorpusStatistics(1, 1, 1, evidenceIds.Count, 1, evidenceIds.Count, 1, 0, 1, 0, 1, 0);
-        var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
+        var coverage = new SynthesisSourceCoverage(["PubMed"], false, false, false, false, 1);
         AcceptedResearchReportClaim[] claims = evidenceIds.Count > 1
             ? [
                 new AcceptedResearchReportClaim(ResearchReportClaimType.Finding, ResearchReportClaimDirection.Positive, "Recall improved in the cited evidence.", [evidenceIds.First()], 0),

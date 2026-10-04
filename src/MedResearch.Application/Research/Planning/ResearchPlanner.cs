@@ -33,6 +33,25 @@ public sealed class ResearchPlanner : IResearchPlanner
         ArgumentException.ThrowIfNullOrWhiteSpace(researchQuestion);
 
         var maxSearchQueries = _options.BoundedMaxSearchQueries;
+        var existingPlan = await _researchPlanStore.FindByResearchRunIdAsync(researchRunId, cancellationToken);
+        if (existingPlan is not null)
+        {
+            if (existingPlan.ResearchQuestionId != researchQuestionId
+                || !string.Equals(existingPlan.OriginalQuestion, NormalizeQuestion(researchQuestion), StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(existingPlan.PromptVersion, ResearchPlannerPrompt.Version, StringComparison.Ordinal))
+            {
+                throw new ResearchPlanValidationException(
+                    "A different research plan already exists for this research run.");
+            }
+
+            _logger.LogInformation(
+                "ResearchPlanReused. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; PromptVersion: {PromptVersion}",
+                researchRunId,
+                existingPlan.Id,
+                existingPlan.PromptVersion);
+            return existingPlan;
+        }
+
         var prompt = ResearchPlannerPrompt.Create(researchQuestion, maxSearchQueries);
         var startedAt = DateTimeOffset.UtcNow;
 
@@ -61,28 +80,28 @@ public sealed class ResearchPlanner : IResearchPlanner
                 ResearchPlannerPrompt.Version,
                 maxSearchQueries);
 
-            await _researchPlanStore.SaveResearchPlanAsync(acceptedPlan, cancellationToken);
+            var persistedPlan = await _researchPlanStore.SaveResearchPlanAsync(acceptedPlan, cancellationToken);
 
             _logger.LogInformation(
                 "ResearchPlanPersisted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; SearchQueryCount: {SearchQueryCount}",
                 researchRunId,
-                acceptedPlan.Id,
-                acceptedPlan.Provider,
-                acceptedPlan.Model,
-                acceptedPlan.PromptVersion,
-                acceptedPlan.SearchQueries.Length);
+                persistedPlan.Id,
+                persistedPlan.Provider,
+                persistedPlan.Model,
+                persistedPlan.PromptVersion,
+                persistedPlan.SearchQueries.Length);
 
             _logger.LogInformation(
                 "ResearchPlanningCompleted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; SearchQueryCount: {SearchQueryCount}; DurationMs: {DurationMs}",
                 researchRunId,
-                acceptedPlan.Id,
-                acceptedPlan.Provider,
-                acceptedPlan.Model,
-                acceptedPlan.PromptVersion,
-                acceptedPlan.SearchQueries.Length,
+                persistedPlan.Id,
+                persistedPlan.Provider,
+                persistedPlan.Model,
+                persistedPlan.PromptVersion,
+                persistedPlan.SearchQueries.Length,
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
 
-            return acceptedPlan;
+            return persistedPlan;
         }
         catch (OperationCanceledException)
         {
@@ -108,6 +127,11 @@ public sealed class ResearchPlanner : IResearchPlanner
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             throw;
         }
+    }
+
+    private static string NormalizeQuestion(string question)
+    {
+        return string.Join(' ', question.Split(null as char[], StringSplitOptions.RemoveEmptyEntries));
     }
 }
 

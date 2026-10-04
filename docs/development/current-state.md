@@ -309,6 +309,14 @@ Changes from the audit were deliberately test-focused:
 
 No production behavior, schema, provider, quantitative semantics, or Docker configuration changed in this milestone.
 
+## F9 Research Integrity and Recovery Hardening
+
+F9 makes two recovery windows idempotent without changing the scientific pipeline: a persisted ResearchPlan is reused for a matching ResearchRun/question/prompt contract, and a successful literature search execution is reused by `(ResearchRunId, ResearchPlanId, Source, Query)`. The search execution key is protected by a forward-only PostgreSQL unique index. Conflicting plan inputs are rejected rather than silently replacing the accepted plan.
+
+F9 also corrects empty-evidence coverage semantics: no validated Evidence is not reported as abstract-only evidence. The frontend CI workflow now installs Chromium and runs the existing deterministic Playwright suite. Local Docker-backed integration tests may still skip when Docker Desktop is unavailable; CI remains authoritative for PostgreSQL execution.
+
+Known limitation retained intentionally: provider failures during a partial multi-source search are logged and do not yet have a first-class persisted failed LiteratureSearch attempt/status. This remains technical debt before automatic failed-attempt replay is expanded.
+
 ## Frontend F3 Research Execution Observatory
 
 F3 adds a backend-backed progress read model and upgrades `/research/[id]` from a simple status page into a live execution observatory.

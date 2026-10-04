@@ -215,3 +215,25 @@ Observed behavior: EF model build and migration scaffolding succeeded, but local
 Decision / fix: Kept the forward-only `AddQuantitativeSynthesisArtifacts` migration and relied on the repository's strict CI/Testcontainers environment for fresh-database application. No local database was reset or modified.
 Verification: The solution builds and deterministic tests pass locally; the new PostgreSQL artifact tests are explicit SkippableFacts locally and fail instead of skipping when `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`.
 Remaining concerns: CI must execute the new migration and artifact tests against fresh PostgreSQL before F6 can claim runtime database confidence.
+
+## 2026-10-04
+
+Date: 2026-10-04
+Area: Research stage recovery idempotency
+Problem: A worker crash after Planning persistence but before the stage transition could cause the recovered worker to generate and insert a second ResearchPlan for the same ResearchRun. A crash during Searching could repeat an already successful provider execution and create unnecessary search provenance.
+Observed behavior: ResearchPlan persistence previously always inserted. Searching generated a new execution identifier on every stage entry.
+Decision / fix: Planning now reuses a matching persisted plan and the EF store returns the canonical plan for a concurrent unique race; conflicting plan inputs are rejected. Searching now reuses a successful `(ResearchRunId, ResearchPlanId, Source, Query)` execution, backed by a forward-only PostgreSQL unique index.
+Verification: Application tests cover plan reuse and search retry reuse. The new migration has no pending model changes. Docker-backed PostgreSQL tests remain authoritative because local Docker is unavailable.
+Remaining concerns: Failed provider attempts are still operationally logged rather than represented as first-class LiteratureSearch status rows. A future retry policy may need persisted attempt diagnostics before automatic reprocessing is expanded.
+
+Date: 2026-10-04
+Area: Empty evidence coverage semantics
+Problem: An empty validated evidence set was reported as abstract-only evidence.
+Decision / fix: `UsesAbstractLevelEvidenceOnly` is now true only for a non-empty evidence set whose selected source scopes are all abstract. Added an Application regression test and corrected the insufficient-report fixture.
+Verification: Application tests pass locally.
+
+Date: 2026-10-04
+Area: Frontend browser CI coverage
+Problem: Playwright passed locally but was absent from the standard GitHub Actions workflow.
+Decision / fix: CI now installs Chromium with official Playwright tooling and runs the existing deterministic `pnpm test:e2e` suite.
+Verification: Seven Playwright tests pass locally; the next CI run must confirm the same step on the Linux runner.

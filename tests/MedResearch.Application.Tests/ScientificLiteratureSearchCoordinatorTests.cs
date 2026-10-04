@@ -71,6 +71,22 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
         Assert.Empty(request.Candidates);
     }
 
+    [Fact]
+    public async Task SearchAsync_ReusesSuccessfulExecutionOnRetryWithoutCallingProviderAgain()
+    {
+        var source = new RecordingScientificSource("EuropePmc", [CreateCandidate("123", "PMC123", "10.1000/shared", "EuropePmc")]);
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([source], store);
+        var runId = Guid.NewGuid();
+        var planId = Guid.NewGuid();
+
+        await coordinator.SearchAsync(runId, planId, ["sleep memory"], CancellationToken.None);
+        await coordinator.SearchAsync(runId, planId, ["sleep memory"], CancellationToken.None);
+
+        Assert.Single(source.Requests);
+        Assert.Single(store.Requests);
+    }
+
     private static ScientificLiteratureSearchCoordinator CreateCoordinator(
         IReadOnlyCollection<IScientificLiteratureSource> sources,
         IScientificSearchResultStore store)
@@ -130,6 +146,20 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
     private sealed class RecordingSearchResultStore : IScientificSearchResultStore
     {
         public List<ScientificSearchPersistenceRequest> Requests { get; } = [];
+
+        public Task<bool> HasPersistedSearchAsync(
+            Guid researchRunId,
+            Guid researchPlanId,
+            string source,
+            string query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Requests.Any(request =>
+                request.ResearchRunId == researchRunId
+                && request.ResearchPlanId == researchPlanId
+                && request.Source == source
+                && request.Query == query));
+        }
 
         public Task<ScientificSearchPersistenceResult> PersistSearchResultsAsync(
             ScientificSearchPersistenceRequest request,

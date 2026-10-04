@@ -6,6 +6,7 @@ using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 
 namespace MedResearch.Infrastructure.Literature.Persistence;
 
@@ -28,6 +29,21 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         _dbContext = dbContext;
         _logger = logger;
         _writeFence = writeFence;
+    }
+
+    public Task<bool> HasPersistedSearchAsync(
+        Guid researchRunId,
+        Guid researchPlanId,
+        string source,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.LiteratureSearches.AnyAsync(
+            search => search.ResearchRunId == researchRunId
+                && search.ResearchPlanId == researchPlanId
+                && search.Source == source
+                && search.Query == query,
+            cancellationToken);
     }
 
     public async Task<ScientificSearchPersistenceResult> PersistSearchResultsAsync(
@@ -126,10 +142,38 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             duplicateCount,
             request.ResearchPlanId));
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
-        return new ScientificSearchPersistenceResult(request.SearchExecutionId, persistedCount, duplicateCount);
+            return new ScientificSearchPersistenceResult(request.SearchExecutionId, persistedCount, duplicateCount);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation
+            })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+
+            var existingSearch = await _dbContext.LiteratureSearches
+                .SingleOrDefaultAsync(search =>
+                    search.ResearchRunId == request.ResearchRunId
+                    && search.ResearchPlanId == request.ResearchPlanId
+                    && search.Source == request.Source
+                    && search.Query == request.Query,
+                    cancellationToken);
+            if (existingSearch is null)
+            {
+                throw;
+            }
+
+            return new ScientificSearchPersistenceResult(
+                existingSearch.Id,
+                existingSearch.PersistedStudyCount,
+                existingSearch.DuplicateStudyCount);
+        }
     }
 
     private async Task<StudyResolution> ResolveExistingStudyAsync(
