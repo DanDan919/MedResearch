@@ -9,6 +9,7 @@ using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
+using MedResearch.Infrastructure.Ai.CodexCli;
 using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
 using MedResearch.Infrastructure.Evaluation.Persistence;
@@ -25,13 +26,17 @@ using MedResearch.Infrastructure.Synthesis.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace MedResearch.Infrastructure.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? environment = null)
     {
         var connectionString = configuration.GetConnectionString("MedResearch");
 
@@ -62,19 +67,40 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQuantitativeSynthesisArtifactStore, EfQuantitativeSynthesisArtifactStore>();
 
         var openAIOptions = CreateOpenAIOptions(configuration);
-        if (!string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"AI provider '{openAIOptions.Provider}' is not supported. Supported provider: OpenAI.");
+            services.AddSingleton(Options.Create(openAIOptions));
+            services.AddHttpClient<OpenAIStructuredLlmClient>(client =>
+            {
+                client.BaseAddress = new Uri(openAIOptions.BaseUrl, UriKind.Absolute);
+                client.Timeout = openAIOptions.Timeout;
+            });
+            services.AddScoped<IStructuredLlmClient>(provider =>
+                provider.GetRequiredService<OpenAIStructuredLlmClient>());
         }
-
-        services.AddSingleton(Options.Create(openAIOptions));
-        services.AddHttpClient<OpenAIStructuredLlmClient>(client =>
+        else if (string.Equals(openAIOptions.Provider, "CodexCli", StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(openAIOptions.Provider, "codex-cli", StringComparison.OrdinalIgnoreCase))
         {
-            client.BaseAddress = new Uri(openAIOptions.BaseUrl, UriKind.Absolute);
-            client.Timeout = openAIOptions.Timeout;
-        });
-        services.AddScoped<IStructuredLlmClient>(provider =>
-            provider.GetRequiredService<OpenAIStructuredLlmClient>());
+            var environmentName = environment?.EnvironmentName
+                ?? configuration["ASPNETCORE_ENVIRONMENT"]
+                ?? Environments.Production;
+            if (!string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(environmentName, "ManualScientificE2E", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "AI:Provider=CodexCli is allowed only in Development or ManualScientificE2E environments.");
+            }
+
+            var codexOptions = CreateCodexCliOptions(configuration);
+            services.AddSingleton(Options.Create(codexOptions));
+            services.AddSingleton<ICodexCliProcessRunner, CodexCliProcessRunner>();
+            services.AddScoped<IStructuredLlmClient, CodexCliStructuredLlmClient>();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"AI provider '{openAIOptions.Provider}' is not supported. Supported providers: OpenAI, CodexCli.");
+        }
 
         var pubMedOptions = CreatePubMedOptions(configuration);
         services.AddSingleton(Options.Create(pubMedOptions));
@@ -140,6 +166,11 @@ public static class ServiceCollectionExtensions
         var processingOptions = CreateResearchProcessingOptions(configuration);
         services.AddSingleton(Options.Create(processingOptions));
 
+        if (bool.TryParse(configuration["Database:ApplyMigrationsOnStartup"], out var applyMigrationsOnStartup) && applyMigrationsOnStartup)
+        {
+            services.AddHostedService<DatabaseMigrationHostedService>();
+        }
+
         if (processingOptions.Enabled)
         {
             services.AddHostedService<BackgroundResearchWorker>();
@@ -147,11 +178,6 @@ public static class ServiceCollectionExtensions
 
         services.AddHealthChecks()
             .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql", "ready"]);
-
-        if (bool.TryParse(configuration["Database:ApplyMigrationsOnStartup"], out var applyMigrationsOnStartup) && applyMigrationsOnStartup)
-        {
-            services.AddHostedService<DatabaseMigrationHostedService>();
-        }
 
         return services;
     }
@@ -309,6 +335,28 @@ public static class ServiceCollectionExtensions
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 30, "AI:TimeoutSeconds"),
             MaxOutputTokens = ReadPositiveInt(section["MaxOutputTokens"], 2_000, "AI:MaxOutputTokens")
         };
+    }
+
+    private static CodexCliOptions CreateCodexCliOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(CodexCliOptions.SectionName);
+        var options = new CodexCliOptions
+        {
+            ExecutablePath = string.IsNullOrWhiteSpace(section["ExecutablePath"])
+                ? "codex"
+                : section["ExecutablePath"]!,
+            Model = string.IsNullOrWhiteSpace(section["Model"])
+                ? null
+                : section["Model"],
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 300, "AI:CodexCli:TimeoutSeconds"),
+            MaxPromptCharacters = ReadPositiveInt(section["MaxPromptCharacters"], 500_000, "AI:CodexCli:MaxPromptCharacters"),
+            Sandbox = string.IsNullOrWhiteSpace(section["Sandbox"])
+                ? "read-only"
+                : section["Sandbox"]!
+        };
+
+        options.Validate();
+        return options;
     }
 
     private static PubMedOptions CreatePubMedOptions(IConfiguration configuration)

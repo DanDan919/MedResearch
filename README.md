@@ -120,12 +120,33 @@ Background processing can be configured with `ResearchProcessing:Enabled`, `Rese
 
 AI planning can be configured with:
 
-- `AI:Provider`, currently only `OpenAI`
+- `AI:Provider`, `OpenAI` or development/manual-only `CodexCli`
 - `AI:BaseUrl`, default `https://api.openai.com/v1/`
 - `AI:Model`, externally supplied
 - `AI:ApiKey`, externally supplied secret
 - `AI:TimeoutSeconds`, default 30
 - `AI:MaxOutputTokens`, default 2000
+
+Codex CLI development provider
+
+`AI:Provider=CodexCli` selects the provider-neutral `IStructuredLlmClient`
+implementation backed by the installed `codex exec` process. It is accepted
+only in `Development` or `ManualScientificE2E`; production startup rejects it.
+The adapter uses the user's existing Codex/ChatGPT CLI authentication and
+does not read tokens or require `OPENAI_API_KEY`. Codex CLI is a local process,
+but model inference may be remote through the user's account, so it is not an
+offline/local model.
+
+Configure the optional development provider with `AI:CodexCli:ExecutablePath`
+(`codex` by default), `AI:CodexCli:Model`,
+`AI:CodexCli:TimeoutSeconds` (10-1800 seconds),
+`AI:CodexCli:MaxPromptCharacters` (1000-2000000), and the fixed
+`AI:CodexCli:Sandbox=read-only`. Each request uses stdin, a unique temporary
+schema/output directory, `--output-schema`, and `--output-last-message`; the
+MedResearch repository is not used as Codex's working directory. Prompt input
+is never silently truncated. Normal tests and CI never invoke Codex. Opt-in
+manual checks use `MEDRESEARCH_RUN_LIVE_CODEX_CLI=true` and the live E2E
+harness uses `MEDRESEARCH_LLM_PROVIDER=CodexCli`.
 
 PubMed can be configured with:
 

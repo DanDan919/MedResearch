@@ -334,7 +334,7 @@ Health checks не вызывают OpenAI, PubMed или Europe PMC.
 | `Database:ApplyMigrationsOnStartup` | local compose convenience migrations |
 | `ResearchProcessing` | worker enabled/idle delay/lease/heartbeat |
 | `ResearchPlanning` | max search queries |
-| `AI` | OpenAI provider/base/model/key/timeout/output tokens |
+| `AI` | OpenAI provider/base/model/key/timeout/output tokens; development-only Codex CLI provider settings |
 | `PubMed` | enabled/base/tool/email/api key/results/rate/batch/retry |
 | `EuropePmc` | enabled/base/results/page/rate/retry |
 | `SourceAcquisition` | source acquisition enabled/max studies/content/preference |

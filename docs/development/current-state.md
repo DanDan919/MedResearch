@@ -40,6 +40,31 @@ advisory lock.
   `SourceMaterial` identity remain global; run-scoped scientific data remains
   protected through the owner-scoped run.
 
+### F11 development Codex CLI provider
+
+- `CodexCliStructuredLlmClient` implements the existing
+  `IStructuredLlmClient` contract; Application stages remain unaware of the
+  provider.
+- The provider is selected with `AI:Provider=CodexCli` only in `Development` or
+  `ManualScientificE2E`. Production selection fails closed.
+- `codex exec` receives the combined system/user prompt through stdin and the
+  existing effective JSON Schema through a unique temporary `--output-schema`
+  file. The final message is read from a unique `--output-last-message` file.
+- Each invocation uses a unique read-only temporary working directory outside
+  the repository. Prompt text is passed with `ProcessStartInfo.ArgumentList`
+  and is never shell-interpolated. Timeout, cancellation, nonzero exit,
+  malformed JSON, missing executable, and usage/authentication-like failures
+  remain provider failures rather than scientific insufficiency.
+- Normal tests and CI do not install, authenticate, or invoke Codex. Manual
+  smoke tests are gated by `MEDRESEARCH_RUN_LIVE_CODEX_CLI=true`; the existing
+  live E2E harness accepts `MEDRESEARCH_LLM_PROVIDER=CodexCli`.
+- F11 deterministic tests pass, and the opt-in adapter/planner live smokes pass.
+  A real PostgreSQL-backed run was exercised through Planning, Searching,
+  Extracting, Evaluating, and Synthesizing, but ended in existing synthesis
+  validation after Codex emitted an unsupported mixed/conflict claim; no live
+  report completion is claimed. Startup migration registration now precedes
+  the worker to avoid polling an unmigrated fresh database.
+
 - Initial repository documentation and development trail.
 - Architecture comprehension documentation:
   - `docs/architecture-overview.md` for a simple Russian system overview.

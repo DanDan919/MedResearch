@@ -1,4 +1,6 @@
 using MedResearch.Application.Research.Literature;
+using MedResearch.Application.Research.Ai;
+using MedResearch.Infrastructure.Ai.CodexCli;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +52,44 @@ public sealed class InfrastructureConfigurationTests
         });
 
         Assert.NotNull(provider);
+    }
+
+    [Fact]
+    public void AddInfrastructure_RejectsCodexCliOutsideDevelopment()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["AI:Provider"] = "CodexCli",
+            ["ASPNETCORE_ENVIRONMENT"] = "Production"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+
+        Assert.Contains("Development", exception.Message);
+    }
+
+    [Fact]
+    public void AddInfrastructure_RegistersCodexCliOnlyForDevelopment()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["AI:Provider"] = "CodexCli",
+            ["ASPNETCORE_ENVIRONMENT"] = "Development",
+            ["AI:CodexCli:ExecutablePath"] = "codex",
+            ["AI:CodexCli:Sandbox"] = "read-only"
+        });
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+
+        using var scope = provider.CreateScope();
+        Assert.IsType<CodexCliStructuredLlmClient>(scope.ServiceProvider.GetRequiredService<IStructuredLlmClient>());
     }
 
     [Fact]

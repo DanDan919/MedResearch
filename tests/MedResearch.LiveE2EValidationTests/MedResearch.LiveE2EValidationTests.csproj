@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MedResearch.Api\MedResearch.Api.csproj" />
+    <ProjectReference Include="..\..\src\MedResearch.Application\MedResearch.Application.csproj" />
+    <ProjectReference Include="..\..\src\MedResearch.Infrastructure\MedResearch.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

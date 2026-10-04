@@ -70,3 +70,4 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 46. Random-effects prediction intervals are deterministic Application code over the existing M22 random-effects estimate, Wald summary variance, and M19 REML tau-squared; LLMs must never calculate, modify, select, or infer prediction intervals.
 47. Quantitative synthesis artifacts are immutable run-scoped snapshots. Contribution rows must retain exact numeric values and validated Evidence lineage; retries must be idempotent and conflicting snapshots must not be overwritten.
 48. Production stage stores must fence writes with the current ResearchRun lease owner and version; a stale worker must not persist scientific output after lease transfer.
+49. Codex CLI is a development/manual-E2E structured LLM adapter only; it must never become the default or production provider, and it must not read or persist Codex authentication credentials.

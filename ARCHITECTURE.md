@@ -66,6 +66,25 @@ Application defines ports that reflect current use cases:
 
 These are deliberately use-case-oriented rather than generic repositories. API endpoints call Application use cases and never query EF Core directly. Infrastructure implements the ports through EF Core/PostgreSQL, OpenAI, PubMed, and Europe PMC adapters.
 
+### Development-only Codex CLI provider
+
+`CodexCliStructuredLlmClient` is an Infrastructure implementation of the same
+`IStructuredLlmClient` port used by OpenAI and deterministic fakes. It launches
+`codex exec` with `--sandbox read-only`, a unique temporary working directory,
+stdin prompt transport, and CLI-enforced `--output-schema`. A per-request
+temporary output file is read only after a successful zero exit code and is
+deleted with the schema directory in a `finally` block. `ArgumentList` is used;
+prompt/source text is never interpolated into a shell command.
+
+The provider is allowed only in `Development` or `ManualScientificE2E` and is
+rejected in production. It relies on Codex CLI's own authentication and never
+reads or stores Codex credentials. It does not enable web search and instructs
+the agent to use only MedResearch-supplied scientific context. The current CLI
+does not expose a strong per-request tool-disable switch, so this remains a
+development-provider limitation. Timeout and cancellation terminate only the
+spawned process tree. Normal tests and CI use fakes; real Codex calls are
+opt-in manual validation.
+
 ## HTTP API
 
 The API currently exposes:
