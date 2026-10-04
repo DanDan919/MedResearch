@@ -9,15 +9,18 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
     private readonly IStructuredLlmClient _structuredLlmClient;
     private readonly EvidenceExtractionDraftValidator _validator;
     private readonly ILogger<EvidenceExtractor> _logger;
+    private readonly ValidationGuidedLlmRepairService _repairService;
 
     public EvidenceExtractor(
         IStructuredLlmClient structuredLlmClient,
         EvidenceExtractionDraftValidator validator,
-        ILogger<EvidenceExtractor> logger)
+        ILogger<EvidenceExtractor> logger,
+        ValidationGuidedLlmRepairService? repairService = null)
     {
         _structuredLlmClient = structuredLlmClient;
         _validator = validator;
         _logger = logger;
+        _repairService = repairService ?? new ValidationGuidedLlmRepairService(structuredLlmClient);
     }
 
     public async Task<EvidenceExtractionResult> ExtractAsync(
@@ -63,25 +66,28 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
 
         try
         {
-            var generationResult = await _structuredLlmClient.GenerateStructuredAsync<EvidenceExtractionDraft>(
+            var validatedGeneration = await _repairService.GenerateAndValidateAsync<EvidenceExtractionDraft, IReadOnlyCollection<AcceptedEvidenceFinding>>(
                 new StructuredLlmRequest(
                     EvidenceExtractionPrompt.Version,
                     prompt.SystemPrompt,
                     prompt.UserPrompt,
                     EvidenceExtractionPrompt.OutputSchema),
+                (draft, _) => _validator.Validate(context, draft),
+                "evidence extraction",
                 cancellationToken);
-
-            var acceptedFindings = _validator.Validate(context, generationResult.Value);
+            var acceptedFindings = validatedGeneration.Value;
 
             _logger.LogInformation(
-                "EvidenceExtractionCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; FindingCount: {FindingCount}; DurationMs: {DurationMs}",
+                "EvidenceExtractionCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; SourceMaterialId: {SourceMaterialId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; FindingCount: {FindingCount}; LlmAttemptCount: {LlmAttemptCount}; RepairedIssueCodes: {RepairedIssueCodes}; DurationMs: {DurationMs}",
                 context.ResearchRunId,
                 context.StudyId,
                 context.SourceMaterialId,
-                generationResult.Metadata.Provider,
-                generationResult.Metadata.Model,
+                validatedGeneration.Metadata.Provider,
+                validatedGeneration.Metadata.Model,
                 EvidenceExtractionPrompt.Version,
                 acceptedFindings.Count,
+                validatedGeneration.AttemptCount,
+                string.Join(',', validatedGeneration.RepairedIssueCodes),
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
 
             return new EvidenceExtractionResult(
@@ -91,10 +97,10 @@ public sealed class EvidenceExtractor : IEvidenceExtractor
                 EvidenceExtractionStatus.Completed,
                 null,
                 context.SourceScope,
-                generationResult.Metadata.Provider,
-                generationResult.Metadata.Model,
+                validatedGeneration.Metadata.Provider,
+                validatedGeneration.Metadata.Model,
                 EvidenceExtractionPrompt.Version,
-                generationResult.Metadata.GeneratedAt,
+                validatedGeneration.Metadata.GeneratedAt,
                 true,
                 acceptedFindings);
         }

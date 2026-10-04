@@ -301,6 +301,15 @@ The source-material layer is now persisted and used as the authoritative extract
 - The live E2E harness uses `WebApplicationFactory<Program>` and production DI/hosted services. It verifies `/health/ready`, submits `POST /api/research`, waits for the worker to complete the ResearchRun, and reads the report endpoint.
 - Normal CI and normal local solution tests remain deterministic and do not call live OpenAI, PubMed, Europe PMC, or full-text endpoints.
 
+## F12 Validation-Guided LLM Repair
+
+- Added provider-neutral `ValidationGuidedLlmRepairService` in Application.
+- `ValidationIssue` carries stable code, optional contract path, bounded repair instruction, and repairable/non-repairable disposition.
+- Evidence extraction and synthesis may make one bounded complete-replacement attempt after typed repairable validation failure. The same trusted SourceMaterial/SynthesisContext, schema, and validator are reused; rejected output is never persisted.
+- Cross-run context, provider/transport failure, cancellation, and infrastructure invariants fail closed without semantic repair. Planner and evaluator semantic repair remain intentionally disabled.
+- Deterministic Application tests cover successful and failed repair, no repair for non-repairable/provider failures, exact context/schema reuse, extraction grounding, synthesis direction, and cross-run precondition.
+- Live F12 classification remains pending the explicit Codex CLI + PubMed + Europe PMC + isolated PostgreSQL run. Normal CI remains external-service independent.
+
 ## Fixed-Effect Quantitative Synthesis V1
 
 - Added `FixedEffectQuantitativeStatisticalSynthesizer` in Application as a deterministic read model over M15 `CompatibleEvidenceGroup` output.
@@ -428,3 +437,9 @@ F6 makes M17-M24 quantitative results durable without changing their formulas. `
 F7 adds `/research/{id}/quantitative` as a frontend read-only workspace over the persisted F6 artifact endpoint. It supports multiple returned groups, summary Common/Fixed and Random Effects, Q/df/I²/tau², Wald versus HKSJ inference, prediction intervals, a presentation-only SVG contribution plot, exact persisted contribution values, lineage IDs, artifact fingerprint, and algorithm metadata.
 
 The frontend does not calculate any scientific quantity. It does not derive contribution confidence intervals from SE, calculate weights, exponentiate analysis-scale values, classify heterogeneity, choose a model, or make clinical recommendations. Study-level titles, identifiers, authors, and contribution-level CIs are not present in the F6 snapshot and remain explicitly unavailable. Report navigation exposes the quantitative link only when the run-scoped endpoint returns a non-empty artifact list.
+
+## F12 Validation-Guided LLM Repair and First Completed Live Run
+
+F12 adds a provider-neutral, typed, bounded semantic repair step for extraction and synthesis validation failures. A repair is attempted only for explicitly repairable issue codes, uses the same task context and schema, requests a complete replacement, and validates the replacement from scratch. Non-repairable failures, provider failures, cancellation, and exhausted budgets fail closed; rejected candidates are never persisted. The default semantic repair budget is one attempt, configurable from zero through two. Planner and evaluator semantic repair remain intentionally disabled.
+
+Deterministic Application tests cover first-valid output, successful and failed replacement, non-repairable/provider/cancellation behavior, same-context/schema use, extraction grounding repair, synthesis direction repair, cross-run rejection, and bounded attempts. A fresh isolated PostgreSQL live run completed through Codex CLI, PubMed, Europe PMC, extraction, evaluation, synthesis, report persistence, and report retrieval. Its report was honestly `InsufficientEvidence` with no validated Evidence or claims; this proves runtime completion and persistence, not scientific completeness. Normal CI remains provider-independent and does not run live E2E.

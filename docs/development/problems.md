@@ -258,3 +258,11 @@ Area: Frontend browser CI coverage
 Problem: Playwright passed locally but was absent from the standard GitHub Actions workflow.
 Decision / fix: CI now installs Chromium with official Playwright tooling and runs the existing deterministic `pnpm test:e2e` suite.
 Verification: Seven Playwright tests pass locally; the next CI run must confirm the same step on the Linux runner.
+
+Date: 2026-10-04
+Area: Validation-guided LLM repair
+Problem: Strict JSON Schema still allowed structurally valid but scientifically invalid extraction or synthesis output. F11 real Codex runs exposed an ungrounded supporting excerpt and an unsupported mixed/conflict claim.
+Root cause: Semantic validation happened after generation, but validation exceptions carried only human-readable text and there was no bounded provider-neutral correction path.
+Decision / fix: Added typed `ValidationIssue` values and a default one-attempt `ValidationGuidedLlmRepairService` for extraction and synthesis. Repair keeps the original trusted context/schema, requests a complete replacement, re-runs the same validator, and fails closed without persistence if it remains invalid. Cross-run and infrastructure issues never go back to the LLM.
+Verification: Application tests cover first-valid, successful repair, invalid replacement, non-repairable failure, provider failure, grounded extraction repair, synthesis direction repair, and cross-run precondition.
+Remaining concerns: Numeric grounding still proves token presence rather than semantic association. Planner/evaluator semantic repair and OpenAI transport retry remain intentionally deferred.

@@ -102,6 +102,10 @@ public static class ServiceCollectionExtensions
                 $"AI provider '{openAIOptions.Provider}' is not supported. Supported providers: OpenAI, CodexCli.");
         }
 
+        var validationRepairOptions = CreateValidationGuidedRepairOptions(configuration);
+        services.AddSingleton(validationRepairOptions);
+        services.AddScoped<ValidationGuidedLlmRepairService>();
+
         var pubMedOptions = CreatePubMedOptions(configuration);
         services.AddSingleton(Options.Create(pubMedOptions));
         services.AddSingleton<IPubMedRequestGate, TokenBucketPubMedRequestGate>();
@@ -353,6 +357,21 @@ public static class ServiceCollectionExtensions
             Sandbox = string.IsNullOrWhiteSpace(section["Sandbox"])
                 ? "read-only"
                 : section["Sandbox"]!
+        };
+
+        options.Validate();
+        return options;
+    }
+
+    private static ValidationGuidedLlmRepairOptions CreateValidationGuidedRepairOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(ValidationGuidedLlmRepairOptions.SectionName);
+        var options = new ValidationGuidedLlmRepairOptions
+        {
+            MaxSemanticRepairAttempts = ReadNonNegativeInt(
+                section["MaxSemanticRepairAttempts"],
+                1,
+                "AI:ValidationGuidedRepair:MaxSemanticRepairAttempts")
         };
 
         options.Validate();

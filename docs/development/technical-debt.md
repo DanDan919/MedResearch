@@ -12,11 +12,11 @@
 - Production migration strategy is not decided. Docker Compose uses config-gated startup migrations for local development only.
 - OpenAI planning has no bounded retry policy yet. Configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures currently move the run through the existing safe failure path.
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.
-- Evidence extraction has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and grounding failures currently move the run through the existing safe failure path.
+- Evidence extraction has a bounded validation-guided semantic repair attempt for typed repairable output issues. Provider failures, malformed structured responses, non-repairable validation failures, and a still-invalid replacement use the existing safe failure path.
 - Evidence extraction is abstract-level only; full-text retrieval, section-aware extraction, and publisher/PDF source handling are not implemented.
 - Evidence evaluation has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported methodological claims currently move the run through the existing safe failure path.
 - Evidence evaluation is an internal categorical assessment only. It is not a validated GRADE, RoB 2, ROBINS-I, AMSTAR-2, NOS, or other formal study-quality framework.
-- Evidence synthesis has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported claims currently move the run through the existing safe failure path.
+- Evidence synthesis has a bounded validation-guided semantic repair attempt for typed repairable output issues. Provider failures, malformed structured responses, cross-run/infrastructure invariants, and a still-invalid replacement use the existing safe failure path.
 - Evidence synthesis now receives and persists narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval artifacts for eligible compatible OR/RR/HR groups. It still does not implement modified/ad-hoc HKSJ, tau-squared confidence intervals, forest plots, vote counting, formal evidence certainty grading, semantic outcome harmonization, cohort-overlap detection, or systematic-review/primary-study citation-overlap detection.
 - Evidence synthesis currently uses exact normalized outcome names for conflict summaries. This avoids unsafe semantic merging but can miss related outcomes expressed with different wording.
 - PubMed and Europe PMC request pacing is conservative and local to one process. There is no distributed rate limiter across multiple API instances.
@@ -54,9 +54,9 @@
 
 ## Live Validation
 
-- The live E2E harness exists but was not executed in this environment because no live OpenAI key and isolated PostgreSQL runtime were configured. It should be run only against a disposable database with explicit `MEDRESEARCH_LIVE_E2E_DATABASE_ACK=isolated`.
-- Live E2E success will validate current external-provider availability for one bounded question, not scientific completeness or general provider uptime.
-- OpenAI structured generation still has no bounded retry policy; live failures from transient OpenAI/API/network issues use the existing safe failure path.
+- The F12 live E2E harness completed one bounded run against a disposable UTF-8 PostgreSQL database using Codex CLI, PubMed, and Europe PMC. The persisted report was `InsufficientEvidence` with no validated Evidence or claims; this is runtime completion, not a claim of scientific completeness.
+- Live E2E success validates current external-provider availability for one bounded question, not scientific completeness or general provider uptime. The live harness does not persist a semantic-repair attempt counter, so repair execution is proven by deterministic tests rather than claimed from this run.
+- OpenAI transport retry is still not implemented; transient OpenAI/API/network failures use the existing safe failure path. Validation-guided repair is semantic output correction only and is not a transport retry.
 
 ## Quantitative Heterogeneity Remaining Work
 

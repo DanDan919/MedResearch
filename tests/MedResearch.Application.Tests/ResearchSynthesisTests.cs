@@ -388,6 +388,50 @@ public sealed class ResearchSynthesizerTests
     }
 
     [Fact]
+    public async Task SynthesizeAsync_RepairsInvalidDirectionAgainstSameContext()
+    {
+        var runId = Guid.NewGuid();
+        var studyId = Guid.NewGuid();
+        var evidenceId = Guid.NewGuid();
+        var context = CreateContext([CreateEvidence(runId, studyId, evidenceId, EvidenceDirection.Negative)]);
+        var invalid = CreateValidDraft(evidenceId);
+        var valid = invalid with
+        {
+            Claims = [CreateClaimDraft(ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Negative, [evidenceId])]
+        };
+        var client = new SequenceStructuredLlmClient(invalid, valid);
+        var synthesizer = CreateSynthesizer(client);
+
+        var result = await synthesizer.SynthesizeAsync(context, CancellationToken.None);
+
+        Assert.Equal(ResearchReportStatus.Completed, result.Status);
+        Assert.Equal(2, client.CallCount);
+        Assert.Contains("InvalidDirection", client.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Equal(client.Requests[0].SystemPrompt, client.Requests[1].SystemPrompt);
+        Assert.Equal(client.Requests[0].OutputSchema.JsonSchema, client.Requests[1].OutputSchema.JsonSchema);
+        Assert.Equal(ResearchReportClaimDirection.Negative, Assert.Single(result.Claims).Direction);
+    }
+
+    [Fact]
+    public async Task SynthesizeAsync_DoesNotRepairCrossRunContextInvariant()
+    {
+        var runId = Guid.NewGuid();
+        var studyId = Guid.NewGuid();
+        var evidenceId = Guid.NewGuid();
+        var context = CreateContext([CreateEvidence(Guid.NewGuid(), studyId, evidenceId, EvidenceDirection.Positive)]) with
+        {
+            ResearchRunId = runId
+        };
+        var client = new SequenceStructuredLlmClient(CreateValidDraft(evidenceId), CreateValidDraft(evidenceId));
+        var synthesizer = CreateSynthesizer(client);
+
+        await Assert.ThrowsAsync<ResearchSynthesisValidationException>(() =>
+            synthesizer.SynthesizeAsync(context, CancellationToken.None));
+
+        Assert.Equal(0, client.CallCount);
+    }
+
+    [Fact]
     public async Task SynthesizeAsync_AllowsConflictClaimWithOpposingEvidence()
     {
         var runId = Guid.NewGuid();
@@ -449,7 +493,7 @@ public sealed class ResearchSynthesizerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => synthesizer.SynthesizeAsync(context, cancellation.Token));
     }
 
-    private static ResearchSynthesizer CreateSynthesizer(FakeStructuredLlmClient client, SynthesisOptions? options = null)
+    private static ResearchSynthesizer CreateSynthesizer(IStructuredLlmClient client, SynthesisOptions? options = null)
     {
         var validator = new ResearchReportDraftValidator(options ?? new SynthesisOptions());
         return new ResearchSynthesizer(client, validator, NullLogger<ResearchSynthesizer>.Instance);
@@ -511,6 +555,29 @@ public sealed class ResearchSynthesizerTests
             }
 
             return Task.FromResult(new StructuredGenerationResult<T>((T)(object)_draft, new StructuredLlmProviderMetadata("FakeLLM", "fake-synthesis-model", "fake-response", DateTimeOffset.UtcNow)));
+        }
+    }
+
+    private sealed class SequenceStructuredLlmClient : IStructuredLlmClient
+    {
+        private readonly Queue<ResearchReportDraft> _drafts;
+
+        public SequenceStructuredLlmClient(params ResearchReportDraft[] drafts)
+        {
+            _drafts = new Queue<ResearchReportDraft>(drafts);
+        }
+
+        public List<StructuredLlmRequest> Requests { get; } = [];
+
+        public int CallCount => Requests.Count;
+
+        public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(StructuredLlmRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(request);
+            return Task.FromResult(new StructuredGenerationResult<T>(
+                (T)(object)_drafts.Dequeue(),
+                new StructuredLlmProviderMetadata("FakeLLM", "fake-synthesis-model", $"response-{Requests.Count}", DateTimeOffset.UtcNow)));
         }
     }
 }

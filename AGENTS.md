@@ -71,3 +71,4 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 47. Quantitative synthesis artifacts are immutable run-scoped snapshots. Contribution rows must retain exact numeric values and validated Evidence lineage; retries must be idempotent and conflicting snapshots must not be overwritten.
 48. Production stage stores must fence writes with the current ResearchRun lease owner and version; a stale worker must not persist scientific output after lease transfer.
 49. Codex CLI is a development/manual-E2E structured LLM adapter only; it must never become the default or production provider, and it must not read or persist Codex authentication credentials.
+50. Validation-guided LLM repair may only retry a typed repairable issue within its bounded budget; never weaken the validator or persist the rejected candidate.

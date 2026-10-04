@@ -184,9 +184,20 @@ Validation remains mandatory even with provider-side schema enforcement. Applica
 - preferred study types must use supported labels;
 - query text must not contain obvious stable study identifiers such as PMID or DOI.
 
+`ValidationGuidedLlmRepairService` is a provider-neutral Application boundary for
+semantic output correction in `EvidenceExtractor` and `ResearchSynthesizer`.
+Typed `ValidationIssue` values distinguish repairable output defects from
+non-repairable context, ownership, provider, cancellation, and infrastructure
+failures. A repairable issue receives at most the bounded
+`AI:ValidationGuidedRepair:MaxSemanticRepairAttempts` budget (default one,
+maximum two). The service keeps the original prompt context and schema, requests
+a complete replacement, and runs the same validator from scratch. It never
+merges or persists the rejected candidate. Planner and evaluator do not use this
+semantic repair path yet.
+
 OpenAI configuration lives under `AI`:
 
-- `Provider`, currently only `OpenAI`
+- `Provider`, `OpenAI` or development/manual-only `CodexCli`
 - `BaseUrl`, default `https://api.openai.com/v1/`
 - `Model`, externally supplied
 - `ApiKey`, externally supplied secret
@@ -400,7 +411,7 @@ Lifecycle fencing extends to stage output. The scoped worker claim is attached t
 
 If processing fails, Application logs the full exception internally and asks Infrastructure to persist the run as `Failed` with a safe failure reason. The API can then observe the failed state through `GET /api/research/{researchRunId}`.
 
-OpenAI configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures follow the existing safe run failure path. PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures follow the same path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
+OpenAI configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and non-repairable validation failures follow the existing safe run failure path. Repairable extraction/synthesis validation failures get only the bounded replacement attempt described above; if the replacement is invalid, the same safe failure path is used. PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures follow the same path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
 
 If the process crashes after claiming a run and before completing or failing it, another worker can reclaim the run after `processing_lease_expires_at`. Reclaim resumes from the persisted current stage. Planning retries reuse the canonical plan, and successful Searching executions are keyed by run/plan/source/query so sequential stage replay is idempotent. Lease-sensitive writes require the current `processing_lease_owner` and monotonically increasing `processing_lease_version`, which prevents stale workers from overwriting progress after ownership has transferred. A provider call can still race with another worker before an execution row exists; first-class in-progress provider attempts remain future work.
 

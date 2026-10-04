@@ -9,15 +9,18 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
     private readonly IStructuredLlmClient _structuredLlmClient;
     private readonly ResearchReportDraftValidator _validator;
     private readonly ILogger<ResearchSynthesizer> _logger;
+    private readonly ValidationGuidedLlmRepairService _repairService;
 
     public ResearchSynthesizer(
         IStructuredLlmClient structuredLlmClient,
         ResearchReportDraftValidator validator,
-        ILogger<ResearchSynthesizer> logger)
+        ILogger<ResearchSynthesizer> logger,
+        ValidationGuidedLlmRepairService? repairService = null)
     {
         _structuredLlmClient = structuredLlmClient;
         _validator = validator;
         _logger = logger;
+        _repairService = repairService ?? new ValidationGuidedLlmRepairService(structuredLlmClient);
     }
 
     public async Task<ResearchSynthesisResult> SynthesizeAsync(
@@ -25,6 +28,7 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _validator.ValidateContext(context);
 
         if (context.Statistics.IncludedEvidenceFindingCount == 0)
         {
@@ -51,23 +55,25 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
 
         try
         {
-            var generationResult = await _structuredLlmClient.GenerateStructuredAsync<ResearchReportDraft>(
+            var validatedGeneration = await _repairService.GenerateAndValidateAsync<ResearchReportDraft, ResearchSynthesisResult>(
                 new StructuredLlmRequest(
                     ResearchSynthesisPrompt.Version,
                     prompt.SystemPrompt,
                     prompt.UserPrompt,
                     ResearchSynthesisPrompt.OutputSchema),
+                (draft, metadata) => _validator.Validate(
+                    context,
+                    draft,
+                    metadata.Provider,
+                    metadata.Model,
+                    metadata.GeneratedAt),
+                "research synthesis",
                 cancellationToken);
 
-            var result = _validator.Validate(
-                context,
-                generationResult.Value,
-                generationResult.Metadata.Provider,
-                generationResult.Metadata.Model,
-                generationResult.Metadata.GeneratedAt);
+            var result = validatedGeneration.Value;
 
             _logger.LogInformation(
-                "ResearchSynthesisCompleted. ResearchRunId: {ResearchRunId}; ReportStatus: {ReportStatus}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; ClaimCount: {ClaimCount}; ConflictCount: {ConflictCount}; DurationMs: {DurationMs}",
+                "ResearchSynthesisCompleted. ResearchRunId: {ResearchRunId}; ReportStatus: {ReportStatus}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; ClaimCount: {ClaimCount}; ConflictCount: {ConflictCount}; LlmAttemptCount: {LlmAttemptCount}; RepairedIssueCodes: {RepairedIssueCodes}; DurationMs: {DurationMs}",
                 result.ResearchRunId,
                 result.Status,
                 result.SynthesizerProvider,
@@ -75,6 +81,8 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
                 result.PromptVersion,
                 result.Claims.Count,
                 context.OutcomeDirectionSummaries.Count(summary => summary.ConflictStatus == SynthesisConflictStatus.Present),
+                validatedGeneration.AttemptCount,
+                string.Join(',', validatedGeneration.RepairedIssueCodes),
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
 
             return result;

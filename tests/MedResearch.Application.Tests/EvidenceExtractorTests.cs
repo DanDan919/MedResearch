@@ -97,6 +97,43 @@ public sealed class EvidenceExtractorTests
     }
 
     [Fact]
+    public async Task ExtractAsync_RepairsUngroundedSupportingExcerptWithSameSourceContext()
+    {
+        var invalid = new EvidenceExtractionDraft([
+            new EvidenceFindingDraft("recall", "Recall improved.", "Recall was cured.", "Positive", null, null, null, null, null, null, null, null, null, null)
+        ]);
+        var valid = new EvidenceExtractionDraft([
+            new EvidenceFindingDraft("recall", "Recall improved.", "Recall improved after sleep.", "Positive", null, null, null, null, null, null, null, null, null, null)
+        ]);
+        var llm = new SequenceStructuredLlmClient(invalid, valid);
+        var extractor = CreateExtractor(llm);
+
+        var result = await extractor.ExtractAsync(CreateContext("Recall improved after sleep."), CancellationToken.None);
+
+        Assert.Equal(EvidenceExtractionStatus.Completed, result.Status);
+        Assert.Equal(2, llm.CallCount);
+        Assert.Contains("SupportingTextNotGrounded", llm.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Equal(llm.Requests[0].SystemPrompt, llm.Requests[1].SystemPrompt);
+        Assert.Equal(llm.Requests[0].OutputSchema.JsonSchema, llm.Requests[1].OutputSchema.JsonSchema);
+        Assert.Equal("Recall improved after sleep.", Assert.Single(result.Findings).SupportingText);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_FailsClosedWhenRepairRemainsInvalid()
+    {
+        var invalid = new EvidenceExtractionDraft([
+            new EvidenceFindingDraft("recall", "Recall improved.", "Recall was cured.", "Positive", null, null, null, null, null, null, null, null, null, null)
+        ]);
+        var llm = new SequenceStructuredLlmClient(invalid, invalid);
+        var extractor = CreateExtractor(llm);
+
+        await Assert.ThrowsAsync<EvidenceGroundingValidationException>(() =>
+            extractor.ExtractAsync(CreateContext("Recall improved after sleep."), CancellationToken.None));
+
+        Assert.Equal(2, llm.CallCount);
+    }
+
+    [Fact]
     public async Task ExtractAsync_RejectsBlankSupportingExcerpt()
     {
         var llm = new FakeStructuredLlmClient(new EvidenceExtractionDraft([
@@ -309,6 +346,29 @@ public sealed class EvidenceExtractorTests
             return Task.FromResult(new StructuredGenerationResult<T>(
                 (T)_value,
                 new StructuredLlmProviderMetadata("FakeLLM", "fake-model", "response-1", DateTimeOffset.UtcNow)));
+        }
+    }
+
+    private sealed class SequenceStructuredLlmClient : IStructuredLlmClient
+    {
+        private readonly Queue<EvidenceExtractionDraft> _drafts;
+
+        public SequenceStructuredLlmClient(params EvidenceExtractionDraft[] drafts)
+        {
+            _drafts = new Queue<EvidenceExtractionDraft>(drafts);
+        }
+
+        public List<StructuredLlmRequest> Requests { get; } = [];
+
+        public int CallCount => Requests.Count;
+
+        public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(StructuredLlmRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(request);
+            return Task.FromResult(new StructuredGenerationResult<T>(
+                (T)(object)_drafts.Dequeue(),
+                new StructuredLlmProviderMetadata("FakeLLM", "fake-model", $"response-{Requests.Count}", DateTimeOffset.UtcNow)));
         }
     }
 }

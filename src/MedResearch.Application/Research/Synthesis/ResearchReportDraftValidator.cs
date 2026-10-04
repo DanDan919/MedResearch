@@ -1,4 +1,5 @@
 using MedResearch.Domain;
+using MedResearch.Application.Research.Validation;
 
 namespace MedResearch.Application.Research.Synthesis;
 
@@ -22,7 +23,7 @@ public sealed class ResearchReportDraftValidator
         string model,
         DateTimeOffset generatedAt)
     {
-        ValidateContextEvidenceScope(context);
+        ValidateContext(context);
 
         var status = ParseEnum<ResearchReportStatus>(draft.ReportStatus, nameof(draft.ReportStatus));
         var reason = ParseNullableEnum<ResearchReportInsufficientEvidenceReason>(draft.InsufficientEvidenceReason, nameof(draft.InsufficientEvidenceReason));
@@ -128,7 +129,13 @@ public sealed class ResearchReportDraftValidator
             var draft = drafts[index];
             if (!string.IsNullOrWhiteSpace(draft.Pmid) || !string.IsNullOrWhiteSpace(draft.Doi) || !string.IsNullOrWhiteSpace(draft.StudyId))
             {
-                throw new ResearchSynthesisValidationException("Model-supplied PMID, DOI, or StudyId values are not accepted as report citation authority.");
+                throw new ResearchSynthesisValidationException(
+                    "Model-supplied PMID, DOI, or StudyId values are not accepted as report citation authority.",
+                    new ValidationIssue(
+                        ValidationIssueCodes.ModelSuppliedCitationMetadata,
+                        $"claims[{index}]",
+                        "Remove model-supplied PMID, DOI, and StudyId values; cite only authoritative EvidenceId values from the supplied context.",
+                        ValidationIssueDisposition.Repairable));
             }
 
             var type = ParseEnum<ResearchReportClaimType>(draft.Type, nameof(draft.Type));
@@ -150,7 +157,13 @@ public sealed class ResearchReportDraftValidator
             {
                 if (!evidenceById.TryGetValue(evidenceId, out var evidence))
                 {
-                    throw new ResearchSynthesisValidationException("Report claim references evidence outside the supplied synthesis context.");
+                    throw new ResearchSynthesisValidationException(
+                        "Report claim references evidence outside the supplied synthesis context.",
+                        new ValidationIssue(
+                            ValidationIssueCodes.UnknownEvidenceReference,
+                            $"claims[{index}].evidenceIds",
+                            "Cite only EvidenceId values present in the supplied synthesis context.",
+                            ValidationIssueDisposition.Repairable));
                 }
 
                 return evidence;
@@ -168,11 +181,17 @@ public sealed class ResearchReportDraftValidator
         return claims;
     }
 
-    private static void ValidateContextEvidenceScope(SynthesisContext context)
+    public void ValidateContext(SynthesisContext context)
     {
         if (context.Studies.SelectMany(study => study.Evidence).Any(evidence => evidence.ResearchRunId != context.ResearchRunId))
         {
-            throw new ResearchSynthesisValidationException("Synthesis context contains evidence from another research run.");
+            throw new ResearchSynthesisValidationException(
+                "Synthesis context contains evidence from another research run.",
+                new ValidationIssue(
+                    ValidationIssueCodes.CrossRunEvidenceReference,
+                    "context.studies[].evidence[].researchRunId",
+                    "The supplied synthesis context is cross-run and cannot be repaired by the model.",
+                    ValidationIssueDisposition.NonRepairable));
         }
     }
 
@@ -202,7 +221,13 @@ public sealed class ResearchReportDraftValidator
             if (!directions.Contains(EvidenceDirection.Mixed)
                 && !(directions.Contains(EvidenceDirection.Positive) && directions.Contains(EvidenceDirection.Negative)))
             {
-                throw new ResearchSynthesisValidationException("Mixed or conflict claims require mixed evidence or opposing positive and negative evidence directions.");
+                throw new ResearchSynthesisValidationException(
+                    "Mixed or conflict claims require mixed evidence or opposing positive and negative evidence directions.",
+                    new ValidationIssue(
+                        ValidationIssueCodes.MixedClaimConflict,
+                        "claims[].direction",
+                        "Use a non-mixed claim direction supported by the cited evidence, or cite the supplied opposing evidence needed for a mixed/conflict claim.",
+                        ValidationIssueDisposition.Repairable));
             }
 
             return;
@@ -215,22 +240,46 @@ public sealed class ResearchReportDraftValidator
 
         if (direction == ResearchReportClaimDirection.Positive && !directions.Contains(EvidenceDirection.Positive))
         {
-            throw new ResearchSynthesisValidationException("Positive report claims require at least one positive supporting evidence direction.");
+            throw new ResearchSynthesisValidationException(
+                "Positive report claims require at least one positive supporting evidence direction.",
+                new ValidationIssue(
+                    ValidationIssueCodes.InvalidDirection,
+                    "claims[].direction",
+                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
+                    ValidationIssueDisposition.Repairable));
         }
 
         if (direction == ResearchReportClaimDirection.Negative && !directions.Contains(EvidenceDirection.Negative))
         {
-            throw new ResearchSynthesisValidationException("Negative report claims require at least one negative supporting evidence direction.");
+            throw new ResearchSynthesisValidationException(
+                "Negative report claims require at least one negative supporting evidence direction.",
+                new ValidationIssue(
+                    ValidationIssueCodes.InvalidDirection,
+                    "claims[].direction",
+                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
+                    ValidationIssueDisposition.Repairable));
         }
 
         if (direction == ResearchReportClaimDirection.NoClearEffect && !directions.Contains(EvidenceDirection.NoClearEffect))
         {
-            throw new ResearchSynthesisValidationException("NoClearEffect report claims require at least one no-clear-effect supporting evidence direction.");
+            throw new ResearchSynthesisValidationException(
+                "NoClearEffect report claims require at least one no-clear-effect supporting evidence direction.",
+                new ValidationIssue(
+                    ValidationIssueCodes.InvalidDirection,
+                    "claims[].direction",
+                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
+                    ValidationIssueDisposition.Repairable));
         }
 
         if (direction == ResearchReportClaimDirection.NotReported && directions.Any(item => item != EvidenceDirection.NotReported))
         {
-            throw new ResearchSynthesisValidationException("NotReported report claims cannot cite evidence with reported effect directions.");
+            throw new ResearchSynthesisValidationException(
+                "NotReported report claims cannot cite evidence with reported effect directions.",
+                new ValidationIssue(
+                    ValidationIssueCodes.InvalidDirection,
+                    "claims[].direction",
+                    "Use NotReported only when all cited evidence directions are NotReported.",
+                    ValidationIssueDisposition.Repairable));
         }
     }
 

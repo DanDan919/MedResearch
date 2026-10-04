@@ -126,6 +126,7 @@ AI planning can be configured with:
 - `AI:ApiKey`, externally supplied secret
 - `AI:TimeoutSeconds`, default 30
 - `AI:MaxOutputTokens`, default 2000
+- `AI:ValidationGuidedRepair:MaxSemanticRepairAttempts`, default `1`, bounded to `0-2`; this is a semantic repair budget, not transport retry
 
 Codex CLI development provider
 
@@ -174,7 +175,7 @@ Europe PMC can be configured with:
 - `EuropePmc:MaxRetryAttempts`, development default `2`, bounded to 0-5
 - `EuropePmc:RetryBaseDelayMilliseconds`, development default `250`
 
-Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`. The API can start and expose health endpoints without an OpenAI API key; a real processing run that reaches an OpenAI-backed stage fails through the normal safe failure path if required provider configuration is absent.
+Use `.env`, user secrets, or CI secrets for real OpenAI and NCBI API keys. Do not commit `.env`. The API can start and expose health endpoints without an OpenAI API key; a real processing run that reaches an OpenAI-backed stage fails through the normal safe failure path if required provider configuration is absent. Extraction and synthesis may perform one bounded validation-guided replacement after a repairable deterministic issue; the original candidate is never persisted and the replacement must pass the same validator from scratch.
 
 ## Research API
 
