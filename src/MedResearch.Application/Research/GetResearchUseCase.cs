@@ -1,21 +1,30 @@
 using Microsoft.Extensions.Logging;
+using MedResearch.Application.Security;
 
 namespace MedResearch.Application.Research;
 
 public sealed class GetResearchUseCase
 {
     private readonly IResearchStore _researchStore;
+    private readonly ICurrentActor _currentActor;
     private readonly ILogger<GetResearchUseCase> _logger;
 
-    public GetResearchUseCase(IResearchStore researchStore, ILogger<GetResearchUseCase> logger)
+    public GetResearchUseCase(
+        IResearchStore researchStore,
+        ICurrentActor currentActor,
+        ILogger<GetResearchUseCase> logger)
     {
         _researchStore = researchStore;
+        _currentActor = currentActor;
         _logger = logger;
     }
 
     public async Task<ResearchRunDetails?> ExecuteAsync(Guid researchRunId, CancellationToken cancellationToken)
     {
-        var result = await _researchStore.FindResearchRunAsync(researchRunId, cancellationToken);
+        var result = await _researchStore.FindResearchRunAsync(
+            researchRunId,
+            _currentActor.RequireSubjectId(),
+            cancellationToken);
 
         if (result is null)
         {

@@ -1,19 +1,102 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using MedResearch.Api.Research;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.TestHost;
 
 namespace MedResearch.IntegrationTests;
 
 public sealed class ResearchApiTests
 {
+    [Fact]
+    public async Task AnonymousResearchEndpoints_AreRejected()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateAnonymousClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/research", new CreateResearchRequest("question"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/research")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}/report")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}/quantitative")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthenticatedRequestWithMalformedSubject_IsRejected()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClientFor(new string('x', 201));
+
+        var response = await client.GetAsync("/api/research");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResearchRun_IsolatedBetweenAuthenticatedSubjects()
+    {
+        using var factory = new ResearchApiFactory();
+        using var ownerClient = factory.CreateClientFor("UserA");
+        using var otherClient = factory.CreateClientFor("UserB");
+
+        var created = await ownerClient.PostAsJsonAsync("/api/research", new CreateResearchRequest("User A private question"));
+        var createdBody = await created.Content.ReadFromJsonAsync<CreateResearchResponse>();
+
+        var ownerRead = await ownerClient.GetAsync($"/api/research/{createdBody!.ResearchRunId}");
+        var otherRead = await otherClient.GetAsync($"/api/research/{createdBody.ResearchRunId}");
+        var otherList = await otherClient.GetAsync("/api/research");
+
+        Assert.Equal(HttpStatusCode.OK, ownerRead.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, otherRead.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, otherList.StatusCode);
+        var listBody = await otherList.Content.ReadFromJsonAsync<ResearchRunListResponse>();
+        Assert.Empty(listBody!.Items);
+        Assert.Equal(0, listBody.TotalCount);
+    }
+
+    [Fact]
+    public async Task ReportAndQuantitativeEndpoints_HideAnotherSubjectsRun()
+    {
+        using var factory = new ResearchApiFactory();
+        using var otherClient = factory.CreateClientFor("UserB");
+        var runId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        factory.Store.Seed(new ResearchRunDetails(
+            runId,
+            "User B private question",
+            ResearchRunStatus.Completed.ToString(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            null),
+            "UserB");
+        factory.ReportStore.Seed(CreateReport(runId, Guid.NewGuid(), ResearchReportStatus.Completed), "UserB");
+
+        var reportResponse = await otherClient.GetAsync($"/api/research/{runId}/report");
+        var quantitativeResponse = await otherClient.GetAsync($"/api/research/{runId}/quantitative");
+
+        Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, quantitativeResponse.StatusCode);
+
+        using var ownerClient = factory.CreateClientFor("UserA");
+        var foreignReportResponse = await ownerClient.GetAsync($"/api/research/{runId}/report");
+        var foreignQuantitativeResponse = await ownerClient.GetAsync($"/api/research/{runId}/quantitative");
+
+        Assert.Equal(HttpStatusCode.NotFound, foreignReportResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignQuantitativeResponse.StatusCode);
+    }
+
     [Fact]
     public async Task PostResearch_WithValidRequest_ReturnsCreated()
     {
@@ -374,18 +457,89 @@ public sealed class ResearchApiTests
 
         public InMemoryResearchReportStore ReportStore { get; } = new();
 
+        public InMemoryQuantitativeStore QuantitativeStore { get; } = new();
+
+        public new HttpClient CreateClient()
+        {
+            return CreateClientFor("UserA");
+        }
+
+        public HttpClient CreateClientFor(string subject)
+        {
+            var client = base.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Test-Subject", subject);
+            return client;
+        }
+
+        public HttpClient CreateAnonymousClient()
+        {
+            return base.CreateClient();
+        }
+
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {
-            builder.ConfigureServices(services =>
+            builder.ConfigureTestServices(services =>
             {
+                services.AddAuthentication(options =>
+                    {
+                        options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
+                        options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
+                    })
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                        TestAuthenticationHandler.Scheme,
+                        _ => { });
                 services.RemoveAll<IHostedService>();
                 services.RemoveAll<IResearchStore>();
                 services.RemoveAll<IResearchProgressStore>();
                 services.RemoveAll<IResearchReportStore>();
+                services.RemoveAll<IQuantitativeSynthesisArtifactStore>();
                 services.AddSingleton<IResearchStore>(Store);
                 services.AddSingleton<IResearchProgressStore>(Store);
                 services.AddSingleton<IResearchReportStore>(ReportStore);
+                services.AddSingleton<IQuantitativeSynthesisArtifactStore>(QuantitativeStore);
             });
+        }
+    }
+
+    private sealed class TestAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+    {
+        public new const string Scheme = "IntegrationTest";
+
+        public TestAuthenticationHandler(
+            IOptionsMonitor<AuthenticationSchemeOptions> options,
+            ILoggerFactory logger,
+            System.Text.Encodings.Web.UrlEncoder encoder)
+            : base(options, logger, encoder)
+        {
+        }
+
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var subject = Request.Headers["X-Test-Subject"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                return Task.FromResult(AuthenticateResult.NoResult());
+            }
+
+            var identity = new ClaimsIdentity([new Claim("sub", subject)], Scheme);
+            return Task.FromResult(AuthenticateResult.Success(
+                new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme)));
+        }
+    }
+
+    private sealed class InMemoryQuantitativeStore : IQuantitativeSynthesisArtifactStore
+    {
+        public Task PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(
+            Guid researchRunId,
+            string ownerSubjectId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>>([]);
         }
     }
 
@@ -393,10 +547,12 @@ public sealed class ResearchApiTests
     private sealed class InMemoryResearchReportStore : IResearchReportStore
     {
         private readonly ConcurrentDictionary<Guid, ResearchReportReadModel> _reports = [];
+        private readonly ConcurrentDictionary<Guid, string> _owners = [];
 
-        public void Seed(ResearchReportReadModel report)
+        public void Seed(ResearchReportReadModel report, string ownerSubjectId = "UserA")
         {
             _reports[report.ResearchRunId] = report;
+            _owners[report.ResearchRunId] = ownerSubjectId;
         }
 
         public Task<bool> HasReportAsync(Guid researchRunId, string promptVersion, CancellationToken cancellationToken)
@@ -409,9 +565,14 @@ public sealed class ResearchApiTests
             return Task.CompletedTask;
         }
 
-        public Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken)
+        public Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
         {
             _reports.TryGetValue(researchRunId, out var report);
+            if (report is not null && (!_owners.TryGetValue(researchRunId, out var owner) || owner != ownerSubjectId))
+            {
+                report = null;
+            }
+
             return Task.FromResult(report);
         }
     }
@@ -419,15 +580,18 @@ public sealed class ResearchApiTests
         , IResearchProgressStore
     {
         private readonly ConcurrentDictionary<Guid, ResearchRunDetails> _runs = [];
+        private readonly ConcurrentDictionary<Guid, string> _owners = [];
 
-        public void Seed(ResearchRunDetails details)
+        public void Seed(ResearchRunDetails details, string ownerSubjectId = "UserA")
         {
             _runs[details.ResearchRunId] = details;
+            _owners[details.ResearchRunId] = ownerSubjectId;
         }
 
         public Task PersistInitialResearchAsync(
             ResearchQuestion question,
             ResearchRun run,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
             _runs[run.Id] = new ResearchRunDetails(
@@ -438,13 +602,19 @@ public sealed class ResearchApiTests
                 run.StartedAt,
                 run.CompletedAt,
                 run.FailureReason);
+            _owners[run.Id] = ownerSubjectId;
 
             return Task.CompletedTask;
         }
 
-        public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, CancellationToken cancellationToken)
+        public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
         {
             _runs.TryGetValue(researchRunId, out var result);
+            if (result is not null && (!_owners.TryGetValue(researchRunId, out var owner) || owner != ownerSubjectId))
+            {
+                result = null;
+            }
+
             return Task.FromResult(result);
         }
 
@@ -452,9 +622,12 @@ public sealed class ResearchApiTests
             int page,
             int pageSize,
             ResearchRunStatus? status,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
-            var filtered = _runs.Values
+            var filtered = _runs
+                .Where(item => _owners.TryGetValue(item.Key, out var owner) && owner == ownerSubjectId)
+                .Select(item => item.Value)
                 .Where(run => status is null || run.Status == status.Value.ToString())
                 .OrderByDescending(run => run.CreatedAt)
                 .ThenByDescending(run => run.ResearchRunId)
@@ -483,9 +656,12 @@ public sealed class ResearchApiTests
 
         public Task<ResearchRunProgressSnapshot?> FindResearchRunProgressSnapshotAsync(
             Guid researchRunId,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
-            if (!_runs.TryGetValue(researchRunId, out var run))
+            if (!_runs.TryGetValue(researchRunId, out var run)
+                || !_owners.TryGetValue(researchRunId, out var owner)
+                || owner != ownerSubjectId)
             {
                 return Task.FromResult<ResearchRunProgressSnapshot?>(null);
             }

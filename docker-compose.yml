@@ -22,6 +22,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      Authentication__Mode: ${AUTHENTICATION_MODE:-DevelopmentLocal}
+      Authentication__DevelopmentSubject: ${AUTHENTICATION_DEVELOPMENT_SUBJECT:-local-development-user}
+      Authentication__Authority: ${AUTHENTICATION_AUTHORITY:-}
+      Authentication__Audience: ${AUTHENTICATION_AUDIENCE:-}
       ConnectionStrings__MedResearch: Host=postgres;Port=5432;Database=${POSTGRES_DB:-medresearch};Username=${POSTGRES_USER:-medresearch};Password=${POSTGRES_PASSWORD:-medresearch_dev_password}
       Database__ApplyMigrationsOnStartup: "true"
       ResearchProcessing__Enabled: "true"

@@ -46,7 +46,7 @@ The F6 artifact does not include publication titles, PMID/PMCID/DOI, author meta
 
 ## Missing OpenAPI CI Source Of Truth
 
-The frontend contains a checked-in OpenAPI snapshot in `frontend/packages/api/openapi/medresearch-api.json`. The backend now exposes `/openapi/v1.json`, but CI currently validates generation from the snapshot to keep frontend validation deterministic without starting the API. A future milestone can add a backend-generated OpenAPI artifact check if the API contract becomes part of release governance.
+The frontend contains a checked-in OpenAPI snapshot in `frontend/packages/api/openapi/medresearch-api.json`. The backend exposes `/openapi/v1.json` only in the Development environment; CI validates generation from the snapshot to keep frontend validation deterministic without starting the API. Production does not expose the development contract endpoint by default.
 
 ## Not Frontend Responsibilities
 

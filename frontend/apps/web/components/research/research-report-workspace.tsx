@@ -102,6 +102,7 @@ function ReportError({ error }: { error: unknown }) {
     return <Card className="border-warning/50"><CardContent className="flex items-start gap-3 py-6"><FileText className="mt-0.5 h-4 w-4 text-warning" /><div><div className="text-sm font-medium">Report not ready</div><p className="mt-1 text-sm text-muted-foreground">This research run is known, but its persisted report is not available yet. Check back after synthesis completes.</p></div></CardContent></Card>;
   }
   if (error instanceof MedResearchApiError && error.kind === "not-found") return <ErrorPanel title="Research run not found" message="The API could not find this research run." />;
+  if (error instanceof MedResearchApiError && error.kind === "unauthorized") return <ErrorPanel title="Authentication required" message="Sign in to view this research report." />;
   return <ErrorPanel title="Report unavailable" message="The API could not return a report for this research run." />;
 }
 

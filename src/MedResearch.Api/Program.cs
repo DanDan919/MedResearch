@@ -4,6 +4,8 @@ using MedResearch.Application.Research;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.DependencyInjection;
+using MedResearch.Application.Security;
+using MedResearch.Api.Security;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentActor, HttpCurrentActor>();
+builder.Services.AddMedResearchAuthentication(builder.Configuration, builder.Environment);
 var allowedCorsOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? [];
@@ -69,7 +74,12 @@ app.UseExceptionHandler(errorApp =>
         });
 });
 
-app.MapOpenApi();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+app.UseAuthentication();
+app.UseAuthorization();
 if (allowedCorsOrigins.Length > 0)
 {
     app.UseCors("Frontend");
@@ -86,7 +96,8 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 });
 
 var research = app.MapGroup("/api/research")
-    .WithTags("Research");
+    .WithTags("Research")
+    .RequireAuthorization(AuthenticationConfiguration.PolicyName);
 
 research.MapPost("/", async (
         CreateResearchRequest request,

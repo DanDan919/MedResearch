@@ -78,6 +78,40 @@ The API currently exposes:
 - `GET /health/live`: liveness check that does not depend on PostgreSQL, OpenAI, PubMed, or other external providers.
 - `GET /health/ready`: readiness check that includes PostgreSQL connectivity.
 
+Research endpoints are protected by the `AuthenticatedUser` policy. Production
+uses the ASP.NET Core JWT Bearer handler with configured issuer (`Authority`),
+audience, signature, and lifetime validation. The API consumes an external
+identity; it does not issue tokens, store passwords, or implement a login
+server. The immutable `sub` claim is normalized and is the only application
+actor identity accepted for ownership. A missing, blank, or oversized subject
+fails authorization closed.
+
+For local Docker development only, `Authentication:Mode=DevelopmentLocal`
+creates the explicit deterministic subject `local-development-user`. Startup
+rejects this mode outside the `Development` environment. Integration tests use
+a test-only ASP.NET authentication handler and never contact an identity
+provider. The frontend API client has one optional bearer-token transport hook;
+it does not invent localStorage token persistence.
+
+`ResearchQuestion.OwnerSubjectId` is the ownership root. `ResearchRun` and all
+run-scoped scientific outputs inherit access through the question relationship;
+EF queries for history, run, progress, reports, and quantitative artifacts
+apply the owner predicate in SQL. Existing pre-ownership rows are migrated to
+the explicit `legacy-unowned` subject rather than assigned to the first caller.
+Ownership is immutable in this milestone. Canonical `Study` and reusable
+scientific `SourceMaterial` identity remain global; their run-specific links
+and evidence are protected through the owning run.
+
+Anonymous access is deliberately limited to `/health`, `/health/live`, and
+`/health/ready`; these endpoints return no credentials or research data. An
+authenticated caller that does not own a route resource receives the same
+404-style result as a nonexistent resource. Authentication failures remain
+401, while an authenticated principal with no valid bounded subject is denied
+without loading scientific data.
+
+Runtime `/openapi/v1.json` is mapped only in Development. The checked-in
+frontend OpenAPI snapshot is a client contract, not an authorization boundary.
+
 Validation and unexpected failures are returned as Problem Details. Internal exception details are logged but not exposed in server-error responses.
 
 The progress read model is observational. `ResearchRun.Status` remains the authoritative lifecycle value. The stage list is derived from that status plus persisted output counts. For terminal failures the system stores a safe failure reason and terminal timestamp, but it does not currently persist the exact failed stage; the API and frontend therefore show the failure separately instead of inventing a failed stage. SourceMaterial is shared by `Study`, so progress counts current source material available for the Studies discovered by the run.

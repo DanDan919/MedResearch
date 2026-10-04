@@ -1,6 +1,7 @@
 using MedResearch.Application.Research;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
+using MedResearch.Application.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace MedResearch.Infrastructure.Research;
@@ -16,13 +17,15 @@ public sealed class EfResearchProgressStore : IResearchProgressStore
 
     public async Task<ResearchRunProgressSnapshot?> FindResearchRunProgressSnapshotAsync(
         Guid researchRunId,
+        string ownerSubjectId,
         CancellationToken cancellationToken)
     {
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
         var run = await (
             from researchRun in _dbContext.ResearchRuns.AsNoTracking()
             join question in _dbContext.ResearchQuestions.AsNoTracking()
                 on researchRun.ResearchQuestionId equals question.Id
-            where researchRun.Id == researchRunId
+            where researchRun.Id == researchRunId && question.OwnerSubjectId == ownerSubjectId
             select new
             {
                 Run = researchRun,

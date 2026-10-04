@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { researchPipelineStages, researchRunStatusPresentation } from "@medresearch/api";
+import { MedResearchApiError, researchPipelineStages, researchRunStatusPresentation } from "@medresearch/api";
 import type { ResearchRunStatus } from "@medresearch/api";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from "@medresearch/ui";
 import { useResearchRuns } from "../../lib/api";
@@ -91,7 +91,10 @@ export function ResearchHistory() {
       {query.isLoading ? <HistorySkeleton /> : null}
 
       {query.isError ? (
-        <ErrorPanel title="Research history unavailable" message="The API could not return the research history page." />
+        <ErrorPanel
+          title={query.error instanceof MedResearchApiError && query.error.kind === "unauthorized" ? "Authentication required" : "Research history unavailable"}
+          message={query.error instanceof MedResearchApiError && query.error.kind === "unauthorized" ? "Sign in to view research history." : "The API could not return the research history page."}
+        />
       ) : null}
 
       {showEmpty ? (

@@ -1,4 +1,5 @@
 using MedResearch.Domain;
+using MedResearch.Application.Security;
 
 namespace MedResearch.Application.Research;
 
@@ -16,10 +17,12 @@ public sealed class GetResearchProgressUseCase
     ];
 
     private readonly IResearchProgressStore _progressStore;
+    private readonly ICurrentActor _currentActor;
 
-    public GetResearchProgressUseCase(IResearchProgressStore progressStore)
+    public GetResearchProgressUseCase(IResearchProgressStore progressStore, ICurrentActor currentActor)
     {
         _progressStore = progressStore;
+        _currentActor = currentActor;
     }
 
     public async Task<ResearchRunProgress?> ExecuteAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -30,7 +33,10 @@ public sealed class GetResearchProgressUseCase
         }
 
         var refreshedAt = DateTimeOffset.UtcNow;
-        var snapshot = await _progressStore.FindResearchRunProgressSnapshotAsync(researchRunId, cancellationToken);
+        var snapshot = await _progressStore.FindResearchRunProgressSnapshotAsync(
+            researchRunId,
+            _currentActor.RequireSubjectId(),
+            cancellationToken);
         if (snapshot is null)
         {
             return null;

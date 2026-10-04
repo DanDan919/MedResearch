@@ -5,7 +5,7 @@
 - Report rows do not yet persist the quantitative artifact id/fingerprint used during synthesis; the relationship is currently implicit in the same synthesis execution.
 - Same-run report citation integrity and SourceMaterial current-version uniqueness are protected by application transactions/advisory locks rather than universal composite constraints or triggers.
 - Numeric grounding proves source-token presence, not semantic association between a token and a reported statistic.
-- Authentication and authorization are outside the current local-development API scope and must be designed before public deployment.
+- F10 adds the first authentication/authorization boundary, but no external identity-provider tenant is configured in this repository. Production deployment must supply a trusted JWT issuer and audience; token issuance, user lifecycle, collaboration, and ownership transfer remain outside scope.
 
 ## Current
 
@@ -75,4 +75,6 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 
 - Planning and successful search execution retries are now idempotent for the current run/plan contract. Failed provider attempts in a partial multi-source search are still operationally logged rather than persisted as first-class LiteratureSearch status records.
 - Local Docker unavailability still prevents execution of PostgreSQL/Testcontainers tests. The GitHub Actions workflow remains the authoritative runtime check and now includes the deterministic Playwright browser suite.
-- No authentication/authorization boundary was added by F9; API access remains an application deployment concern.
+- F10 authentication is intentionally bearer-based and stateless. There is no refresh-token/session lifecycle, localStorage token persistence, cookie auth, or CSRF workflow until a concrete identity-provider/client product is selected.
+- Resource creation has no per-user quota or rate limit yet. Authentication prevents cross-user access, but one authenticated actor can still submit many expensive research runs; a narrow resource-abuse policy is a future operational milestone.
+- Existing pre-ownership rows are preserved under `legacy-unowned`. A deliberate administrative migration/ownership assignment tool is still required before those rows can be made user-visible.

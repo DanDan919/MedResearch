@@ -6,5 +6,8 @@ public interface IResearchReportStore
 
     Task PersistReportAsync(ResearchSynthesisResult result, CancellationToken cancellationToken);
 
-    Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken);
+    Task<ResearchReportReadModel?> FindReportAsync(
+        Guid researchRunId,
+        string ownerSubjectId,
+        CancellationToken cancellationToken);
 }

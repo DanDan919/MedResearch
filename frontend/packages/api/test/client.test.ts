@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { MedResearchApiClient } from "../src/client";
 
 describe("MedResearchApiClient research history", () => {
+  it("adds a bearer token through the centralized transport option", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }));
+    const client = new MedResearchApiClient({
+      baseUrl: "https://api.example.test",
+      fetch: fetchMock,
+      getAccessToken: () => "test-token"
+    });
+
+    await client.listResearchRuns();
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+
   it("requests paged research runs with default filters", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
@@ -51,6 +65,20 @@ describe("MedResearchApiClient research history", () => {
     expect(result.items[0].status).toBe("Completed");
     const [url] = fetchMock.mock.calls[0];
     expect(String(url)).toBe("https://api.example.test/api/research?page=2&pageSize=10&status=Completed");
+  });
+});
+
+describe("MedResearchApiClient authentication errors", () => {
+  it("classifies an unauthorized API response distinctly from a missing resource", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ title: "Unauthorized", status: 401 }), {
+        status: 401,
+        headers: { "Content-Type": "application/problem+json" }
+      })
+    );
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test", fetch: fetchMock });
+
+    await expect(client.listResearchRuns()).rejects.toMatchObject({ kind: "unauthorized", status: 401 });
   });
 });
 

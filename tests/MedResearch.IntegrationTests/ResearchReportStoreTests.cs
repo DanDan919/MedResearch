@@ -76,7 +76,7 @@ public sealed class ResearchReportStoreTests
 
         await using var verification = _fixture.CreateDbContext();
         var readStore = new EfResearchSynthesisStore(verification);
-        var report = await readStore.FindReportAsync(seed.RunId, CancellationToken.None);
+        var report = await readStore.FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.NotNull(report);
         Assert.Equal(seed.RunId, report.ResearchRunId);
@@ -281,7 +281,7 @@ public sealed class ResearchReportStoreTests
 
         await using var verification = _fixture.CreateDbContext();
         var readStore = new EfResearchSynthesisStore(verification);
-        var reportReadModel = await readStore.FindReportAsync(second.RunId, CancellationToken.None);
+        var reportReadModel = await readStore.FindReportAsync(second.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.NotNull(reportReadModel);
         var claimReadModel = Assert.Single(reportReadModel.Claims);

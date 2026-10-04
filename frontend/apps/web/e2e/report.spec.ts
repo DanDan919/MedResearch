@@ -28,6 +28,14 @@ test("report workspace presents a not-ready state for a known run without a repo
   await expect(page.getByText(/failed/i)).not.toBeVisible();
 });
 
+test("report workspace distinguishes an unauthenticated response", async ({ page }) => {
+  await mockReportApi(page, { title: "Unauthorized", status: 401 }, 401);
+  await page.goto(`/research/${runId}/report`);
+
+  await expect(page.getByText("Authentication required")).toBeVisible();
+  await expect(page.getByText(/Sign in to view this research report/i)).toBeVisible();
+});
+
 test("report workspace keeps missing study identifiers absent", async ({ page }) => {
   await mockReportApi(page, reportResponse(true));
   await page.goto(`/research/${runId}/report`);

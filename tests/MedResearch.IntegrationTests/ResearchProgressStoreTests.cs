@@ -28,7 +28,7 @@ public sealed class ResearchProgressStoreTests
         await using var context = _fixture.CreateDbContext();
         var store = new EfResearchProgressStore(context);
 
-        var snapshot = await store.FindResearchRunProgressSnapshotAsync(seed.RunId, CancellationToken.None);
+        var snapshot = await store.FindResearchRunProgressSnapshotAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.NotNull(snapshot);
         Assert.Equal(seed.RunId, snapshot.ResearchRunId);
@@ -111,7 +111,7 @@ public sealed class ResearchProgressStoreTests
         await using var verification = _fixture.CreateDbContext();
         var store = new EfResearchProgressStore(verification);
 
-        var snapshot = await store.FindResearchRunProgressSnapshotAsync(seed.RunId, CancellationToken.None);
+        var snapshot = await store.FindResearchRunProgressSnapshotAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.NotNull(snapshot);
         Assert.Equal(1, snapshot.Metrics.EvidenceExtractionCount);

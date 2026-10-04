@@ -4,6 +4,7 @@ using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using MedResearch.Application.Security;
 using Npgsql;
 
 namespace MedResearch.Infrastructure.Synthesis.Persistence;
@@ -104,6 +105,7 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
 
     public async Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(
         Guid researchRunId,
+        string ownerSubjectId,
         CancellationToken cancellationToken)
     {
         if (researchRunId == Guid.Empty)
@@ -111,9 +113,21 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
             throw new ArgumentException("Research run id cannot be empty.", nameof(researchRunId));
         }
 
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
+
         var entities = await _dbContext.QuantitativeSynthesisArtifacts
             .AsNoTracking()
             .Where(artifact => artifact.ResearchRunId == researchRunId)
+            .Join(
+                _dbContext.ResearchRuns.AsNoTracking(),
+                artifact => artifact.ResearchRunId,
+                run => run.Id,
+                (artifact, run) => new { artifact, run.ResearchQuestionId })
+            .Join(
+                _dbContext.ResearchQuestions.AsNoTracking().Where(question => question.OwnerSubjectId == ownerSubjectId),
+                item => item.ResearchQuestionId,
+                question => question.Id,
+                (item, _) => item.artifact)
             .OrderBy(artifact => artifact.GroupKey)
             .ThenBy(artifact => artifact.Id)
             .ToArrayAsync(cancellationToken);

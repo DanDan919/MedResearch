@@ -1,4 +1,5 @@
 using MedResearch.Domain;
+using MedResearch.Application.Security;
 using Microsoft.Extensions.Logging;
 
 namespace MedResearch.Application.Research;
@@ -10,11 +11,16 @@ public sealed class ListResearchRunsUseCase
     public const int MaxPageSize = 100;
 
     private readonly IResearchStore _researchStore;
+    private readonly ICurrentActor _currentActor;
     private readonly ILogger<ListResearchRunsUseCase> _logger;
 
-    public ListResearchRunsUseCase(IResearchStore researchStore, ILogger<ListResearchRunsUseCase> logger)
+    public ListResearchRunsUseCase(
+        IResearchStore researchStore,
+        ICurrentActor currentActor,
+        ILogger<ListResearchRunsUseCase> logger)
     {
         _researchStore = researchStore;
+        _currentActor = currentActor;
         _logger = logger;
     }
 
@@ -41,7 +47,12 @@ public sealed class ListResearchRunsUseCase
         }
 
         var status = ParseStatus(query.Status);
-        var result = await _researchStore.ListResearchRunsAsync(page, pageSize, status, cancellationToken);
+        var result = await _researchStore.ListResearchRunsAsync(
+            page,
+            pageSize,
+            status,
+            _currentActor.RequireSubjectId(),
+            cancellationToken);
 
         _logger.LogInformation(
             "Research runs listed. Page: {Page}; PageSize: {PageSize}; TotalCount: {TotalCount}; Status: {Status}",

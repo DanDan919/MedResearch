@@ -4,5 +4,6 @@ public interface IResearchProgressStore
 {
     Task<ResearchRunProgressSnapshot?> FindResearchRunProgressSnapshotAsync(
         Guid researchRunId,
+        string ownerSubjectId,
         CancellationToken cancellationToken);
 }

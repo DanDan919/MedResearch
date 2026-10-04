@@ -25,5 +25,13 @@ internal sealed class ResearchQuestionConfiguration : IEntityTypeConfiguration<R
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        builder.Property(question => question.OwnerSubjectId)
+            .HasColumnName("owner_subject_id")
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.HasIndex(question => question.OwnerSubjectId)
+            .HasDatabaseName("ix_research_questions_owner_subject_id");
     }
 }

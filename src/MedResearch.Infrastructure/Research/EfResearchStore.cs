@@ -1,6 +1,7 @@
 using MedResearch.Application.Research;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
+using MedResearch.Application.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace MedResearch.Infrastructure.Research;
@@ -17,8 +18,15 @@ public sealed class EfResearchStore : IResearchStore
     public async Task PersistInitialResearchAsync(
         ResearchQuestion question,
         ResearchRun run,
+        string ownerSubjectId,
         CancellationToken cancellationToken)
     {
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
+        if (!string.Equals(question.OwnerSubjectId, ownerSubjectId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Research question ownership does not match the current actor.");
+        }
+
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         _dbContext.ResearchQuestions.Add(question);
@@ -28,13 +36,17 @@ public sealed class EfResearchStore : IResearchStore
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, CancellationToken cancellationToken)
+    public async Task<ResearchRunDetails?> FindResearchRunAsync(
+        Guid researchRunId,
+        string ownerSubjectId,
+        CancellationToken cancellationToken)
     {
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
         return await (
             from run in _dbContext.ResearchRuns.AsNoTracking()
             join question in _dbContext.ResearchQuestions.AsNoTracking()
                 on run.ResearchQuestionId equals question.Id
-            where run.Id == researchRunId
+            where run.Id == researchRunId && question.OwnerSubjectId == ownerSubjectId
             select new ResearchRunDetails(
                 run.Id,
                 question.Text,
@@ -50,8 +62,10 @@ public sealed class EfResearchStore : IResearchStore
         int page,
         int pageSize,
         ResearchRunStatus? status,
+        string ownerSubjectId,
         CancellationToken cancellationToken)
     {
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
         var query =
             from run in _dbContext.ResearchRuns.AsNoTracking()
             join question in _dbContext.ResearchQuestions.AsNoTracking()
@@ -59,8 +73,11 @@ public sealed class EfResearchStore : IResearchStore
             select new
             {
                 Run = run,
-                Question = question.Text
+                Question = question.Text,
+                OwnerSubjectId = question.OwnerSubjectId
             };
+
+        query = query.Where(item => item.OwnerSubjectId == ownerSubjectId);
 
         if (status.HasValue)
         {

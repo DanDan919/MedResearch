@@ -1,4 +1,5 @@
 using MedResearch.Application.Research;
+using MedResearch.Application.Security;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -10,7 +11,7 @@ public sealed class ResearchUseCaseTests
     public async Task CreateResearch_CreatesQueuedLinkedRun()
     {
         var store = new CapturingResearchStore();
-        var useCase = new CreateResearchUseCase(store, NullLogger<CreateResearchUseCase>.Instance);
+        var useCase = new CreateResearchUseCase(store, new TestCurrentActor(), NullLogger<CreateResearchUseCase>.Instance);
 
         var result = await useCase.ExecuteAsync(
             new CreateResearchCommand("Does chronic sleep deprivation impair working memory in adults?"),
@@ -31,7 +32,7 @@ public sealed class ResearchUseCaseTests
     public async Task CreateResearch_RejectsInvalidQuestion(string? question)
     {
         var store = new CapturingResearchStore();
-        var useCase = new CreateResearchUseCase(store, NullLogger<CreateResearchUseCase>.Instance);
+        var useCase = new CreateResearchUseCase(store, new TestCurrentActor(), NullLogger<CreateResearchUseCase>.Instance);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             useCase.ExecuteAsync(new CreateResearchCommand(question), CancellationToken.None));
@@ -44,7 +45,7 @@ public sealed class ResearchUseCaseTests
     public async Task GetResearch_ReturnsNullForUnknownRun()
     {
         var store = new CapturingResearchStore();
-        var useCase = new GetResearchUseCase(store, NullLogger<GetResearchUseCase>.Instance);
+        var useCase = new GetResearchUseCase(store, new TestCurrentActor(), NullLogger<GetResearchUseCase>.Instance);
 
         var result = await useCase.ExecuteAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -55,7 +56,7 @@ public sealed class ResearchUseCaseTests
     public async Task ListResearch_UsesDefaults()
     {
         var store = new CapturingResearchStore();
-        var useCase = new ListResearchRunsUseCase(store, NullLogger<ListResearchRunsUseCase>.Instance);
+        var useCase = new ListResearchRunsUseCase(store, new TestCurrentActor(), NullLogger<ListResearchRunsUseCase>.Instance);
 
         var result = await useCase.ExecuteAsync(new ListResearchRunsQuery(null, null, null), CancellationToken.None);
 
@@ -69,7 +70,7 @@ public sealed class ResearchUseCaseTests
     public async Task ListResearch_ParsesStatusFilter()
     {
         var store = new CapturingResearchStore();
-        var useCase = new ListResearchRunsUseCase(store, NullLogger<ListResearchRunsUseCase>.Instance);
+        var useCase = new ListResearchRunsUseCase(store, new TestCurrentActor(), NullLogger<ListResearchRunsUseCase>.Instance);
 
         await useCase.ExecuteAsync(
             new ListResearchRunsQuery(2, 10, ResearchRunStatus.Completed.ToString()),
@@ -88,7 +89,7 @@ public sealed class ResearchUseCaseTests
     public async Task ListResearch_RejectsInvalidParameters(int page, int pageSize, string? status)
     {
         var store = new CapturingResearchStore();
-        var useCase = new ListResearchRunsUseCase(store, NullLogger<ListResearchRunsUseCase>.Instance);
+        var useCase = new ListResearchRunsUseCase(store, new TestCurrentActor(), NullLogger<ListResearchRunsUseCase>.Instance);
 
         await Assert.ThrowsAnyAsync<ArgumentException>(() =>
             useCase.ExecuteAsync(new ListResearchRunsQuery(page, pageSize, status), CancellationToken.None));
@@ -103,6 +104,7 @@ public sealed class ResearchUseCaseTests
         public Task PersistInitialResearchAsync(
             ResearchQuestion question,
             ResearchRun run,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
             SavedQuestion = question;
@@ -110,7 +112,7 @@ public sealed class ResearchUseCaseTests
             return Task.CompletedTask;
         }
 
-        public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, CancellationToken cancellationToken)
+        public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
         {
             return Task.FromResult<ResearchRunDetails?>(null);
         }
@@ -125,6 +127,7 @@ public sealed class ResearchUseCaseTests
             int page,
             int pageSize,
             ResearchRunStatus? status,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
             Page = page;
@@ -132,5 +135,14 @@ public sealed class ResearchUseCaseTests
             Status = status;
             return Task.FromResult(new ResearchRunListResult([], page, pageSize, 0, 0));
         }
+    }
+
+    private sealed class TestCurrentActor : ICurrentActor
+    {
+        public bool IsAuthenticated => true;
+
+        public string? SubjectId => "UserA";
+
+        public string RequireSubjectId() => "UserA";
     }
 }

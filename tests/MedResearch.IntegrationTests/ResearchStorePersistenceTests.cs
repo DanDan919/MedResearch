@@ -27,7 +27,7 @@ public sealed class ResearchStorePersistenceTests
         await using (var context = _fixture.CreateDbContext())
         {
             var store = new EfResearchStore(context);
-            await store.PersistInitialResearchAsync(question, run, CancellationToken.None);
+            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
         }
 
         await using var verificationContext = _fixture.CreateDbContext();
@@ -54,12 +54,12 @@ public sealed class ResearchStorePersistenceTests
         await using (var context = _fixture.CreateDbContext())
         {
             var store = new EfResearchStore(context);
-            await store.PersistInitialResearchAsync(question, run, CancellationToken.None);
+            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
         }
 
         await using var retrievalContext = _fixture.CreateDbContext();
         var retrievalStore = new EfResearchStore(retrievalContext);
-        var result = await retrievalStore.FindResearchRunAsync(run.Id, CancellationToken.None);
+        var result = await retrievalStore.FindResearchRunAsync(run.Id, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(run.Id, result.ResearchRunId);
@@ -113,7 +113,7 @@ public sealed class ResearchStorePersistenceTests
             var store = new EfResearchStore(context);
 
             await Assert.ThrowsAsync<DbUpdateException>(() =>
-                store.PersistInitialResearchAsync(question, run, CancellationToken.None));
+                store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
         }
 
         await using var verificationContext = _fixture.CreateDbContext();
@@ -131,9 +131,9 @@ public sealed class ResearchStorePersistenceTests
         await using var context = _fixture.CreateDbContext();
         var store = new EfResearchStore(context);
 
-        var baseline = await store.ListResearchRunsAsync(1, 1, null, CancellationToken.None);
+        var baseline = await store.ListResearchRunsAsync(1, 1, null, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
         var beyondLastPage = baseline.TotalCount + 1;
-        var result = await store.ListResearchRunsAsync(beyondLastPage, 1, null, CancellationToken.None);
+        var result = await store.ListResearchRunsAsync(beyondLastPage, 1, null, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.Empty(result.Items);
         Assert.Equal(beyondLastPage, result.Page);
@@ -168,10 +168,10 @@ public sealed class ResearchStorePersistenceTests
         await using var retrievalContext = _fixture.CreateDbContext();
         var store = new EfResearchStore(retrievalContext);
 
-        var firstPage = await store.ListResearchRunsAsync(1, 2, null, CancellationToken.None);
-        var secondPage = await store.ListResearchRunsAsync(2, 2, null, CancellationToken.None);
+        var firstPage = await store.ListResearchRunsAsync(1, 2, null, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        var secondPage = await store.ListResearchRunsAsync(2, 2, null, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
         var beyondPageNumber = (firstPage.TotalCount / 2) + 2;
-        var beyondPage = await store.ListResearchRunsAsync(beyondPageNumber, 2, null, CancellationToken.None);
+        var beyondPage = await store.ListResearchRunsAsync(beyondPageNumber, 2, null, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         Assert.Equal([newestRun.Id, tiedHigherRun.Id], firstPage.Items.Select(item => item.ResearchRunId).ToArray());
         Assert.Equal([tiedLowerRun.Id, olderRun.Id], secondPage.Items.Select(item => item.ResearchRunId).ToArray());
@@ -207,7 +207,7 @@ public sealed class ResearchStorePersistenceTests
         await using var retrievalContext = _fixture.CreateDbContext();
         var store = new EfResearchStore(retrievalContext);
 
-        var result = await store.ListResearchRunsAsync(1, 100, ResearchRunStatus.Completed, CancellationToken.None);
+        var result = await store.ListResearchRunsAsync(1, 100, ResearchRunStatus.Completed, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
 
         var item = Assert.Single(result.Items, item => item.ResearchRunId == completedRun.Id);
         Assert.Equal(completedRun.Id, item.ResearchRunId);
@@ -215,6 +215,37 @@ public sealed class ResearchStorePersistenceTests
         Assert.Equal(result.Items.Count, result.Items.Select(item => item.ResearchRunId).Distinct().Count());
         Assert.True(result.TotalCount >= 1);
         Assert.True(result.TotalPages >= 1);
+    }
+
+    [SkippableFact]
+    public async Task ResearchRunReads_AreScopedToTheQuestionOwner()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var now = DateTimeOffset.UtcNow;
+        var questionA = new ResearchQuestion("Private owner A question", now, "UserA");
+        var questionB = new ResearchQuestion("Private owner B question", now.AddSeconds(1), "UserB");
+        var runA = new ResearchRun(questionA.Id, now);
+        var runB = new ResearchRun(questionB.Id, now.AddSeconds(1));
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfResearchStore(context);
+            await store.PersistInitialResearchAsync(questionA, runA, "UserA", CancellationToken.None);
+            await store.PersistInitialResearchAsync(questionB, runB, "UserB", CancellationToken.None);
+        }
+
+        await using var verificationContext = _fixture.CreateDbContext();
+        var storeForRead = new EfResearchStore(verificationContext);
+        var ownerARead = await storeForRead.FindResearchRunAsync(runA.Id, "UserA", CancellationToken.None);
+        var crossUserRead = await storeForRead.FindResearchRunAsync(runB.Id, "UserA", CancellationToken.None);
+        var ownerAList = await storeForRead.ListResearchRunsAsync(1, 100, null, "UserA", CancellationToken.None);
+
+        Assert.NotNull(ownerARead);
+        Assert.Null(crossUserRead);
+        Assert.Contains(ownerAList.Items, item => item.ResearchRunId == runA.Id);
+        Assert.DoesNotContain(ownerAList.Items, item => item.ResearchRunId == runB.Id);
+        Assert.Equal(ownerAList.Items.Count, ownerAList.TotalCount);
     }
 
     private void SkipIfPostgreSqlUnavailable()

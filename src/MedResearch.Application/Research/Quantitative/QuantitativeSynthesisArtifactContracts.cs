@@ -16,6 +16,7 @@ public interface IQuantitativeSynthesisArtifactStore
 
     Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(
         Guid researchRunId,
+        string ownerSubjectId,
         CancellationToken cancellationToken);
 }
 

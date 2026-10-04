@@ -17,6 +17,29 @@ advisory lock.
 
 ## Exists Now
 
+### F10 authentication and ownership boundary
+
+- Production research routes use ASP.NET Core JWT Bearer authentication with
+  configured issuer, audience, signature, and lifetime validation.
+- The application consumes the immutable `sub` claim through `ICurrentActor`;
+  HTTP headers and client-supplied owner IDs are not accepted as ownership
+  input.
+- `ResearchQuestion.OwnerSubjectId` is the immutable ownership root. History,
+  run, progress, report, and quantitative reads apply owner scope in their
+  application/store contracts and EF queries.
+- `/health`, `/health/live`, and `/health/ready` remain anonymous. Research
+  endpoints require the `AuthenticatedUser` policy. Unauthorized resources
+  are returned as 404-style results after authentication to reduce existence
+  disclosure.
+- Local Compose development uses explicitly gated `DevelopmentLocal` auth;
+  the mode is rejected outside `Development`. Integration tests use a
+  test-only deterministic authentication handler and no external identity
+  provider.
+- Existing rows are migrated to `legacy-unowned` and are not silently exposed
+  to the first authenticated user. Canonical `Study` and scientific
+  `SourceMaterial` identity remain global; run-scoped scientific data remains
+  protected through the owner-scoped run.
+
 - Initial repository documentation and development trail.
 - Architecture comprehension documentation:
   - `docs/architecture-overview.md` for a simple Russian system overview.

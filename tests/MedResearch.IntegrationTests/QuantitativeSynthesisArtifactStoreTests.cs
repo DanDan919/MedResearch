@@ -45,7 +45,7 @@ public sealed class QuantitativeSynthesisArtifactStoreTests
         await using var verification = _fixture.CreateDbContext();
         Assert.Equal(1, await verification.QuantitativeSynthesisArtifacts.CountAsync(artifact => artifact.ResearchRunId == seed.RunId));
         Assert.Equal(1, await verification.QuantitativeSynthesisContributionSnapshots.CountAsync(snapshot => snapshot.EvidenceId == seed.EvidenceId));
-        var readModel = Assert.Single(await new EfQuantitativeSynthesisArtifactStore(verification).FindByResearchRunIdAsync(seed.RunId, CancellationToken.None));
+        var readModel = Assert.Single(await new EfQuantitativeSynthesisArtifactStore(verification).FindByResearchRunIdAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
         Assert.Equal(result.AnalysisScaleEffect, readModel.Result.AnalysisScaleEffect);
         Assert.Equal(result.Contributions.Single().EvidenceId, readModel.Result.Contributions.Single().EvidenceId);
         Assert.Equal(QuantitativeSynthesisArtifactSnapshot.ComputeFingerprint(result), readModel.SnapshotFingerprint);
@@ -169,7 +169,7 @@ public sealed class QuantitativeSynthesisArtifactStoreTests
 
         await using var verification = _fixture.CreateDbContext();
         await Assert.ThrowsAsync<InvalidOperationException>(() => new EfQuantitativeSynthesisArtifactStore(verification)
-            .FindByResearchRunIdAsync(seed.RunId, CancellationToken.None));
+            .FindByResearchRunIdAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
     }
 
     [SkippableFact]

@@ -1,4 +1,5 @@
 using MedResearch.Application.Research;
+using MedResearch.Application.Security;
 using MedResearch.Domain;
 
 namespace MedResearch.Application.Tests;
@@ -21,7 +22,7 @@ public sealed class ResearchProgressUseCaseTests
             DateTimeOffset.UtcNow,
             3,
             Metrics(evidenceExtractionCount: 1)));
-        var useCase = new GetResearchProgressUseCase(store);
+        var useCase = new GetResearchProgressUseCase(store, new TestCurrentActor());
 
         var result = await useCase.ExecuteAsync(runId, CancellationToken.None);
 
@@ -47,7 +48,7 @@ public sealed class ResearchProgressUseCaseTests
             null,
             2,
             Metrics(researchPlanCount: 1, literatureSearchCount: 1)));
-        var useCase = new GetResearchProgressUseCase(store);
+        var useCase = new GetResearchProgressUseCase(store, new TestCurrentActor());
 
         var result = await useCase.ExecuteAsync(runId, CancellationToken.None);
 
@@ -74,7 +75,7 @@ public sealed class ResearchProgressUseCaseTests
             DateTimeOffset.UtcNow.AddMinutes(-2),
             4,
             Metrics(researchPlanCount: 1)));
-        var useCase = new GetResearchProgressUseCase(store);
+        var useCase = new GetResearchProgressUseCase(store, new TestCurrentActor());
 
         var result = await useCase.ExecuteAsync(runId, CancellationToken.None);
 
@@ -138,9 +139,19 @@ public sealed class ResearchProgressUseCaseTests
 
         public Task<ResearchRunProgressSnapshot?> FindResearchRunProgressSnapshotAsync(
             Guid researchRunId,
+            string ownerSubjectId,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_snapshot?.ResearchRunId == researchRunId ? _snapshot : null);
         }
+    }
+
+    private sealed class TestCurrentActor : ICurrentActor
+    {
+        public bool IsAuthenticated => true;
+
+        public string? SubjectId => "UserA";
+
+        public string RequireSubjectId() => "UserA";
     }
 }

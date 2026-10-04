@@ -84,6 +84,38 @@ For details, see `docs/frontend/architecture.md`, `docs/frontend/development.md`
 
 The Docker Compose API service sets `Database__ApplyMigrationsOnStartup=true`, so the committed EF migrations are applied when the local stack starts. The same API service hosts the background research worker.
 
+### Authentication and ownership
+
+Research data is owner-scoped at the API and PostgreSQL query boundaries. The
+owner is the immutable authenticated `sub` claim; clients cannot submit an
+owner ID. `ResearchQuestion` is the ownership root and all run-scoped report,
+progress, and quantitative reads join through that root. Canonical `Study`
+metadata remains global scientific identity and is not duplicated per user.
+
+Production uses ASP.NET Core JWT Bearer validation. Set
+`Authentication__Mode=JwtBearer`, `Authentication__Authority`, and
+`Authentication__Audience`; issuer, audience, signature, and token lifetime
+are validated by the framework. The API does not issue tokens or implement a
+password store.
+
+Local Docker development uses the explicit `DevelopmentLocal` mode with a
+deterministic `local-development-user` subject. This mode is rejected outside
+the `Development` environment and is not a production authentication bypass.
+The test suite uses a test-only authentication handler and never calls an
+external identity provider. Bearer transport is the intended client boundary;
+there is no localStorage token persistence or cookie authentication in this
+milestone, so cookie-specific CSRF protection is not invented here.
+
+Anonymous endpoints are `/health/live` and `/health/ready`. Research creation,
+history, progress, report, and quantitative endpoints require authentication.
+An unauthorized or nonexistent research run has the same 404-style resource
+behavior after authentication, avoiding intentional existence disclosure.
+
+Existing rows from before ownership was introduced are migrated to the explicit
+`legacy-unowned` subject and are not silently assigned to the first caller.
+They require an explicit future migration/ownership tool before a user can
+access them.
+
 Background processing can be configured with `ResearchProcessing:Enabled`, `ResearchProcessing:IdleDelayMilliseconds`, `ResearchProcessing:LeaseDurationSeconds`, and `ResearchProcessing:HeartbeatIntervalSeconds`. The heartbeat interval must be positive and shorter than the lease duration. Evidence extraction volume can be configured with `EvidenceExtraction:MaxStudiesPerRun`; the default is 10 and the application bounds it between 1 and 50. Evidence evaluation volume can be configured with `EvidenceEvaluation:MaxStudiesPerRun` with the same default and bounds. Synthesis context size can be configured with `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`; defaults are 10, 40, and 12. Quantitative synthesis can be configured with `QuantitativeSynthesis:OutputConfidenceLevel` and `QuantitativeSynthesis:MinimumUniqueStudies`, defaulting to 0.95 and 2. The same confidence level is used for common/fixed-effect, M22 random-effects Wald, M23 canonical HKSJ, and M24 random-effects prediction intervals.
 
 AI planning can be configured with:

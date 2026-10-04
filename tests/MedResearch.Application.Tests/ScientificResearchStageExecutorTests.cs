@@ -894,7 +894,7 @@ public sealed class ScientificResearchStageExecutorTests
             return Task.CompletedTask;
         }
 
-        public Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken)
+        public Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
         {
             return Task.FromResult<ResearchReportReadModel?>(null);
         }

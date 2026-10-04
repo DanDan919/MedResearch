@@ -3,6 +3,7 @@ using MedResearch.Application.Research.Processing;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using MedResearch.Application.Security;
 
 namespace MedResearch.Infrastructure.Synthesis.Persistence;
 
@@ -357,15 +358,19 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
         }
     }
 
-    public async Task<ResearchReportReadModel?> FindReportAsync(Guid researchRunId, CancellationToken cancellationToken)
+    public async Task<ResearchReportReadModel?> FindReportAsync(
+        Guid researchRunId,
+        string ownerSubjectId,
+        CancellationToken cancellationToken)
     {
+        ownerSubjectId = ActorIdentity.NormalizeSubject(ownerSubjectId);
         var reportProjection = await (
             from report in _dbContext.ResearchReports.AsNoTracking()
             join run in _dbContext.ResearchRuns.AsNoTracking()
                 on report.ResearchRunId equals run.Id
             join question in _dbContext.ResearchQuestions.AsNoTracking()
                 on run.ResearchQuestionId equals question.Id
-            where report.ResearchRunId == researchRunId
+            where report.ResearchRunId == researchRunId && question.OwnerSubjectId == ownerSubjectId
             orderby report.GeneratedAt descending, report.Id
             select new { report, question.Text })
             .FirstOrDefaultAsync(cancellationToken);

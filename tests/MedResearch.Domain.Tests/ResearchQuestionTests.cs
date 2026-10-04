@@ -20,4 +20,19 @@ public sealed class ResearchQuestionTests
 
         Assert.Equal("Does sleep deprivation alter memory consolidation?", question.Text);
     }
+
+    [Fact]
+    public void Constructor_PreservesOpaqueOwnerSubjectWithoutCaseFolding()
+    {
+        var question = new ResearchQuestion("Does sleep improve memory?", DateTimeOffset.UtcNow, "  UserA  ");
+
+        Assert.Equal("UserA", question.OwnerSubjectId);
+    }
+
+    [Fact]
+    public void Constructor_RejectsOversizedOwnerSubject()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ResearchQuestion("Does sleep improve memory?", DateTimeOffset.UtcNow, new string('x', 201)));
+    }
 }

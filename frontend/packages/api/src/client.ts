@@ -23,15 +23,18 @@ import type {
 export interface MedResearchApiClientOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
+  getAccessToken?: () => string | null | undefined;
 }
 
 export class MedResearchApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly getAccessToken?: () => string | null | undefined;
 
   public constructor(options: MedResearchApiClientOptions = {}) {
     this.baseUrl = normalizeApiBaseUrl(options.baseUrl);
     this.fetchImpl = options.fetch ?? fetch;
+    this.getAccessToken = options.getAccessToken;
   }
 
   public async getReadyHealth(signal?: AbortSignal): Promise<HealthState> {
@@ -150,6 +153,14 @@ export class MedResearchApiClient {
     parse: (value: unknown) => T,
     init: RequestInit
   ): Promise<T> {
+    const accessToken = this.getAccessToken?.();
+    if (accessToken) {
+      init.headers = {
+        ...Object.fromEntries(new Headers(init.headers).entries()),
+        Authorization: `Bearer ${accessToken}`
+      };
+    }
+
     let response: Response;
     try {
       response = await this.fetchImpl(this.url(path), init);

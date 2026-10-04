@@ -39,6 +39,8 @@ export function CreateResearchForm() {
         ? mutation.error.message
         : null;
 
+  const authenticationRequired = mutation.error instanceof MedResearchApiError && mutation.error.kind === "unauthorized";
+
   return (
     <Card>
       <CardHeader>
@@ -61,7 +63,7 @@ export function CreateResearchForm() {
             disabled={mutation.isPending}
           />
           {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}
-          {backendError ? <p className="text-sm text-destructive">{backendError}</p> : null}
+          {backendError ? <p className="text-sm text-destructive">{authenticationRequired ? "Sign in to start research." : backendError}</p> : null}
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Start Research

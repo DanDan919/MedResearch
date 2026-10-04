@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Activity, ArrowRight, Database, HeartPulse, TriangleAlert } from "lucide-react";
-import { isTerminalResearchStatus } from "@medresearch/api";
+import { isTerminalResearchStatus, MedResearchApiError } from "@medresearch/api";
 import type { ResearchRunProgressResponse } from "@medresearch/api";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@medresearch/ui";
 import { useResearchProgress } from "../../lib/api";
@@ -19,6 +19,10 @@ export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
   }
 
   if (query.isError || !query.data) {
+    if (query.error instanceof MedResearchApiError && query.error.kind === "unauthorized") {
+      return <ErrorPanel title="Authentication required" message="Sign in to view this research run." />;
+    }
+
     return <ErrorPanel title="Research progress unavailable" message="The API could not return this research run progress." />;
   }
 

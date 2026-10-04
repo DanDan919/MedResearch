@@ -1,5 +1,26 @@
 # Problems
 
+## 2026-10-04 F10: anonymous research data and cross-user IDOR boundary
+
+Observed before F10: every research endpoint accepted anonymous requests, and
+the persistence reads used only `ResearchRunId`. A caller who learned another
+run UUID could therefore read run state, progress, reports, or quantitative
+lineage; list pagination also represented the global dataset.
+
+Fix: add framework-managed JWT Bearer authentication for production, an
+explicit DevelopmentLocal mode guarded by the ASP.NET environment, and a
+test-only authentication handler. Persist the immutable `sub` claim as
+`ResearchQuestion.OwnerSubjectId`; scope list, run, progress, report, and
+quantitative queries through that ownership root. Unauthorized/nonexistent
+resources use the same 404-style result after authentication. Existing rows
+are backfilled to `legacy-unowned`, never to the first caller.
+
+Verification: API tests cover anonymous rejection, owner success, malformed
+subject rejection, cross-user run/list isolation, and cross-user report and
+quantitative access. PostgreSQL tests cover owner-scoped SQL reads and
+pagination. The frontend client has a single bearer transport hook and a
+distinct 401 error kind; Playwright covers the unauthenticated report state.
+
 ## 2026-10-01 F8: stale stage writers and artifact/report trust boundaries
 
 Adversarial inspection found that queue lifecycle fencing did not automatically fence stage stores: a slow worker with an old lease could reach plan, search, source, Evidence, quantitative artifact, or report persistence after a reclaim. The same audit found that quantitative contributions did not require the exact SourceMaterial selected by their EvidenceExtraction, and that direct report persistence trusted EvidenceIds more than the Application validator did.
