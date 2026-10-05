@@ -259,6 +259,9 @@ advisory lock.
 - The audit does not claim that numeric substring grounding proves semantic
   statistic-to-field association, that provider failures have persisted
   first-class attempt rows, or that report/artifact linkage is a persisted FK.
+- Post-F14 GitHub Actions run `37279009249` completed successfully on the audit
+  commit; both Ubuntu jobs passed, including strict Docker/Testcontainers,
+  frontend Playwright, EF model, and Compose checks.
 
 ## Next Logical Milestone
 

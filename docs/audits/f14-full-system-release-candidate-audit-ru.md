@@ -6,6 +6,7 @@ Remote: `https://github.com/DanDan919/MedResearch.git`
 Ветка: `main`
 Фактический baseline до F14: `8b57c6efbec257711246f978a1e6032461b51a82`
 Предыдущий подтверждённый CI: [37272462150](https://github.com/DanDan919/MedResearch/actions/runs/37272462150)
+Post-F14 CI: [37279009249](https://github.com/DanDan919/MedResearch/actions/runs/37279009249), success
 
 ## 1. Метод и честность результата
 
@@ -325,6 +326,10 @@ also changed only stale display text and requires a fresh frontend run in CI.
 
 No live OpenAI, PubMed, Europe PMC, Codex CLI or paid network call was used by
 the normal validation. Live projects remain opt-in and outside the solution.
+Post-F14 CI `37279009249` completed successfully on `5fb285ca`; both Ubuntu
+jobs passed, including the strict Docker/Testcontainers gate, EF model check,
+Compose validation, frontend Playwright and production builds. The standard
+workflow does not run live PubMed/Europe PMC/OpenAI checks.
 
 ## 13. Findings and actions
 
@@ -393,10 +398,9 @@ execute locally when Docker is available. F14 does not certify scientific truth,
 external identity-provider deployment, provider uptime, semantic numeric
 grounding, persisted failed-attempt provenance, or database-level RLS.
 
-The release decision is **not final until the post-F14 GitHub Actions run is
-green** and confirms that Docker-required integration tests have zero skips. The
-remaining PARTIAL items are explicitly bounded architectural debt, not hidden
-features to be claimed as complete.
+The release-candidate audit gate is **green** after post-F14 CI `37279009249`.
+The remaining PARTIAL items are explicitly bounded architectural debt, not
+hidden features to be claimed as complete.
 
 ## 16. Audit answers 135--150
 
@@ -416,7 +420,8 @@ features to be claimed as complete.
 147. **Zero results:** valid successful search state.
 148. **Source content exposure:** raw SourceMaterial content excluded from provenance/read API.
 149. **Quantitative UI:** display of persisted artifacts, not recomputation.
-150. **F14 conclusion:** conditional RC; post-change CI is the final gate.
+150. **F14 conclusion:** RC audit gate green; remaining partial guarantees are
+   documented debt, not release claims.
 
 ## 17. Files touched by F14
 
