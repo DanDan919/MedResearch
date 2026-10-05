@@ -508,7 +508,7 @@ public sealed partial class FullFakePipelineTests
                     new EvidenceFindingDraft(
                         "depression severity",
                         "Depression severity improved with structured sleep compared with placebo.",
-                        "depression severity improved in 120 adults compared with placebo",
+                        FakeScientificLiteratureSource.FullTextAbstract,
                         "Positive",
                         "adults with depressive symptoms",
                         "structured sleep",
@@ -531,7 +531,7 @@ public sealed partial class FullFakePipelineTests
                     new EvidenceFindingDraft(
                         "depression severity",
                         "Depression severity improved with structured sleep compared with placebo.",
-                        "depression severity improved in 120 adults compared with placebo",
+                        FakeScientificLiteratureSource.AbstractOddsRatioText,
                         "Positive",
                         "adults with depressive symptoms",
                         "structured sleep",
@@ -554,7 +554,7 @@ public sealed partial class FullFakePipelineTests
                     new EvidenceFindingDraft(
                         "depression severity",
                         "Depression severity improved with structured sleep compared with placebo.",
-                        "depression severity improved in 120 adults compared with placebo",
+                        FakeScientificLiteratureSource.ThirdOddsRatioText,
                         "Positive",
                         "adults with depressive symptoms",
                         "structured sleep",
