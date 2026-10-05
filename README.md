@@ -255,7 +255,7 @@ Extracting first materializes bounded SourceMaterial snapshots for each distinct
 
 Source selection is deterministic: a current usable non-truncated StructuredFullText snapshot is preferred, then a current Abstract snapshot, otherwise the study receives a persisted NoExtractableText skip and no LLM call. Each completed EvidenceExtraction references the exact SourceMaterial snapshot used. Source content is hashed with SHA-256, historical versions remain available, and changed content creates a new version instead of mutating the source used by older evidence.
 
-The prompt version is evidence-extractor-v1. Supporting excerpts are validated against the selected source snapshot after deterministic normalization. Numeric fields are persisted only when the value appears in that source text; otherwise they remain null. Source scope is preserved as Abstract or StructuredFullText, including truncation metadata.
+The prompt version is `evidence-extractor-v2-source-anchors`. Supporting excerpts must resolve uniquely against the selected SourceMaterial after the versioned `source-text-v1` normalization; the persisted anchor stores canonical offsets, normalized span text, and a SHA-256 span hash. Numeric fields are retained only when deterministic local statistical context verifies the field: effect measure and estimate, CI tuple, p-value/operator, standard error, or conservatively scoped sample size. `Ambiguous` and `Unsupported` facts remain explicit and cannot enter quantitative synthesis. Source scope is preserved as Abstract or StructuredFullText, including truncation metadata.
 
 ## Evidence Evaluation
 

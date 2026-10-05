@@ -1,5 +1,7 @@
 using MedResearch.Domain;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace MedResearch.Infrastructure.Persistence.Configurations;
@@ -106,6 +108,21 @@ internal sealed class EvidenceConfiguration : IEntityTypeConfiguration<Evidence>
         builder.Property(evidence => evidence.ReportedStandardError)
             .HasColumnName("reported_standard_error")
             .HasColumnType("numeric(18,6)");
+
+        builder.Property(evidence => evidence.PValueOperator)
+            .HasColumnName("p_value_operator")
+            .HasMaxLength(2);
+
+        builder.Property(evidence => evidence.NumericGrounding)
+            .HasColumnName("numeric_grounding")
+            .HasColumnType("jsonb")
+            .HasConversion(
+                value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
+                value => JsonSerializer.Deserialize<NumericGroundingFact[]>(value, (JsonSerializerOptions?)null) ?? Array.Empty<NumericGroundingFact>())
+            .Metadata.SetValueComparer(new ValueComparer<IReadOnlyCollection<NumericGroundingFact>>(
+                (left, right) => left != null && right != null && left.SequenceEqual(right),
+                value => value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
+                value => value.ToArray()));
 
         builder.Property(evidence => evidence.PValue)
             .HasColumnName("p_value")

@@ -194,6 +194,32 @@ public sealed class QuantitativeEvidenceAssessorTests
         Assert.DoesNotContain(QuantitativeIneligibilityReason.SourceTruncated, assessment.ReasonCodes);
     }
 
+    [Fact]
+    public async Task Assess_RequiresPersistedVerifiedNumericGroundingForQuantitativeInput()
+    {
+        var runId = Guid.NewGuid();
+        var legacy = CreateEvidence(runId, Guid.NewGuid(), "Depression severity", "Odds Ratio", 1.75m, 1.20m, 2.55m, confidenceLevel: 0.95m)
+            with { NumericGrounding = [] };
+        var verified = CreateEvidence(runId, Guid.NewGuid(), "Depression severity", "Odds Ratio", 1.40m, 1.05m, 1.90m, confidenceLevel: 0.95m)
+            with
+            {
+                NumericGrounding =
+                [
+                    new NumericGroundingFact(NumericGroundingField.EffectMeasure, NumericGroundingStatus.Verified, null, null),
+                    new NumericGroundingFact(NumericGroundingField.EffectEstimate, NumericGroundingStatus.Verified, null, null),
+                    new NumericGroundingFact(NumericGroundingField.ConfidenceInterval, NumericGroundingStatus.Verified, null, null)
+                ]
+            };
+
+        var readiness = new QuantitativeEvidenceAssessor().Assess(await BuildCorpusAsync(runId, [legacy, verified]));
+
+        var legacyAssessment = Assert.Single(readiness.Assessments, assessment => assessment.EvidenceId == legacy.EvidenceId);
+        Assert.Equal(QuantitativeEligibility.Ineligible, legacyAssessment.Eligibility);
+        Assert.Contains(QuantitativeIneligibilityReason.NumericGroundingNotVerified, legacyAssessment.ReasonCodes);
+        var verifiedAssessment = Assert.Single(readiness.Assessments, assessment => assessment.EvidenceId == verified.EvidenceId);
+        Assert.Equal(QuantitativeEligibility.Eligible, verifiedAssessment.Eligibility);
+    }
+
     private static async Task<EvidenceCorpus> BuildCorpusAsync(Guid runId, IReadOnlyCollection<SynthesisEvidenceContext> evidence)
     {
         var studies = evidence

@@ -4,7 +4,7 @@
 
 - Report rows do not yet persist the quantitative artifact id/fingerprint used during synthesis; the relationship is currently implicit in the same synthesis execution.
 - Same-run report citation integrity and SourceMaterial current-version uniqueness are protected by application transactions/advisory locks rather than universal composite constraints or triggers.
-- Numeric grounding proves source-token presence, not semantic association between a token and a reported statistic.
+- F15 replaces the prior token-only numeric gate with source-anchored local statistical grounding. Remaining debt is intentionally narrower: outcome/population/comparator context is exact normalized text matching rather than ontology-based semantic equivalence, and timepoint-specific interpretation is not modeled as a separate persisted field.
 - F10 adds the first authentication/authorization boundary, but no external identity-provider tenant is configured in this repository. Production deployment must supply a trusted JWT issuer and audience; token issuance, user lifecycle, collaboration, and ownership transfer remain outside scope.
 
 ## Current
@@ -14,9 +14,11 @@
 - F14 confirms that provider-failure provenance is still operational logging
   rather than a first-class persisted LiteratureSearch attempt, and that
   SourceMaterial acquisition is global per Study rather than run-attributed.
-- F14 confirms that numeric grounding proves source-token presence, not the
-  semantic association between a token and a reported statistic. This remains
-  outside the current quantitative scope.
+- F15 confirms numeric fields now require a unique canonical SourceMaterial
+  anchor and deterministic local statistical association before quantitative
+  use. The verifier does not infer equivalence between differently worded
+  outcomes, populations, comparators, or timepoints; those remain explicit
+  compatibility and semantic limitations.
 
 - Production migration strategy is not decided. Docker Compose uses config-gated startup migrations for local development only.
 - OpenAI planning has no bounded retry policy yet. Configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures currently move the run through the existing safe failure path.

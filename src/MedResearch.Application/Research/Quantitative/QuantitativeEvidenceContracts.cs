@@ -40,7 +40,8 @@ public enum QuantitativeIneligibilityReason
     InsufficientStatisticalData = 13,
     SourceTruncated = 14,
     AmbiguousDirection = 15,
-    DuplicateStudyContribution = 16
+    DuplicateStudyContribution = 16,
+    NumericGroundingNotVerified = 17
 }
 
 public enum StatisticOrigin

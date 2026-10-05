@@ -277,7 +277,7 @@ Input:
 
 - current-run distinct discovered studies;
 - best current source material per study;
-- prompt version `evidence-extractor-v1`.
+- prompt version `evidence-extractor-v2-source-anchors`; supporting text is uniquely anchored to canonical SourceMaterial and numeric fields carry deterministic local-context grounding facts.
 
 Output:
 

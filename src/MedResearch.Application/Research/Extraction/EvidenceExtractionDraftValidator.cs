@@ -22,27 +22,27 @@ public sealed class EvidenceExtractionDraftValidator
         "other"
     };
 
-    private readonly EvidenceGroundingValidator _groundingValidator;
-    private readonly EvidenceNumericGroundingValidator _numericGroundingValidator;
+    private readonly SourceAnchorResolver _sourceAnchorResolver;
+    private readonly SemanticNumericGroundingVerifier _numericGroundingVerifier;
 
     public EvidenceExtractionDraftValidator()
-        : this(new EvidenceGroundingValidator(), new EvidenceNumericGroundingValidator())
+        : this(new SourceAnchorResolver(), new SemanticNumericGroundingVerifier())
     {
     }
 
     public EvidenceExtractionDraftValidator(
-        EvidenceGroundingValidator groundingValidator,
-        EvidenceNumericGroundingValidator numericGroundingValidator)
+        SourceAnchorResolver sourceAnchorResolver,
+        SemanticNumericGroundingVerifier numericGroundingVerifier)
     {
-        _groundingValidator = groundingValidator;
-        _numericGroundingValidator = numericGroundingValidator;
+        _sourceAnchorResolver = sourceAnchorResolver;
+        _numericGroundingVerifier = numericGroundingVerifier;
     }
 
     public IReadOnlyCollection<AcceptedEvidenceFinding> Validate(
         EvidenceExtractionStudyContext context,
         EvidenceExtractionDraft draft)
     {
-        if (string.IsNullOrWhiteSpace(context.SourceContent))
+        if (context.SourceMaterialId is null || string.IsNullOrWhiteSpace(context.SourceContent))
         {
             throw new EvidenceExtractionValidationException("Cannot validate evidence extraction without source text.");
         }
@@ -62,10 +62,13 @@ public sealed class EvidenceExtractionDraftValidator
             var resultSummary = NormalizeRequired(finding.ResultSummary, "Evidence result summary is required.", 800);
             var supportingText = NormalizeRequired(finding.SupportingText, "Evidence supporting text is required.", 1_000);
 
-            if (!_groundingValidator.TryValidate(context.SourceContent, supportingText, out var groundingError))
+            var anchorResolution = _sourceAnchorResolver.Resolve(context.SourceMaterialId!.Value, context.SourceContent, supportingText);
+            if (anchorResolution.Status != NumericGroundingStatus.Verified || anchorResolution.Anchor is null)
             {
-                throw new EvidenceGroundingValidationException(groundingError);
+                throw new EvidenceGroundingValidationException(anchorResolution.Reason ?? "Supporting text could not be uniquely anchored to SourceMaterial.");
             }
+
+            var numericGrounding = _numericGroundingVerifier.Verify(finding, anchorResolution.Anchor);
 
             var dedupeKey = string.Join('|',
                 EvidenceGroundingValidator.NormalizeForContainment(outcome),
@@ -92,14 +95,16 @@ public sealed class EvidenceExtractionDraftValidator
                 NormalizeOptional(finding.ExposureOrIntervention, 300),
                 NormalizeOptional(finding.Comparator, 300),
                 studyDesign,
-                KeepGroundedInt(context.SourceContent, finding.SampleSize),
+                KeepGroundedInt(numericGrounding.Facts, finding.SampleSize),
                 NormalizeOptional(finding.EffectMeasure, 100),
-                KeepGroundedDecimal(context.SourceContent, finding.EffectValue),
-                KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalLower),
-                KeepGroundedDecimal(context.SourceContent, finding.ConfidenceIntervalUpper),
-                KeepGroundedDecimal(context.SourceContent, finding.PValue),
-                KeepGroundedConfidenceLevel(context.SourceContent, finding.ConfidenceLevel),
-                KeepGroundedDecimal(context.SourceContent, finding.ReportedStandardError)));
+                KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.EffectEstimate, finding.EffectValue),
+                KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.ConfidenceInterval, finding.ConfidenceIntervalLower),
+                KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.ConfidenceInterval, finding.ConfidenceIntervalUpper),
+                KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.PValue, finding.PValue),
+                KeepGroundedConfidenceLevel(numericGrounding.Facts, finding.ConfidenceLevel),
+                KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.StandardError, finding.ReportedStandardError),
+                numericGrounding.PValueOperator,
+                numericGrounding.Facts));
         }
 
         return accepted;
@@ -120,39 +125,41 @@ public sealed class EvidenceExtractionDraftValidator
         throw new EvidenceExtractionValidationException($"Unsupported evidence direction '{value}'.");
     }
 
-    private int? KeepGroundedInt(string sourceText, int? value)
+    private static int? KeepGroundedInt(IReadOnlyCollection<NumericGroundingFact> facts, int? value)
     {
-        return value.HasValue && _numericGroundingValidator.IsGrounded(sourceText, value.Value)
+        return value.HasValue && IsVerified(facts, NumericGroundingField.SampleSize)
             ? value
             : null;
     }
 
-    private decimal? KeepGroundedConfidenceLevel(string sourceText, decimal? value)
+    private static decimal? KeepGroundedConfidenceLevel(IReadOnlyCollection<NumericGroundingFact> facts, decimal? value)
     {
         if (!value.HasValue)
         {
             return null;
         }
 
-        if (value is <= 0m or >= 1m)
+        if (value is <= 0m or >= 1m || !IsVerified(facts, NumericGroundingField.ConfidenceLevel))
         {
             return null;
         }
 
-        if (_numericGroundingValidator.IsGrounded(sourceText, value.Value)
-            || _numericGroundingValidator.IsGrounded(sourceText, value.Value * 100m))
-        {
-            return value;
-        }
-
-        return null;
+        return value;
     }
 
-    private decimal? KeepGroundedDecimal(string sourceText, decimal? value)
+    private static decimal? KeepGroundedDecimal(
+        IReadOnlyCollection<NumericGroundingFact> facts,
+        NumericGroundingField field,
+        decimal? value)
     {
-        return value.HasValue && _numericGroundingValidator.IsGrounded(sourceText, value.Value)
+        return value.HasValue && IsVerified(facts, field)
             ? value
             : null;
+    }
+
+    private static bool IsVerified(IReadOnlyCollection<NumericGroundingFact> facts, NumericGroundingField field)
+    {
+        return facts.Any(fact => fact.Field == field && fact.Status == NumericGroundingStatus.Verified);
     }
 
     private static string NormalizeRequired(string? value, string message, int maxLength)

@@ -25,7 +25,9 @@ public sealed class Evidence
         decimal? confidenceIntervalUpper,
         decimal? pValue,
         decimal? confidenceLevel = null,
-        decimal? reportedStandardError = null)
+        decimal? reportedStandardError = null,
+        string? pValueOperator = null,
+        IReadOnlyCollection<NumericGroundingFact>? numericGrounding = null)
     {
         if (id == Guid.Empty)
         {
@@ -82,6 +84,11 @@ public sealed class Evidence
             throw new ArgumentOutOfRangeException(nameof(reportedStandardError), "Reported standard error must be positive when present.");
         }
 
+        if (pValueOperator is not null && pValueOperator is not ("=" or "<" or ">" or "<=" or ">=" or "≤" or "≥"))
+        {
+            throw new ArgumentException("P-value operator is not supported.", nameof(pValueOperator));
+        }
+
         Id = id;
         ResearchRunId = researchRunId;
         StudyId = studyId;
@@ -105,6 +112,12 @@ public sealed class Evidence
         PValue = pValue;
         ConfidenceLevel = confidenceLevel;
         ReportedStandardError = reportedStandardError;
+        PValueOperator = NormalizeOptional(pValueOperator);
+        NumericGrounding = numericGrounding?.ToArray() ?? [];
+        if (NumericGrounding.Any(fact => fact.Anchor is not null && !SourceAnchorIntegrity.IsValid(fact.Anchor)))
+        {
+            throw new ArgumentException("Evidence numeric grounding contains an invalid source anchor.", nameof(numericGrounding));
+        }
     }
 
     public Guid Id { get; }
@@ -152,6 +165,10 @@ public sealed class Evidence
     public decimal? ConfidenceLevel { get; }
 
     public decimal? ReportedStandardError { get; }
+
+    public string? PValueOperator { get; }
+
+    public IReadOnlyCollection<NumericGroundingFact> NumericGrounding { get; }
 
     private static string NormalizeRequired(string value, string parameterName)
     {

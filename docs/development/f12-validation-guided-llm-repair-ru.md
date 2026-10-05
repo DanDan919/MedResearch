@@ -65,12 +65,13 @@ candidate как источник фактов.
 
 `EvidenceExtractor` повторно использует тот же `EvidenceExtractionStudyContext`:
 тот же `SourceMaterialId`, hash и текст snapshot, тот же study metadata и тот
-же `evidence-extractor-v1` schema. `SupportingTextNotGrounded` классифицируется
+же extraction schema. После F15 это `evidence-extractor-v2-source-anchors` с
+уникальным SourceMaterial anchor. `SupportingTextNotGrounded` классифицируется
 как repairable. Исправленный excerpt снова проходит exact normalized containment
 grounding validator. Если repair остаётся invalid, `EvidenceExtractionResult` не
 возвращается и store не получает данные.
 
-Числовая grounding защита не расширялась: presence numeric token не доказывает
+На момент F12 числовая grounding защита не расширялась: presence numeric token не доказывала
 его семантическую связь с effect/CI/SE. Это отдельный известный gap, который F12
 не маскирует.
 
@@ -150,7 +151,8 @@ Repairable/failed repair, context/schema invariants и bounded budget доказ
 ## Remaining limitations
 
 - repair не делает validator мягче и не гарантирует научную истинность;
-- numeric token grounding остаётся syntactic, а не semantic;
+- до F15 numeric token grounding оставалась syntactic; F15 добавляет bounded
+  local statistical context, но не полноценное semantic entailment;
 - нет bounded OpenAI transport retry;
 - planner/evaluator semantic repair отложены;
 - live Codex availability и качество ответа не являются CI guarantee;

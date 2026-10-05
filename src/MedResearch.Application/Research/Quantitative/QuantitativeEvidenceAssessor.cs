@@ -118,6 +118,19 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
             reasons.Add(QuantitativeIneligibilityReason.MissingEffectValue);
         }
 
+        if (evidence.NumericGrounding is not null)
+        {
+            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectMeasure, reasons, !string.IsNullOrWhiteSpace(evidence.EffectMeasure));
+            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectEstimate, reasons, evidence.EffectValue.HasValue);
+            RequireVerifiedNumericGrounding(
+                evidence,
+                NumericGroundingField.ConfidenceInterval,
+                reasons,
+                evidence.ConfidenceIntervalLower.HasValue || evidence.ConfidenceIntervalUpper.HasValue);
+            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.StandardError, reasons, evidence.ReportedStandardError.HasValue);
+            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.SampleSize, reasons, effectMeasureType == EffectMeasureType.Correlation);
+        }
+
         NormalizedStatistic? statistic = null;
         if (reasons.Count == 0 || reasons.All(reason => reason is QuantitativeIneligibilityReason.PopulationNotCompatible
                 or QuantitativeIneligibilityReason.ComparatorNotCompatible
@@ -356,6 +369,18 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
         // delimiter collisions from combining otherwise incompatible evidence groups.
         return string.Join('|', components.Select(component =>
             $"{component.Length.ToString(CultureInfo.InvariantCulture)}:{component}"));
+    }
+
+    private static void RequireVerifiedNumericGrounding(
+        SynthesisEvidenceContext evidence,
+        NumericGroundingField field,
+        ICollection<QuantitativeIneligibilityReason> reasons,
+        bool required)
+    {
+        if (required && !evidence.NumericGrounding!.Any(fact => fact.Field == field && fact.Status == NumericGroundingStatus.Verified))
+        {
+            reasons.Add(QuantitativeIneligibilityReason.NumericGroundingNotVerified);
+        }
     }
 
     private static string? NormalizeCompatibilityKey(string? value)

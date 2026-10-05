@@ -46,6 +46,9 @@ Before significant changes, read:
 31. `Study` identity is global, but `Evidence`, `EvidenceExtraction`, `EvidenceEvaluation`, and report citations must remain scoped to the relevant `ResearchRun`.
 32. Scientific search source expansion must preserve per-source and per-search `LiteratureSearch`/`ResearchStudyDiscovery` provenance; do not collapse multiple providers into one search record.
 33. Stable `Study` identity uses normalized PMID, PMCID, and DOI only; never merge studies by title, fuzzy metadata, author similarity, or year.
+34. Numeric Evidence grounding must bind each retained reported statistic to a unique canonical span of the exact extraction SourceMaterial; numeric token presence alone is insufficient.
+35. `Ambiguous` or `Unsupported` numeric grounding must not be promoted to a quantitative synthesis input; LLM output cannot upgrade grounding status.
+36. Source anchors use a versioned deterministic normalization and hash; changes to SourceMaterial content must create a new source snapshot rather than reusing an old anchor.
 
 ## Development Trail
 

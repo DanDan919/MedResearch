@@ -138,11 +138,12 @@ advisory lock.
 - Source-grounded evidence extraction:
   - `IEvidenceExtractor` and `EvidenceExtractor` in Application.
   - `IEvidenceExtractionStore` implemented by `EfEvidenceExtractionStore` in Infrastructure.
-  - Prompt version `evidence-extractor-v1` with strict structured output.
+  - Prompt version `evidence-extractor-v2-source-anchors` with strict structured output and an exact `pValueOperator` field.
   - LLM input scope is limited to the current question, bounded plan context, and one study title/abstract/metadata item.
   - Studies with no usable abstract are recorded as skipped with `NoExtractableText` and are not sent to the LLM.
-  - Supporting excerpts are validated deterministically against the supplied abstract.
-  - Numeric fields are persisted only when the same numeric value appears in supplied source text; otherwise they remain null.
+  - Supporting excerpts are resolved uniquely against the exact selected SourceMaterial using versioned `source-text-v1` normalization, canonical offsets, normalized span text, and a SHA-256 span hash.
+  - Numeric grounding verifies local statistical association rather than token presence alone: effect measure/estimate, CI bounds, p-value/operator, standard error, and conservatively scoped sample size are persisted with `Verified`, `Ambiguous`, or `Unsupported` facts.
+  - Quantitative synthesis rejects persisted numeric inputs without the required `Verified` grounding facts. Legacy persisted rows with empty grounding metadata are not silently treated as verified.
   - Provider, malformed output, validation, and grounding failures use the existing safe run failure path.
   - `EvidenceExtraction:MaxStudiesPerRun` defaults to 10 and is bounded between 1 and 50.
 - Structured evidence evaluation:

@@ -46,6 +46,57 @@ public sealed class EvidenceExtractionStoreTests
     }
 
     [SkippableFact]
+    public async Task PersistExtractionResultAsync_RoundTripsSourceAnchoredNumericGrounding()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        const string source = "The odds ratio was 0.73 (95% CI 0.55 to 0.96, p = 0.03).";
+        var seed = await SeedDiscoveredStudyAsync("Does the treatment affect the odds ratio?", source);
+        var anchor = new SourceAnchorResolver().Resolve(seed.SourceMaterialId!.Value, source, source).Anchor!;
+        var facts = new[]
+        {
+            new NumericGroundingFact(NumericGroundingField.EffectMeasure, NumericGroundingStatus.Verified, anchor, null),
+            new NumericGroundingFact(NumericGroundingField.EffectEstimate, NumericGroundingStatus.Verified, anchor, null),
+            new NumericGroundingFact(NumericGroundingField.ConfidenceInterval, NumericGroundingStatus.Verified, anchor, null),
+            new NumericGroundingFact(NumericGroundingField.PValue, NumericGroundingStatus.Verified, anchor, null)
+        };
+        var finding = new AcceptedEvidenceFinding(
+            "odds ratio",
+            source,
+            source,
+            EvidenceDirection.Positive,
+            null,
+            null,
+            null,
+            "randomized controlled trial",
+            null,
+            "OR",
+            0.73m,
+            0.55m,
+            0.96m,
+            0.03m,
+            0.95m,
+            null,
+            "=",
+            facts);
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var store = new EfEvidenceExtractionStore(context);
+            await store.PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId.Value, [finding]), CancellationToken.None);
+        }
+
+        await using var verification = _fixture.CreateDbContext();
+        var evidence = await verification.Evidence.SingleAsync(item => item.ResearchRunId == seed.RunId);
+        Assert.Equal("=", evidence.PValueOperator);
+        var effectFact = Assert.Single(evidence.NumericGrounding, fact => fact.Field == NumericGroundingField.EffectEstimate);
+        Assert.Equal(NumericGroundingStatus.Verified, effectFact.Status);
+        Assert.Equal(seed.SourceMaterialId, effectFact.Anchor?.SourceMaterialId);
+        Assert.Equal(anchor.SpanHash, effectFact.Anchor?.SpanHash);
+        Assert.Equal(anchor.StartOffset, effectFact.Anchor?.StartOffset);
+    }
+
+    [SkippableFact]
     public async Task PersistExtractionResultAsync_AllowsMultipleFindingsForOneStudy()
     {
         SkipIfPostgreSqlUnavailable();

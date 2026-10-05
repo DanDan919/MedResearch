@@ -101,7 +101,7 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 item.discovery.DiscoveredAt))
             .ToArrayAsync(cancellationToken);
         var studyIds = discoveredStudies.Select(study => study.StudyId).ToArray();
-        var evidence = await _dbContext.Evidence
+        var evidenceRows = await _dbContext.Evidence
             .AsNoTracking()
             .Where(evidence => evidence.ResearchRunId == researchRunId)
             .Where(evidence => studyIds.Contains(evidence.StudyId))
@@ -109,6 +109,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
             .OrderBy(evidence => evidence.ExtractedAt)
             .ThenBy(evidence => evidence.StudyId)
             .ThenBy(evidence => evidence.Id)
+            .ToArrayAsync(cancellationToken);
+        var evidence = evidenceRows
             .Select(evidence => new SynthesisEvidenceContext(
                 evidence.Id,
                 evidence.ResearchRunId,
@@ -131,8 +133,10 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 evidence.ConfidenceIntervalUpper,
                 evidence.PValue,
                 evidence.ConfidenceLevel,
-                evidence.ReportedStandardError))
-            .ToArrayAsync(cancellationToken);
+                evidence.ReportedStandardError,
+                evidence.PValueOperator,
+                evidence.NumericGrounding))
+            .ToArray();
         var evaluations = await _dbContext.EvidenceEvaluations
             .AsNoTracking()
             .Where(evaluation => evaluation.ResearchRunId == researchRunId)

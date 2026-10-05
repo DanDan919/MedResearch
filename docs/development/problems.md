@@ -1,5 +1,29 @@
 # Problems
 
+## 2026-10-05 F15: numeric tokens could be detached from their statistical context
+
+Before F15, extraction validated that `supportingText` occurred in the selected
+SourceMaterial and that reported numeric tokens occurred somewhere in that
+text. That allowed a finding to combine an effect from one outcome with a CI or
+p-value from another equally plausible sentence.
+
+The fix adds a versioned canonical source-anchor model (`source-text-v1`) with
+unique normalized offsets, normalized span text, and a SHA-256 span hash. A
+deterministic Application verifier now checks local sentence-level statistical
+relationships, preserves the source p-value operator, and marks each numeric
+field `Verified`, `Ambiguous`, or `Unsupported`. Persisted Evidence carries
+these facts and quantitative eligibility rejects the numeric input when the
+required facts are not `Verified`. A conflicting p-value operator supplied by
+the LLM is rejected rather than trusted.
+
+This is deliberately not an ontology or natural-language entailment engine.
+Outcome/population/comparator text is matched conservatively after the same
+normalization, timepoint is not yet a separate extraction field, and legacy
+rows without grounding metadata are not silently upgraded. F15 tests cover
+repeated anchors, Frankenstein effect/CI/p-value combinations, wrong measures
+and subgroup sample sizes, p-value operator preservation and conflict,
+PostgreSQL JSON round-trip, and quantitative gating.
+
 ## 2026-10-04 F10: anonymous research data and cross-user IDOR boundary
 
 Observed before F10: every research endpoint accepted anonymous requests, and

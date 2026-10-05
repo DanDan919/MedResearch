@@ -237,7 +237,7 @@ Flow: Study -> SourceMaterial snapshot -> EvidenceExtractor -> IStructuredLlmCli
 
 SourceMaterial is immutable scientific content identity: content is normalized only for line endings and outer whitespace, then hashed with SHA-256 over UTF-8. A changed provider representation creates a new version and leaves historical versions available for old extractions. Europe PMC structured full text is parsed only from the official bounded fullTextXML endpoint with DTD/entity resolution disabled. Abstract fallback is a scientific coverage decision, not a pipeline failure; no usable source produces a persisted NoExtractableText skip and no LLM call.
 
-The prompt version is evidence-extractor-v1. Supporting excerpts and numeric fields are validated against the exact selected source content. StructuredFullText means more source material is available; it is not a methodological quality score.
+The prompt version is `evidence-extractor-v2-source-anchors`. Supporting excerpts must resolve uniquely against the exact selected source content using the versioned `source-text-v1` normalization. Each retained numeric field carries a deterministic grounding fact and source anchor with canonical offsets and a SHA-256 span hash. Local statistical verification requires the reported value to occur with its declared effect measure, CI tuple, p-value operator, or standard-error label in one bounded sentence; scoped sample-size contexts are rejected conservatively. StructuredFullText means more source material is available; it is not a methodological quality score. Quantitative eligibility requires persisted `Verified` grounding for the numeric fields it uses; the LLM cannot calculate or upgrade this state.
 
 ## Evidence Evaluation
 

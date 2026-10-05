@@ -21,4 +21,5 @@ public sealed record EvidenceFindingDraft(
     [property: JsonPropertyName("confidenceIntervalUpper")] decimal? ConfidenceIntervalUpper,
     [property: JsonPropertyName("pValue")] decimal? PValue,
     [property: JsonPropertyName("confidenceLevel")] decimal? ConfidenceLevel = null,
-    [property: JsonPropertyName("reportedStandardError")] decimal? ReportedStandardError = null);
+    [property: JsonPropertyName("reportedStandardError")] decimal? ReportedStandardError = null,
+    [property: JsonPropertyName("pValueOperator")] string? PValueOperator = null);

@@ -54,7 +54,9 @@ public sealed record AcceptedEvidenceFinding(
     decimal? ConfidenceIntervalUpper,
     decimal? PValue,
     decimal? ConfidenceLevel = null,
-    decimal? ReportedStandardError = null);
+    decimal? ReportedStandardError = null,
+    string? PValueOperator = null,
+    IReadOnlyCollection<NumericGroundingFact>? NumericGrounding = null);
 
 public sealed record EvidenceExtractionResult(
     Guid ResearchRunId,

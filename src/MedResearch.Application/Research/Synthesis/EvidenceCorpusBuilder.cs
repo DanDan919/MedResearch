@@ -170,6 +170,23 @@ public sealed class EvidenceCorpusBuilder : IEvidenceCorpusBuilder
             {
                 throw new ResearchSynthesisValidationException("Evidence must retain the exact SourceMaterial used for extraction.");
             }
+
+            foreach (var grounding in evidence.NumericGrounding ?? [])
+            {
+                if (grounding.Anchor is null)
+                {
+                    continue;
+                }
+
+                if (grounding.Anchor.SourceMaterialId != extraction.SourceMaterialId.Value
+                    || grounding.Anchor.StartOffset < 0
+                    || grounding.Anchor.EndOffset <= grounding.Anchor.StartOffset
+                    || grounding.Anchor.EndOffset - grounding.Anchor.StartOffset != grounding.Anchor.Text.Length
+                    || !SourceAnchorIntegrity.IsValid(grounding.Anchor))
+                {
+                    throw new ResearchSynthesisValidationException("Evidence numeric grounding anchor does not preserve the exact extraction SourceMaterial lineage or valid span bounds.");
+                }
+            }
         }
 
         foreach (var evaluation in snapshot.Evaluations)
