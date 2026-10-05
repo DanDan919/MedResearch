@@ -245,6 +245,21 @@ advisory lock.
 - Optional live PubMed and Europe PMC smoke test projects exist outside `MedResearch.slnx`; they are not run by default or by normal CI. Normal tests use fixtures and fake HTTP.
 - No live OpenAI smoke test is configured or run by default. Normal tests use fake LLM providers and fake HTTP.
 
+### F14 release-candidate audit
+
+- F14 performed a code-first adversarial audit of ownership, pipeline lifecycle,
+  worker recovery/fencing, LLM validation, scientific provenance, quantitative
+  artifacts, frontend/API contracts, and CI coverage.
+- The audit is recorded in `docs/audits/f14-full-system-release-candidate-audit-ru.md`.
+- A real API defect was fixed: the allow-listed CORS middleware now runs before
+  authentication/authorization, so browser preflight requests for protected
+  research routes are answered before the endpoint authorization challenge.
+- The fix has an API integration regression test. It does not weaken endpoint
+  authorization: the actual research request remains protected.
+- The audit does not claim that numeric substring grounding proves semantic
+  statistic-to-field association, that provider failures have persisted
+  first-class attempt rows, or that report/artifact linkage is a persisted FK.
+
 ## Next Logical Milestone
 
 Keep hardening trust boundaries, retry behavior, provider diagnostics, and identity-conflict observability before adding a third scientific source or another LLM provider. Do not add diagnosis, treatment recommendations, or patient-specific medical advice.

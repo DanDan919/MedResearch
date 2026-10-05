@@ -11,7 +11,7 @@ test("quantitative workspace presents persisted analysis on desktop and mobile",
   await expect(page.getByRole("heading", { name: "HKSJ interval" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Prediction interval" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Quantitative contribution plot" })).toBeVisible();
-  await expect(page.getByText("Study-level confidence intervals are not available in F6.")).toBeVisible();
+  await expect(page.getByText("Study-level confidence intervals are not available in this artifact.")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "Scientific synthesis workspace" })).toBeVisible();

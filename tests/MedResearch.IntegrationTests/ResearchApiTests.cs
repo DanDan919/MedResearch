@@ -36,6 +36,22 @@ public sealed class ResearchApiTests
     }
 
     [Fact]
+    public async Task AllowedCorsPreflight_IsHandledBeforeProtectedEndpointAuthorization()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateAnonymousClient();
+        using var request = new HttpRequestMessage(HttpMethod.Options, "/api/research");
+        request.Headers.Add("Origin", "http://localhost:3000");
+        request.Headers.Add("Access-Control-Request-Method", "POST");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal("http://localhost:3000", response.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Contains("POST", response.Headers.GetValues("Access-Control-Allow-Methods").Single(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AuthenticatedRequestWithMalformedSubject_IsRejected()
     {
         using var factory = new ResearchApiFactory();

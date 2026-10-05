@@ -9,6 +9,15 @@
 
 ## Current
 
+- F14 found and fixed CORS middleware ordering for protected browser routes;
+  the allow-listed preflight must run before authentication/authorization.
+- F14 confirms that provider-failure provenance is still operational logging
+  rather than a first-class persisted LiteratureSearch attempt, and that
+  SourceMaterial acquisition is global per Study rather than run-attributed.
+- F14 confirms that numeric grounding proves source-token presence, not the
+  semantic association between a token and a reported statistic. This remains
+  outside the current quantitative scope.
+
 - Production migration strategy is not decided. Docker Compose uses config-gated startup migrations for local development only.
 - OpenAI planning has no bounded retry policy yet. Configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and validation failures currently move the run through the existing safe failure path.
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.

@@ -79,12 +79,12 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-app.UseAuthentication();
-app.UseAuthorization();
 if (allowedCorsOrigins.Length > 0)
 {
     app.UseCors("Frontend");
 }
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
