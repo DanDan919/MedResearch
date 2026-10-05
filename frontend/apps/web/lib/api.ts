@@ -75,3 +75,13 @@ export function useResearchQuantitative(researchRunId: string, enabled = true) {
     enabled: enabled && researchRunId.length > 0
   });
 }
+
+export function useResearchProvenance(researchRunId: string) {
+  const client = useApiClient();
+
+  return useQuery({
+    queryKey: queryKeys.research.provenance(researchRunId),
+    queryFn: ({ signal }) => client.getResearchProvenance(researchRunId, signal),
+    enabled: researchRunId.length > 0
+  });
+}

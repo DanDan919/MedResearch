@@ -111,11 +111,76 @@ describe("MedResearchApiClient quantitative results", () => {
   });
 });
 
+describe("MedResearchApiClient provenance", () => {
+  it("reads the run-scoped persisted lineage endpoint without reconstructing source content", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(provenanceResponse()));
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test", fetch: fetchMock });
+
+    const result = await client.getResearchProvenance("11111111-1111-4111-8111-111111111111");
+
+    expect(result.coverage.discoveryPathCount).toBe(2);
+    expect(result.studies[0].sourceMaterials[0].contentHash).toBe("hash");
+    expect(String(fetchMock.mock.calls[0][0])).toBe("https://api.example.test/api/research/11111111-1111-4111-8111-111111111111/provenance");
+  });
+});
+
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: { "Content-Type": "application/json" }
   });
+}
+
+function provenanceResponse() {
+  const studyId = "55555555-5555-4555-8555-555555555555";
+  const extractionId = "66666666-6666-4666-8666-666666666666";
+  const evidenceId = "77777777-7777-4777-8777-777777777777";
+  return {
+    researchRunId: "11111111-1111-4111-8111-111111111111",
+    question: "Does sleep improve recall?",
+    status: "Completed",
+    createdAt: "2026-09-28T12:00:00Z",
+    startedAt: "2026-09-28T12:01:00Z",
+    completedAt: "2026-09-28T12:05:00Z",
+    coverage: {
+      researchPlanCount: 1,
+      literatureSearchCount: 2,
+      discoveryPathCount: 2,
+      distinctStudyCount: 1,
+      sourceMaterialCount: 1,
+      evidenceExtractionCount: 1,
+      evidenceFindingCount: 1,
+      evidenceEvaluationCount: 0,
+      researchReportClaimCount: 0,
+      hasPersistedProviderFailureProvenance: false
+    },
+    plans: [],
+    searches: [],
+    studies: [{
+      studyId,
+      title: "Sleep and recall",
+      pmid: "12345678",
+      pmcid: null,
+      doi: null,
+      journal: "Journal",
+      publicationYear: 2026,
+      publicationMonth: 1,
+      publicationDay: null,
+      publicationTypes: [],
+      authors: [],
+      source: "PubMed",
+      discoveryPaths: [
+        { researchStudyDiscoveryId: "88888888-8888-4888-8888-888888888888", literatureSearchId: "99999999-9999-4999-8999-999999999999", source: "PubMed", sourceStudyIdentifier: "12345678", query: "sleep recall", searchedAt: "2026-09-28T12:01:00Z", discoveredAt: "2026-09-28T12:01:00Z" },
+        { researchStudyDiscoveryId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", literatureSearchId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", source: "EuropePmc", sourceStudyIdentifier: "MED:12345678", query: "sleep recall", searchedAt: "2026-09-28T12:01:00Z", discoveredAt: "2026-09-28T12:01:00Z" }
+      ],
+      sourceMaterials: [{ sourceMaterialId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", studyId, type: "Abstract", provider: "PubMed", providerSourceId: "12345678", retrievalMethod: "SearchMetadataAbstract", contentHash: "hash", contentVersion: 1, retrievedAt: "2026-09-28T12:02:00Z", sourceUpdatedAt: null, accessStatus: "Unknown", characterCount: 12, wasTruncated: false, isCurrent: true, sectionNames: ["Abstract"] }],
+      extractions: [{ evidenceExtractionId: extractionId, studyId, sourceMaterialId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", status: "Completed", skipReason: null, sourceScope: "Abstract", provider: "FakeLLM", model: "fake-model", promptVersion: "extract-v1", extractedAt: "2026-09-28T12:03:00Z", evidenceCount: 1, groundingValidated: true }],
+      evidence: [{ evidenceId, evidenceExtractionId: extractionId, outcome: "recall", resultSummary: "Recall improved.", supportingText: "Persisted excerpt.", direction: "Positive", sourceScope: "Abstract", extractedAt: "2026-09-28T12:03:00Z", groundingValidated: true, population: null, exposureOrIntervention: null, comparator: null, studyDesign: null, sampleSize: null, effectMeasure: null, effectValue: null, confidenceIntervalLower: null, confidenceIntervalUpper: null, confidenceLevel: null, reportedStandardError: null, pValue: null }],
+      evaluations: []
+    }],
+    reportClaims: [],
+    quantitativeContributions: []
+  };
 }
 
 function progressResponse() {

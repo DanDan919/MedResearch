@@ -251,6 +251,32 @@
           "500": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/research/{researchRunId}/provenance": {
+      "get": {
+        "operationId": "getResearchProvenance",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "researchRunId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted evidence and provenance lineage for the authorized research run",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ResearchProvenanceResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "500": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -836,6 +862,225 @@
           "analysisScaleStandardError": { "type": "number" },
           "weight": { "type": "number" },
           "normalizedWeight": { "type": "number" }
+        }
+      },
+      "ResearchProvenanceCoverageResponse": {
+        "type": "object",
+        "required": ["researchPlanCount", "literatureSearchCount", "discoveryPathCount", "distinctStudyCount", "sourceMaterialCount", "evidenceExtractionCount", "evidenceFindingCount", "evidenceEvaluationCount", "researchReportClaimCount", "hasPersistedProviderFailureProvenance"],
+        "properties": {
+          "researchPlanCount": { "type": "integer" },
+          "literatureSearchCount": { "type": "integer" },
+          "discoveryPathCount": { "type": "integer" },
+          "distinctStudyCount": { "type": "integer" },
+          "sourceMaterialCount": { "type": "integer" },
+          "evidenceExtractionCount": { "type": "integer" },
+          "evidenceFindingCount": { "type": "integer" },
+          "evidenceEvaluationCount": { "type": "integer" },
+          "researchReportClaimCount": { "type": "integer" },
+          "hasPersistedProviderFailureProvenance": { "type": "boolean" }
+        }
+      },
+      "ResearchPlanProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "researchPlanId": { "type": "string", "format": "uuid" },
+          "originalQuestion": { "type": "string" },
+          "searchQueries": { "type": "array", "items": { "type": "string" } },
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "promptVersion": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "LiteratureSearchProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "literatureSearchId": { "type": "string", "format": "uuid" },
+          "researchPlanId": { "type": ["string", "null"], "format": "uuid" },
+          "source": { "type": "string" },
+          "query": { "type": "string" },
+          "searchedAt": { "type": "string", "format": "date-time" },
+          "resultCount": { "type": "integer" },
+          "persistedStudyCount": { "type": "integer" },
+          "duplicateStudyCount": { "type": "integer" },
+          "resultStatus": { "type": "string" }
+        }
+      },
+      "StudyDiscoveryProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "researchStudyDiscoveryId": { "type": "string", "format": "uuid" },
+          "literatureSearchId": { "type": "string", "format": "uuid" },
+          "source": { "type": "string" },
+          "sourceStudyIdentifier": { "type": ["string", "null"] },
+          "query": { "type": "string" },
+          "searchedAt": { "type": "string", "format": "date-time" },
+          "discoveredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SourceMaterialProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "sourceMaterialId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "type": { "type": "string" },
+          "provider": { "type": "string" },
+          "providerSourceId": { "type": ["string", "null"] },
+          "retrievalMethod": { "type": "string" },
+          "contentHash": { "type": "string" },
+          "contentVersion": { "type": "integer" },
+          "retrievedAt": { "type": "string", "format": "date-time" },
+          "sourceUpdatedAt": { "type": ["string", "null"], "format": "date-time" },
+          "accessStatus": { "type": "string" },
+          "characterCount": { "type": "integer" },
+          "wasTruncated": { "type": "boolean" },
+          "isCurrent": { "type": "boolean" },
+          "sectionNames": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "EvidenceExtractionProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "evidenceExtractionId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "sourceMaterialId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string" },
+          "skipReason": { "type": ["string", "null"] },
+          "sourceScope": { "type": "string" },
+          "provider": { "type": ["string", "null"] },
+          "model": { "type": ["string", "null"] },
+          "promptVersion": { "type": "string" },
+          "extractedAt": { "type": "string", "format": "date-time" },
+          "evidenceCount": { "type": "integer" },
+          "groundingValidated": { "type": "boolean" }
+        }
+      },
+      "EvidenceProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "evidenceExtractionId": { "type": "string", "format": "uuid" },
+          "outcome": { "type": "string" },
+          "resultSummary": { "type": "string" },
+          "supportingText": { "type": "string" },
+          "direction": { "type": "string" },
+          "sourceScope": { "type": "string" },
+          "extractedAt": { "type": "string", "format": "date-time" },
+          "groundingValidated": { "type": "boolean" },
+          "population": { "type": ["string", "null"] },
+          "exposureOrIntervention": { "type": ["string", "null"] },
+          "comparator": { "type": ["string", "null"] },
+          "studyDesign": { "type": ["string", "null"] },
+          "sampleSize": { "type": ["integer", "null"] },
+          "effectMeasure": { "type": ["string", "null"] },
+          "effectValue": { "type": ["number", "null"] },
+          "confidenceIntervalLower": { "type": ["number", "null"] },
+          "confidenceIntervalUpper": { "type": ["number", "null"] },
+          "confidenceLevel": { "type": ["number", "null"] },
+          "reportedStandardError": { "type": ["number", "null"] },
+          "pValue": { "type": ["number", "null"] }
+        }
+      },
+      "EvidenceEvaluationProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "evidenceEvaluationId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string" },
+          "skipReason": { "type": ["string", "null"] },
+          "sourceScope": { "type": "string" },
+          "evidenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "evaluatorProvider": { "type": ["string", "null"] },
+          "evaluatorModel": { "type": ["string", "null"] },
+          "promptVersion": { "type": "string" },
+          "evaluatedAt": { "type": "string", "format": "date-time" },
+          "studyDesign": { "type": "string" },
+          "sampleInformation": { "type": "string" },
+          "comparatorPresence": { "type": "string" },
+          "comparatorDescription": { "type": ["string", "null"] },
+          "randomization": { "type": "string" },
+          "blinding": { "type": "string" },
+          "allocationConcealment": { "type": "string" },
+          "attritionMissingData": { "type": "string" },
+          "precision": { "type": "string" },
+          "directness": { "type": "string" },
+          "overallConfidence": { "type": "string" },
+          "rationale": { "type": "string" },
+          "reportingLimitations": { "type": "array", "items": { "type": "string" } },
+          "authorReportedLimitations": { "type": "array", "items": { "type": "string" } },
+          "hasSampleSize": { "type": "boolean" },
+          "hasEffectEstimate": { "type": "boolean" },
+          "hasConfidenceInterval": { "type": "boolean" },
+          "hasPValue": { "type": "boolean" },
+          "hasComparator": { "type": "boolean" },
+          "unknownDomainCount": { "type": "integer" },
+          "insufficientSourceDomainCount": { "type": "integer" }
+        }
+      },
+      "ResearchReportClaimProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "researchReportId": { "type": "string", "format": "uuid" },
+          "researchReportClaimId": { "type": "string", "format": "uuid" },
+          "claimType": { "type": "string" },
+          "direction": { "type": "string" },
+          "text": { "type": "string" },
+          "ordinal": { "type": "integer" },
+          "evidenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+        }
+      },
+      "QuantitativeContributionProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "artifactId": { "type": "string", "format": "uuid" },
+          "groupKey": { "type": "string" },
+          "analysisMethod": { "type": "string" },
+          "ordinal": { "type": "integer" },
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "studyId": { "type": "string", "format": "uuid" },
+          "evidenceExtractionId": { "type": "string", "format": "uuid" },
+          "sourceMaterialId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "ResearchProvenanceResponse": {
+        "type": "object",
+        "properties": {
+          "researchRunId": { "type": "string", "format": "uuid" },
+          "question": { "type": "string" },
+          "status": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "startedAt": { "type": ["string", "null"], "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "coverage": { "$ref": "#/components/schemas/ResearchProvenanceCoverageResponse" },
+          "plans": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchPlanProvenanceResponse" } },
+          "searches": { "type": "array", "items": { "$ref": "#/components/schemas/LiteratureSearchProvenanceResponse" } },
+          "studies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "studyId": { "type": "string", "format": "uuid" },
+                "title": { "type": "string" },
+                "pmid": { "type": ["string", "null"] },
+                "pmcid": { "type": ["string", "null"] },
+                "doi": { "type": ["string", "null"] },
+                "journal": { "type": ["string", "null"] },
+                "publicationYear": { "type": ["integer", "null"] },
+                "publicationMonth": { "type": ["integer", "null"] },
+                "publicationDay": { "type": ["integer", "null"] },
+                "publicationTypes": { "type": "array", "items": { "type": "string" } },
+                "authors": { "type": "array", "items": { "type": "string" } },
+                "source": { "type": "string" },
+                "discoveryPaths": { "type": "array", "items": { "$ref": "#/components/schemas/StudyDiscoveryProvenanceResponse" } },
+                "sourceMaterials": { "type": "array", "items": { "$ref": "#/components/schemas/SourceMaterialProvenanceResponse" } },
+                "extractions": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceExtractionProvenanceResponse" } },
+                "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceProvenanceResponse" } },
+                "evaluations": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceEvaluationProvenanceResponse" } }
+              }
+            }
+          },
+          "reportClaims": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchReportClaimProvenanceResponse" } },
+          "quantitativeContributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeContributionProvenanceResponse" } }
         }
       },
       "ProblemDetails": {

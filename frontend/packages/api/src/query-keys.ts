@@ -18,6 +18,7 @@ export const queryKeys = {
     detail: (researchRunId: string) => ["research", researchRunId] as const,
     progress: (researchRunId: string) => ["research", researchRunId, "progress"] as const,
     report: (researchRunId: string) => ["research", researchRunId, "report"] as const,
-    quantitative: (researchRunId: string) => ["research", researchRunId, "quantitative"] as const
+    quantitative: (researchRunId: string) => ["research", researchRunId, "quantitative"] as const,
+    provenance: (researchRunId: string) => ["research", researchRunId, "provenance"] as const
   }
 };

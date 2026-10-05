@@ -266,3 +266,7 @@ Root cause: Semantic validation happened after generation, but validation except
 Decision / fix: Added typed `ValidationIssue` values and a default one-attempt `ValidationGuidedLlmRepairService` for extraction and synthesis. Repair keeps the original trusted context/schema, requests a complete replacement, re-runs the same validator, and fails closed without persistence if it remains invalid. Cross-run and infrastructure issues never go back to the LLM.
 Verification: Application tests cover first-valid, successful repair, invalid replacement, non-repairable failure, provider failure, grounded extraction repair, synthesis direction repair, and cross-run precondition.
 Remaining concerns: Numeric grounding still proves token presence rather than semantic association. Planner/evaluator semantic repair and OpenAI transport retry remain intentionally deferred.
+
+## F13: provenance read model cannot show unpersisted provider failures
+
+The audit found that `LiteratureSearch` has result counts and persisted-study counts, but no persisted failure status for a provider call that fails before a search row exists. The F13 endpoint keeps this limitation explicit: zero-result searches are shown as successful zero-result executions, while the response flags that persisted provider-failure provenance is unavailable. This avoids presenting absence of a row as a scientific zero-result or inventing an operational event. The remaining work is a separate schema decision for bounded failure-attempt provenance.

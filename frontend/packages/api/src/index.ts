@@ -20,6 +20,7 @@ export type {
   ResearchRunProgressResponse,
   ResearchReportResponse,
   QuantitativeSynthesisArtifactResponse,
+  ResearchProvenanceResponse,
   ResearchRunResponse,
   ResearchRunSummaryResponse,
   ResearchRunStatus

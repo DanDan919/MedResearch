@@ -3,6 +3,7 @@ using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
+using MedResearch.Application.Research.Provenance;
 using MedResearch.Infrastructure.DependencyInjection;
 using MedResearch.Application.Security;
 using MedResearch.Api.Security;
@@ -266,6 +267,29 @@ research.MapGet("/{researchRunId:guid}/quantitative", async (
     .Produces<IReadOnlyCollection<QuantitativeSynthesisArtifactResponse>>(StatusCodes.Status200OK)
     .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
+
+research.MapGet("/{researchRunId:guid}/provenance", async (
+        Guid researchRunId,
+        GetResearchProvenanceUseCase useCase,
+        CancellationToken cancellationToken) =>
+    {
+        var result = await useCase.ExecuteAsync(researchRunId, cancellationToken);
+
+        if (result is null)
+        {
+            return Results.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Research run not found"
+            });
+        }
+
+        return Results.Ok(ToProvenanceResponse(result));
+    })
+    .WithName("GetResearchProvenance")
+    .Produces<ResearchProvenanceResponse>(StatusCodes.Status200OK)
+    .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+    .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 app.Run();
 
 static ResearchReportResponse ToReportResponse(ResearchReportReadModel report)
@@ -395,6 +419,167 @@ static ResearchRunProgressResponse ToProgressResponse(ResearchRunProgress progre
             stage.Metrics.Select(metric => new ResearchRunProgressMetricResponse(
                 metric.Label,
                 metric.Value)).ToArray())).ToArray());
+}
+
+static ResearchProvenanceResponse ToProvenanceResponse(ResearchProvenanceReadModel provenance)
+{
+    return new ResearchProvenanceResponse(
+        provenance.ResearchRunId,
+        provenance.Question,
+        provenance.Status.ToString(),
+        provenance.CreatedAt,
+        provenance.StartedAt,
+        provenance.CompletedAt,
+        new ResearchProvenanceCoverageResponse(
+            provenance.Coverage.ResearchPlanCount,
+            provenance.Coverage.LiteratureSearchCount,
+            provenance.Coverage.DiscoveryPathCount,
+            provenance.Coverage.DistinctStudyCount,
+            provenance.Coverage.SourceMaterialCount,
+            provenance.Coverage.EvidenceExtractionCount,
+            provenance.Coverage.EvidenceFindingCount,
+            provenance.Coverage.EvidenceEvaluationCount,
+            provenance.Coverage.ResearchReportClaimCount,
+            provenance.Coverage.HasPersistedProviderFailureProvenance),
+        provenance.Plans.Select(plan => new ResearchPlanProvenanceResponse(
+            plan.ResearchPlanId,
+            plan.OriginalQuestion,
+            plan.SearchQueries,
+            plan.Provider,
+            plan.Model,
+            plan.PromptVersion,
+            plan.GeneratedAt)).ToArray(),
+        provenance.Searches.Select(search => new LiteratureSearchProvenanceResponse(
+            search.LiteratureSearchId,
+            search.ResearchPlanId,
+            search.Source,
+            search.Query,
+            search.SearchedAt,
+            search.ResultCount,
+            search.PersistedStudyCount,
+            search.DuplicateStudyCount,
+            search.ResultStatus)).ToArray(),
+        provenance.Studies.Select(study => new StudyProvenanceResponse(
+            study.StudyId,
+            study.Title,
+            study.Pmid,
+            study.Pmcid,
+            study.Doi,
+            study.Journal,
+            study.PublicationYear,
+            study.PublicationMonth,
+            study.PublicationDay,
+            study.PublicationTypes,
+            study.Authors,
+            study.Source,
+            study.DiscoveryPaths.Select(discovery => new StudyDiscoveryProvenanceResponse(
+                discovery.ResearchStudyDiscoveryId,
+                discovery.LiteratureSearchId,
+                discovery.Source,
+                discovery.SourceStudyIdentifier,
+                discovery.Query,
+                discovery.SearchedAt,
+                discovery.DiscoveredAt)).ToArray(),
+            study.SourceMaterials.Select(material => new SourceMaterialProvenanceResponse(
+                material.SourceMaterialId,
+                material.StudyId,
+                material.Type.ToString(),
+                material.Provider,
+                material.ProviderSourceId,
+                material.RetrievalMethod,
+                material.ContentHash,
+                material.ContentVersion,
+                material.RetrievedAt,
+                material.SourceUpdatedAt,
+                material.AccessStatus.ToString(),
+                material.CharacterCount,
+                material.WasTruncated,
+                material.IsCurrent,
+                material.SectionNames)).ToArray(),
+            study.Extractions.Select(extraction => new EvidenceExtractionProvenanceResponse(
+                extraction.EvidenceExtractionId,
+                extraction.StudyId,
+                extraction.SourceMaterialId,
+                extraction.Status.ToString(),
+                extraction.SkipReason?.ToString(),
+                extraction.SourceScope.ToString(),
+                extraction.Provider,
+                extraction.Model,
+                extraction.PromptVersion,
+                extraction.ExtractedAt,
+                extraction.EvidenceCount,
+                extraction.GroundingValidated)).ToArray(),
+            study.Evidence.Select(item => new EvidenceProvenanceResponse(
+                item.EvidenceId,
+                item.EvidenceExtractionId,
+                item.Outcome,
+                item.ResultSummary,
+                item.SupportingText,
+                item.Direction.ToString(),
+                item.SourceScope.ToString(),
+                item.ExtractedAt,
+                item.GroundingValidated,
+                item.Population,
+                item.ExposureOrIntervention,
+                item.Comparator,
+                item.StudyDesign,
+                item.SampleSize,
+                item.EffectMeasure,
+                item.EffectValue,
+                item.ConfidenceIntervalLower,
+                item.ConfidenceIntervalUpper,
+                item.ConfidenceLevel,
+                item.ReportedStandardError,
+                item.PValue)).ToArray(),
+            study.Evaluations.Select(evaluation => new EvidenceEvaluationProvenanceResponse(
+                evaluation.EvidenceEvaluationId,
+                evaluation.StudyId,
+                evaluation.Status.ToString(),
+                evaluation.SkipReason?.ToString(),
+                evaluation.SourceScope.ToString(),
+                evaluation.EvidenceIds,
+                evaluation.EvaluatorProvider,
+                evaluation.EvaluatorModel,
+                evaluation.PromptVersion,
+                evaluation.EvaluatedAt,
+                evaluation.StudyDesign.ToString(),
+                evaluation.SampleInformation.ToString(),
+                evaluation.ComparatorPresence.ToString(),
+                evaluation.ComparatorDescription,
+                evaluation.Randomization.ToString(),
+                evaluation.Blinding.ToString(),
+                evaluation.AllocationConcealment.ToString(),
+                evaluation.AttritionMissingData.ToString(),
+                evaluation.Precision.ToString(),
+                evaluation.Directness.ToString(),
+                evaluation.OverallConfidence.ToString(),
+                evaluation.Rationale,
+                evaluation.ReportingLimitations,
+                evaluation.AuthorReportedLimitations,
+                evaluation.HasSampleSize,
+                evaluation.HasEffectEstimate,
+                evaluation.HasConfidenceInterval,
+                evaluation.HasPValue,
+                evaluation.HasComparator,
+                evaluation.UnknownDomainCount,
+                evaluation.InsufficientSourceDomainCount)).ToArray())).ToArray(),
+        provenance.ReportClaims.Select(claim => new ResearchReportClaimProvenanceResponse(
+            claim.ResearchReportId,
+            claim.ResearchReportClaimId,
+            claim.ClaimType.ToString(),
+            claim.Direction.ToString(),
+            claim.Text,
+            claim.Ordinal,
+            claim.EvidenceIds)).ToArray(),
+        provenance.QuantitativeContributions.Select(contribution => new QuantitativeContributionProvenanceResponse(
+            contribution.ArtifactId,
+            contribution.GroupKey,
+            contribution.AnalysisMethod,
+            contribution.Ordinal,
+            contribution.EvidenceId,
+            contribution.StudyId,
+            contribution.EvidenceExtractionId,
+            contribution.SourceMaterialId)).ToArray());
 }
 public partial class Program
 {

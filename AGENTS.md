@@ -72,3 +72,5 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 48. Production stage stores must fence writes with the current ResearchRun lease owner and version; a stale worker must not persist scientific output after lease transfer.
 49. Codex CLI is a development/manual-E2E structured LLM adapter only; it must never become the default or production provider, and it must not read or persist Codex authentication credentials.
 50. Validation-guided LLM repair may only retry a typed repairable issue within its bounded budget; never weaken the validator or persist the rejected candidate.
+51. The Evidence & Provenance read model must project persisted run-scoped lineage; the frontend must not reconstruct citations or expose SourceMaterial.Content.
+52. Provenance queries must preserve global Study identity while filtering Evidence, extraction, evaluation, report claims, and quantitative lineage to the requested ResearchRun.

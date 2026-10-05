@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/{researchRunId}/provenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getResearchProvenance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -453,6 +469,220 @@ export interface components {
             weight: number;
             normalizedWeight: number;
         };
+        ResearchProvenanceCoverageResponse: {
+            researchPlanCount: number;
+            literatureSearchCount: number;
+            discoveryPathCount: number;
+            distinctStudyCount: number;
+            sourceMaterialCount: number;
+            evidenceExtractionCount: number;
+            evidenceFindingCount: number;
+            evidenceEvaluationCount: number;
+            researchReportClaimCount: number;
+            hasPersistedProviderFailureProvenance: boolean;
+        };
+        ResearchPlanProvenanceResponse: {
+            /** Format: uuid */
+            researchPlanId?: string;
+            originalQuestion?: string;
+            searchQueries?: string[];
+            provider?: string;
+            model?: string;
+            promptVersion?: string;
+            /** Format: date-time */
+            generatedAt?: string;
+        };
+        LiteratureSearchProvenanceResponse: {
+            /** Format: uuid */
+            literatureSearchId?: string;
+            /** Format: uuid */
+            researchPlanId?: string | null;
+            source?: string;
+            query?: string;
+            /** Format: date-time */
+            searchedAt?: string;
+            resultCount?: number;
+            persistedStudyCount?: number;
+            duplicateStudyCount?: number;
+            resultStatus?: string;
+        };
+        StudyDiscoveryProvenanceResponse: {
+            /** Format: uuid */
+            researchStudyDiscoveryId?: string;
+            /** Format: uuid */
+            literatureSearchId?: string;
+            source?: string;
+            sourceStudyIdentifier?: string | null;
+            query?: string;
+            /** Format: date-time */
+            searchedAt?: string;
+            /** Format: date-time */
+            discoveredAt?: string;
+        };
+        SourceMaterialProvenanceResponse: {
+            /** Format: uuid */
+            sourceMaterialId?: string;
+            /** Format: uuid */
+            studyId?: string;
+            type?: string;
+            provider?: string;
+            providerSourceId?: string | null;
+            retrievalMethod?: string;
+            contentHash?: string;
+            contentVersion?: number;
+            /** Format: date-time */
+            retrievedAt?: string;
+            /** Format: date-time */
+            sourceUpdatedAt?: string | null;
+            accessStatus?: string;
+            characterCount?: number;
+            wasTruncated?: boolean;
+            isCurrent?: boolean;
+            sectionNames?: string[];
+        };
+        EvidenceExtractionProvenanceResponse: {
+            /** Format: uuid */
+            evidenceExtractionId?: string;
+            /** Format: uuid */
+            studyId?: string;
+            /** Format: uuid */
+            sourceMaterialId?: string | null;
+            status?: string;
+            skipReason?: string | null;
+            sourceScope?: string;
+            provider?: string | null;
+            model?: string | null;
+            promptVersion?: string;
+            /** Format: date-time */
+            extractedAt?: string;
+            evidenceCount?: number;
+            groundingValidated?: boolean;
+        };
+        EvidenceProvenanceResponse: {
+            /** Format: uuid */
+            evidenceId?: string;
+            /** Format: uuid */
+            evidenceExtractionId?: string;
+            outcome?: string;
+            resultSummary?: string;
+            supportingText?: string;
+            direction?: string;
+            sourceScope?: string;
+            /** Format: date-time */
+            extractedAt?: string;
+            groundingValidated?: boolean;
+            population?: string | null;
+            exposureOrIntervention?: string | null;
+            comparator?: string | null;
+            studyDesign?: string | null;
+            sampleSize?: number | null;
+            effectMeasure?: string | null;
+            effectValue?: number | null;
+            confidenceIntervalLower?: number | null;
+            confidenceIntervalUpper?: number | null;
+            confidenceLevel?: number | null;
+            reportedStandardError?: number | null;
+            pValue?: number | null;
+        };
+        EvidenceEvaluationProvenanceResponse: {
+            /** Format: uuid */
+            evidenceEvaluationId?: string;
+            /** Format: uuid */
+            studyId?: string;
+            status?: string;
+            skipReason?: string | null;
+            sourceScope?: string;
+            evidenceIds?: string[];
+            evaluatorProvider?: string | null;
+            evaluatorModel?: string | null;
+            promptVersion?: string;
+            /** Format: date-time */
+            evaluatedAt?: string;
+            studyDesign?: string;
+            sampleInformation?: string;
+            comparatorPresence?: string;
+            comparatorDescription?: string | null;
+            randomization?: string;
+            blinding?: string;
+            allocationConcealment?: string;
+            attritionMissingData?: string;
+            precision?: string;
+            directness?: string;
+            overallConfidence?: string;
+            rationale?: string;
+            reportingLimitations?: string[];
+            authorReportedLimitations?: string[];
+            hasSampleSize?: boolean;
+            hasEffectEstimate?: boolean;
+            hasConfidenceInterval?: boolean;
+            hasPValue?: boolean;
+            hasComparator?: boolean;
+            unknownDomainCount?: number;
+            insufficientSourceDomainCount?: number;
+        };
+        ResearchReportClaimProvenanceResponse: {
+            /** Format: uuid */
+            researchReportId?: string;
+            /** Format: uuid */
+            researchReportClaimId?: string;
+            claimType?: string;
+            direction?: string;
+            text?: string;
+            ordinal?: number;
+            evidenceIds?: string[];
+        };
+        QuantitativeContributionProvenanceResponse: {
+            /** Format: uuid */
+            artifactId?: string;
+            groupKey?: string;
+            analysisMethod?: string;
+            ordinal?: number;
+            /** Format: uuid */
+            evidenceId?: string;
+            /** Format: uuid */
+            studyId?: string;
+            /** Format: uuid */
+            evidenceExtractionId?: string;
+            /** Format: uuid */
+            sourceMaterialId?: string;
+        };
+        ResearchProvenanceResponse: {
+            /** Format: uuid */
+            researchRunId?: string;
+            question?: string;
+            status?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+            coverage?: components["schemas"]["ResearchProvenanceCoverageResponse"];
+            plans?: components["schemas"]["ResearchPlanProvenanceResponse"][];
+            searches?: components["schemas"]["LiteratureSearchProvenanceResponse"][];
+            studies?: {
+                /** Format: uuid */
+                studyId?: string;
+                title?: string;
+                pmid?: string | null;
+                pmcid?: string | null;
+                doi?: string | null;
+                journal?: string | null;
+                publicationYear?: number | null;
+                publicationMonth?: number | null;
+                publicationDay?: number | null;
+                publicationTypes?: string[];
+                authors?: string[];
+                source?: string;
+                discoveryPaths?: components["schemas"]["StudyDiscoveryProvenanceResponse"][];
+                sourceMaterials?: components["schemas"]["SourceMaterialProvenanceResponse"][];
+                extractions?: components["schemas"]["EvidenceExtractionProvenanceResponse"][];
+                evidence?: components["schemas"]["EvidenceProvenanceResponse"][];
+                evaluations?: components["schemas"]["EvidenceEvaluationProvenanceResponse"][];
+            }[];
+            reportClaims?: components["schemas"]["ResearchReportClaimProvenanceResponse"][];
+            quantitativeContributions?: components["schemas"]["QuantitativeContributionProvenanceResponse"][];
+        };
         ProblemDetails: {
             type?: string;
             title?: string;
@@ -668,6 +898,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuantitativeSynthesisArtifactResponse"][];
+                };
+            };
+            404: components["responses"]["Problem"];
+            500: components["responses"]["Problem"];
+        };
+    };
+    getResearchProvenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Persisted evidence and provenance lineage for the authorized research run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchProvenanceResponse"];
                 };
             };
             404: components["responses"]["Problem"];

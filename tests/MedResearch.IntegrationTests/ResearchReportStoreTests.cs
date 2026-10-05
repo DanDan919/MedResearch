@@ -1,6 +1,8 @@
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Provenance;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
+using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Synthesis.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +16,53 @@ public sealed class ResearchReportStoreTests
     public ResearchReportStoreTests(PostgreSqlFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    [SkippableFact]
+    public async Task ProvenanceProjection_IsRunScopedAndPreservesThePersistedLineageGraph()
+    {
+        SkipIfPostgreSqlUnavailable();
+
+        var first = await SeedRunWithEvidenceAsync(evidenceCount: 2);
+        await using (var context = _fixture.CreateDbContext())
+        {
+            var synthesisStore = new EfResearchSynthesisStore(context);
+            await synthesisStore.PersistReportAsync(
+                CreateCompletedResult(first.RunId, first.EvidenceIds),
+                CancellationToken.None);
+        }
+
+        var second = await SeedSecondRunForExistingStudyAsync(first.StudyId);
+
+        await using var verification = _fixture.CreateDbContext();
+        var provenanceStore = new EfResearchProvenanceStore(verification);
+        var firstModel = await provenanceStore.FindAsync(
+            first.RunId,
+            ResearchOwnership.LegacyUnownedSubjectId,
+            CancellationToken.None);
+        var secondModel = await provenanceStore.FindAsync(
+            second.RunId,
+            ResearchOwnership.LegacyUnownedSubjectId,
+            CancellationToken.None);
+
+        var firstStudy = Assert.Single(firstModel!.Studies);
+        Assert.Equal(first.StudyId, firstStudy.StudyId);
+        Assert.Single(firstStudy.DiscoveryPaths);
+        Assert.Single(firstStudy.Extractions);
+        Assert.Equal(2, firstStudy.Evidence.Count);
+        Assert.Single(firstStudy.Evaluations);
+        Assert.NotEmpty(firstModel.ReportClaims);
+        Assert.Equal(
+            first.EvidenceIds.OrderBy(id => id),
+            firstModel.ReportClaims.SelectMany(claim => claim.EvidenceIds).Distinct().OrderBy(id => id));
+        Assert.DoesNotContain(firstStudy.SourceMaterials, material => material.ContentHash is null);
+
+        var secondStudy = Assert.Single(secondModel!.Studies);
+        Assert.Equal(first.StudyId, secondStudy.StudyId);
+        Assert.Single(secondStudy.Extractions);
+        Assert.Single(secondStudy.Evidence);
+        Assert.All(first.EvidenceIds, id => Assert.DoesNotContain(id, secondStudy.Evidence.Select(item => item.EvidenceId)));
+        Assert.Empty(secondModel.ReportClaims);
     }
 
     [SkippableFact]

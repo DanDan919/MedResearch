@@ -322,6 +322,196 @@ export const quantitativeSynthesisArtifactResponseSchema = z.object({
   result: quantitativeSynthesisResultSchema
 });
 
+const researchProvenanceCoverageSchema = z.object({
+  researchPlanCount: z.number().int(),
+  literatureSearchCount: z.number().int(),
+  discoveryPathCount: z.number().int(),
+  distinctStudyCount: z.number().int(),
+  sourceMaterialCount: z.number().int(),
+  evidenceExtractionCount: z.number().int(),
+  evidenceFindingCount: z.number().int(),
+  evidenceEvaluationCount: z.number().int(),
+  researchReportClaimCount: z.number().int(),
+  hasPersistedProviderFailureProvenance: z.boolean()
+});
+
+const researchPlanProvenanceSchema = z.object({
+  researchPlanId: z.string().uuid(),
+  originalQuestion: z.string(),
+  searchQueries: z.array(z.string()),
+  provider: z.string(),
+  model: z.string(),
+  promptVersion: z.string(),
+  generatedAt: z.string()
+});
+
+const literatureSearchProvenanceSchema = z.object({
+  literatureSearchId: z.string().uuid(),
+  researchPlanId: z.string().uuid().nullable(),
+  source: z.string(),
+  query: z.string(),
+  searchedAt: z.string(),
+  resultCount: z.number().int(),
+  persistedStudyCount: z.number().int(),
+  duplicateStudyCount: z.number().int(),
+  resultStatus: z.string()
+});
+
+const studyDiscoveryProvenanceSchema = z.object({
+  researchStudyDiscoveryId: z.string().uuid(),
+  literatureSearchId: z.string().uuid(),
+  source: z.string(),
+  sourceStudyIdentifier: z.string().nullable(),
+  query: z.string(),
+  searchedAt: z.string(),
+  discoveredAt: z.string()
+});
+
+const sourceMaterialProvenanceSchema = z.object({
+  sourceMaterialId: z.string().uuid(),
+  studyId: z.string().uuid(),
+  type: z.string(),
+  provider: z.string(),
+  providerSourceId: z.string().nullable(),
+  retrievalMethod: z.string(),
+  contentHash: z.string(),
+  contentVersion: z.number().int(),
+  retrievedAt: z.string(),
+  sourceUpdatedAt: z.string().nullable(),
+  accessStatus: z.string(),
+  characterCount: z.number().int(),
+  wasTruncated: z.boolean(),
+  isCurrent: z.boolean(),
+  sectionNames: z.array(z.string())
+});
+
+const evidenceExtractionProvenanceSchema = z.object({
+  evidenceExtractionId: z.string().uuid(),
+  studyId: z.string().uuid(),
+  sourceMaterialId: z.string().uuid().nullable(),
+  status: z.string(),
+  skipReason: z.string().nullable(),
+  sourceScope: z.string(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  promptVersion: z.string(),
+  extractedAt: z.string(),
+  evidenceCount: z.number().int(),
+  groundingValidated: z.boolean()
+});
+
+const evidenceProvenanceSchema = z.object({
+  evidenceId: z.string().uuid(),
+  evidenceExtractionId: z.string().uuid(),
+  outcome: z.string(),
+  resultSummary: z.string(),
+  supportingText: z.string(),
+  direction: z.string(),
+  sourceScope: z.string(),
+  extractedAt: z.string(),
+  groundingValidated: z.boolean(),
+  population: z.string().nullable(),
+  exposureOrIntervention: z.string().nullable(),
+  comparator: z.string().nullable(),
+  studyDesign: z.string().nullable(),
+  sampleSize: z.number().int().nullable(),
+  effectMeasure: z.string().nullable(),
+  effectValue: z.number().nullable(),
+  confidenceIntervalLower: z.number().nullable(),
+  confidenceIntervalUpper: z.number().nullable(),
+  confidenceLevel: z.number().nullable(),
+  reportedStandardError: z.number().nullable(),
+  pValue: z.number().nullable()
+});
+
+const evidenceEvaluationProvenanceSchema = z.object({
+  evidenceEvaluationId: z.string().uuid(),
+  studyId: z.string().uuid(),
+  status: z.string(),
+  skipReason: z.string().nullable(),
+  sourceScope: z.string(),
+  evidenceIds: z.array(z.string().uuid()),
+  evaluatorProvider: z.string().nullable(),
+  evaluatorModel: z.string().nullable(),
+  promptVersion: z.string(),
+  evaluatedAt: z.string(),
+  studyDesign: z.string(),
+  sampleInformation: z.string(),
+  comparatorPresence: z.string(),
+  comparatorDescription: z.string().nullable(),
+  randomization: z.string(),
+  blinding: z.string(),
+  allocationConcealment: z.string(),
+  attritionMissingData: z.string(),
+  precision: z.string(),
+  directness: z.string(),
+  overallConfidence: z.string(),
+  rationale: z.string(),
+  reportingLimitations: z.array(z.string()),
+  authorReportedLimitations: z.array(z.string()),
+  hasSampleSize: z.boolean(),
+  hasEffectEstimate: z.boolean(),
+  hasConfidenceInterval: z.boolean(),
+  hasPValue: z.boolean(),
+  hasComparator: z.boolean(),
+  unknownDomainCount: z.number().int(),
+  insufficientSourceDomainCount: z.number().int()
+});
+
+const researchReportClaimProvenanceSchema = z.object({
+  researchReportId: z.string().uuid(),
+  researchReportClaimId: z.string().uuid(),
+  claimType: z.string(),
+  direction: z.string(),
+  text: z.string(),
+  ordinal: z.number().int(),
+  evidenceIds: z.array(z.string().uuid())
+});
+
+const quantitativeContributionProvenanceSchema = z.object({
+  artifactId: z.string().uuid(),
+  groupKey: z.string(),
+  analysisMethod: z.string(),
+  ordinal: z.number().int(),
+  evidenceId: z.string().uuid(),
+  studyId: z.string().uuid(),
+  evidenceExtractionId: z.string().uuid(),
+  sourceMaterialId: z.string().uuid()
+});
+
+export const researchProvenanceResponseSchema = z.object({
+  researchRunId: z.string().uuid(),
+  question: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  coverage: researchProvenanceCoverageSchema,
+  plans: z.array(researchPlanProvenanceSchema),
+  searches: z.array(literatureSearchProvenanceSchema),
+  studies: z.array(z.object({
+    studyId: z.string().uuid(),
+    title: z.string(),
+    pmid: z.string().nullable(),
+    pmcid: z.string().nullable(),
+    doi: z.string().nullable(),
+    journal: z.string().nullable(),
+    publicationYear: z.number().int().nullable(),
+    publicationMonth: z.number().int().nullable(),
+    publicationDay: z.number().int().nullable(),
+    publicationTypes: z.array(z.string()),
+    authors: z.array(z.string()),
+    source: z.string(),
+    discoveryPaths: z.array(studyDiscoveryProvenanceSchema),
+    sourceMaterials: z.array(sourceMaterialProvenanceSchema),
+    extractions: z.array(evidenceExtractionProvenanceSchema),
+    evidence: z.array(evidenceProvenanceSchema),
+    evaluations: z.array(evidenceEvaluationProvenanceSchema)
+  })),
+  reportClaims: z.array(researchReportClaimProvenanceSchema),
+  quantitativeContributions: z.array(quantitativeContributionProvenanceSchema)
+});
+
 export const problemDetailsSchema = z
   .object({
     type: z.string().optional(),

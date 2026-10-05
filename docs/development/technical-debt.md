@@ -78,3 +78,9 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 - F10 authentication is intentionally bearer-based and stateless. There is no refresh-token/session lifecycle, localStorage token persistence, cookie auth, or CSRF workflow until a concrete identity-provider/client product is selected.
 - Resource creation has no per-user quota or rate limit yet. Authentication prevents cross-user access, but one authenticated actor can still submit many expensive research runs; a narrow resource-abuse policy is a future operational milestone.
 - Existing pre-ownership rows are preserved under `legacy-unowned`. A deliberate administrative migration/ownership assignment tool is still required before those rows can be made user-visible.
+
+## F13 Provenance observability limitations
+
+The Evidence & Provenance Explorer is deliberately a projection of persisted facts. `LiteratureSearch` currently stores successful search executions but has no first-class status/error payload for a provider attempt that fails before a search row can be persisted. The endpoint therefore distinguishes successful results from successful zero-result searches and reports `hasPersistedProviderFailureProvenance=false`; it does not fabricate failed-attempt history. A future change may add bounded failure provenance and retry-attempt metadata with a forward migration.
+
+SourceMaterial is global per Study, while acquisition attempts are not separately run-scoped. F13 can show the exact SourceMaterialId used by an extraction and all persisted snapshot metadata for the discovered Study, but cannot claim that every global snapshot was acquired during the selected run. Raw source content remains intentionally outside the read model.

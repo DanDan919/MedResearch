@@ -386,6 +386,14 @@ F3 adds a backend-backed progress read model and upgrades `/research/[id]` from 
 - It deliberately does not show percentages, ETA, live provider activity, local scientific calculations, or a guessed failed stage.
 - No database schema change was added. Failure stage remains not persisted; failure is displayed as terminal run state with safe failure reason.
 - SourceMaterial is global per Study, so progress counts current source material available for the Studies discovered by the run.
+
+## F13 Evidence & Provenance Explorer
+
+F13 adds the owner-authorized `GET /api/research/{researchRunId}/provenance` endpoint and `/research/[id]/evidence` read-only workspace. The backend projects one ResearchRun's persisted search executions, per-search discovery paths, canonical Studies, SourceMaterial metadata, run-scoped extraction/Evidence/Evaluation records, report claim Evidence links, and quantitative contribution lineage. A study discovered by PubMed and Europe PMC appears once with multiple discovery paths.
+
+The endpoint intentionally excludes raw `SourceMaterial.Content`. The UI shows content hashes, versions, access status, character counts, and sections instead. It does not invent identifiers, citations, confidence, or study-level quantitative intervals. Search results with zero records are represented as successful zero-result executions. Provider failure attempts are not currently persisted by `LiteratureSearch`; that limitation is exposed and documented instead of being hidden.
+
+Cross-run isolation is enforced in the EF projection by owner-filtering the ResearchRun and filtering all run-scoped child records by the requested run. Report claim Evidence links are additionally joined to same-run Evidence. PostgreSQL integration coverage verifies the global Study/multiple discovery relationship and run-scoped Evidence graph; API and Playwright tests cover authorization, zero evidence, source-content exclusion, claim links, and quantitative lineage.
 ## Canonical HKSJ Summary-Effect Inference V1
 
 Milestone 23 adds `HksjSummaryEffectInferenceCalculator` as a deterministic Application read model nested under each successful M22 random-effects result.

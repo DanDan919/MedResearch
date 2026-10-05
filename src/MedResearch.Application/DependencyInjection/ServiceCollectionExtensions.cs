@@ -4,6 +4,7 @@ using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Provenance;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Application.Research.Synthesis;
@@ -18,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CreateResearchUseCase>();
         services.AddScoped<GetResearchUseCase>();
         services.AddScoped<GetResearchProgressUseCase>();
+        services.AddScoped<GetResearchProvenanceUseCase>();
         services.AddScoped<ListResearchRunsUseCase>();
         services.AddSingleton<ResearchPlanningOptions>();
         services.AddScoped<IResearchPlanner, ResearchPlanner>();

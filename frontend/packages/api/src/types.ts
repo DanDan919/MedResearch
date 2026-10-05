@@ -1,4 +1,6 @@
 import type { components } from "./generated/medresearch-api";
+import { researchProvenanceResponseSchema } from "./schemas";
+import type { z } from "zod";
 
 export type CreateResearchRequest = components["schemas"]["CreateResearchRequest"];
 export type CreateResearchResponse = components["schemas"]["CreateResearchResponse"];
@@ -9,6 +11,7 @@ export type ResearchRunProgressResponse = components["schemas"]["ResearchRunProg
 export type ResearchRunStatus = components["schemas"]["ResearchRunStatus"];
 export type ResearchReportResponse = components["schemas"]["ResearchReportResponse"];
 export type QuantitativeSynthesisArtifactResponse = components["schemas"]["QuantitativeSynthesisArtifactResponse"];
+export type ResearchProvenanceResponse = z.infer<typeof researchProvenanceResponseSchema>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
 
 export type HealthState = "connected" | "unavailable";

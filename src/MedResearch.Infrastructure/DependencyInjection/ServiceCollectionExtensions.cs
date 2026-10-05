@@ -23,6 +23,7 @@ using MedResearch.Infrastructure.Research.Processing;
 using MedResearch.Infrastructure.SourceMaterials.EuropePmc;
 using MedResearch.Infrastructure.SourceMaterials.Persistence;
 using MedResearch.Infrastructure.Synthesis.Persistence;
+using MedResearch.Application.Research.Provenance;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IResearchStore, EfResearchStore>();
         services.AddScoped<IResearchProgressStore, EfResearchProgressStore>();
+        services.AddScoped<IResearchProvenanceStore, EfResearchProvenanceStore>();
         services.AddScoped<IResearchRunQueue>(provider =>
             new PostgreSqlResearchRunQueue(provider.GetRequiredService<IDbContextFactory<MedResearchDbContext>>()));
         services.AddScoped<IResearchRunWriteFence, PostgreSqlResearchRunWriteFence>();

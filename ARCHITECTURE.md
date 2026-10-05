@@ -626,3 +626,24 @@ F7 adds a frontend read-only workspace over the immutable F6 artifact endpoint. 
 The UI presents persisted common/fixed and random-effects outputs, heterogeneity diagnostics, tau-squared state, Wald/HKSJ inference, prediction intervals, contribution snapshots, lineage IDs, fingerprints, and algorithm versions. It does not load raw SourceMaterial, issue one request per contribution, or derive missing study confidence intervals.
 
 The SVG forest plot maps persisted analysis-scale numbers to screen coordinates only. It does not calculate effects, exponentiate values, calculate weights, infer a null line from an unknown display contract, or classify heterogeneity. F6 currently does not include publication titles/identifiers or study-level intervals in the quantitative snapshot; F7 therefore renders lineage IDs and explicit unavailable states rather than joining or inventing metadata.
+
+## Evidence & Provenance Explorer V1
+
+F13 adds a read-only, owner-authorized provenance projection at `GET /api/research/{researchRunId}/provenance` and the frontend route `/research/[id]/evidence`. `GetResearchProvenanceUseCase` delegates to `IResearchProvenanceStore`; `EfResearchProvenanceStore` joins only the requested run's ResearchQuestion ownership, searches, discovery paths, run-scoped extraction/evidence/evaluation/report-claim links, and quantitative contribution snapshots.
+
+The projection keeps the three identity scopes visible:
+
+```text
+ResearchRun
+  -> LiteratureSearch (one provider/query execution)
+      -> ResearchStudyDiscovery (one search-to-study path)
+          -> global Study (canonical publication identity)
+              -> SourceMaterial metadata (global immutable snapshot metadata)
+              -> EvidenceExtraction / Evidence / EvidenceEvaluation (run-scoped)
+  -> ResearchReportClaim -> same-run Evidence IDs
+  -> Quantitative contribution -> Evidence/Study/extraction/source-material IDs
+```
+
+Multiple providers or queries can show multiple discovery paths under one Study without producing duplicate downstream work. The endpoint returns SourceMaterial metadata, hashes, versions, access state, and section names, but never `SourceMaterial.Content`. Report claim links are joined to Evidence with the same ResearchRun filter so a malformed cross-run relational link cannot leak into the read model. The current LiteratureSearch schema does not persist failed provider attempts as first-class rows; the response truthfully exposes `hasPersistedProviderFailureProvenance=false` rather than inventing a failure event.
+
+The frontend uses a generated API contract plus Zod validation, run-scoped TanStack Query keys, and a display-only study filter. It renders zero-evidence and missing-metadata states explicitly and does not calculate scientific values or reconstruct bibliographic identifiers.

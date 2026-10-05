@@ -107,13 +107,20 @@ export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
         </CardContent>
       </Card>
 
-      {progress.status === "Completed" ? (
-        <Button asChild>
-          <Link href={`/research/${progress.researchRunId}/report`}>
-            Open Report <ArrowRight className="h-4 w-4" />
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="secondary">
+          <Link href={`/research/${progress.researchRunId}/evidence`}>
+            Evidence &amp; Provenance <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
-      ) : null}
+        {progress.status === "Completed" ? (
+          <Button asChild>
+            <Link href={`/research/${progress.researchRunId}/report`}>
+              Open Report <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

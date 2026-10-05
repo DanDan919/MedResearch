@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using MedResearch.Api.Research;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Provenance;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
@@ -31,6 +32,7 @@ public sealed class ResearchApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}/report")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}/quantitative")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/research/{Guid.NewGuid()}/provenance")).StatusCode);
     }
 
     [Fact]
@@ -95,6 +97,89 @@ public sealed class ResearchApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, foreignReportResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, foreignQuantitativeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProvenanceEndpoint_ReturnsPersistedLineageWithoutSourceContent()
+    {
+        using var factory = new ResearchApiFactory();
+        var runId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+        var studyId = Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+        var extractionId = Guid.Parse("dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+        var sourceMaterialId = Guid.Parse("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
+        var evidenceId = Guid.Parse("ffffffff-ffff-4fff-8fff-ffffffffffff");
+        var model = new ResearchProvenanceReadModel(
+            runId,
+            "Does sleep improve recall?",
+            ResearchRunStatus.Completed,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            new ResearchProvenanceCoverage(1, 2, 2, 1, 1, 1, 1, 1, 1, false),
+            [new ResearchPlanProvenance(Guid.NewGuid(), "Does sleep improve recall?", ["sleep recall"], "FakeLLM", "fake-model", "planner-v1", DateTimeOffset.UtcNow)],
+            [
+                new LiteratureSearchProvenance(Guid.NewGuid(), null, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 1, 0, "SucceededWithResults"),
+                new LiteratureSearchProvenance(Guid.NewGuid(), null, "EuropePmc", "sleep recall", DateTimeOffset.UtcNow, 1, 1, 0, "SucceededWithResults")
+            ],
+            [new StudyProvenance(
+                studyId,
+                "Sleep and recall",
+                "12345678",
+                "PMC123456",
+                "10.1000/sleep",
+                "Journal",
+                2026,
+                1,
+                null,
+                ["Journal Article"],
+                ["Ada Lovelace"],
+                "PubMed",
+                [
+                    new StudyDiscoveryProvenance(Guid.NewGuid(), Guid.NewGuid(), "PubMed", "12345678", "sleep recall", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+                    new StudyDiscoveryProvenance(Guid.NewGuid(), Guid.NewGuid(), "EuropePmc", "MED:12345678", "sleep recall", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+                ],
+                [new SourceMaterialProvenance(sourceMaterialId, studyId, SourceMaterialType.Abstract, "PubMed", "12345678", "SearchMetadataAbstract", "hash", 1, DateTimeOffset.UtcNow, null, SourceMaterialAccessStatus.Unknown, 42, false, true, ["Abstract"])],
+                [new EvidenceExtractionProvenance(extractionId, studyId, sourceMaterialId, EvidenceExtractionStatus.Completed, null, EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", "extract-v1", DateTimeOffset.UtcNow, 1, true)],
+                [new EvidenceProvenance(
+                    EvidenceId: evidenceId,
+                    EvidenceExtractionId: extractionId,
+                    Outcome: "recall",
+                    ResultSummary: "Recall improved.",
+                    SupportingText: "Persisted supporting excerpt.",
+                    Direction: EvidenceDirection.Positive,
+                    SourceScope: EvidenceSourceScope.Abstract,
+                    ExtractedAt: DateTimeOffset.UtcNow,
+                    GroundingValidated: true,
+                    Population: null,
+                    ExposureOrIntervention: null,
+                    Comparator: null,
+                    StudyDesign: null,
+                    SampleSize: null,
+                    EffectMeasure: null,
+                    EffectValue: null,
+                    ConfidenceIntervalLower: null,
+                    ConfidenceIntervalUpper: null,
+                    ConfidenceLevel: null,
+                    ReportedStandardError: null,
+                    PValue: null)],
+                [new EvidenceEvaluationProvenance(Guid.NewGuid(), studyId, EvidenceEvaluationStatus.Completed, null, EvidenceSourceScope.Abstract, [evidenceId], "FakeLLM", "fake-model", "eval-v1", DateTimeOffset.UtcNow, StudyDesignClassification.Unknown, MethodologicalAssessmentState.Unknown, ComparatorPresence.Unclear, null, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, DirectnessRating.Unclear, MethodologicalConfidence.InsufficientInformation, "Rationale", [], [], false, false, false, false, false, 0, 0)]
+            )],
+            [new ResearchReportClaimProvenance(Guid.NewGuid(), Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Recall improved.", 0, [evidenceId])],
+            [new QuantitativeContributionProvenance(Guid.NewGuid(), "recall", "Fixed", 0, evidenceId, studyId, extractionId, sourceMaterialId)]);
+        factory.ProvenanceStore.Seed(model, "UserA");
+
+        using var client = factory.CreateClientFor("UserA");
+        var response = await client.GetAsync($"/api/research/{runId}/provenance");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("discoveryPathCount", body);
+        Assert.Contains("SucceededWithResults", body);
+        Assert.Contains("Persisted supporting excerpt.", body);
+        Assert.DoesNotContain("raw source body", body, StringComparison.OrdinalIgnoreCase);
+
+        using var otherClient = factory.CreateClientFor("UserB");
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync($"/api/research/{runId}/provenance")).StatusCode);
     }
 
     [Fact]
@@ -459,6 +544,8 @@ public sealed class ResearchApiTests
 
         public InMemoryQuantitativeStore QuantitativeStore { get; } = new();
 
+        public InMemoryResearchProvenanceStore ProvenanceStore { get; } = new();
+
         public new HttpClient CreateClient()
         {
             return CreateClientFor("UserA");
@@ -493,10 +580,12 @@ public sealed class ResearchApiTests
                 services.RemoveAll<IResearchProgressStore>();
                 services.RemoveAll<IResearchReportStore>();
                 services.RemoveAll<IQuantitativeSynthesisArtifactStore>();
+                services.RemoveAll<IResearchProvenanceStore>();
                 services.AddSingleton<IResearchStore>(Store);
                 services.AddSingleton<IResearchProgressStore>(Store);
                 services.AddSingleton<IResearchReportStore>(ReportStore);
                 services.AddSingleton<IQuantitativeSynthesisArtifactStore>(QuantitativeStore);
+                services.AddSingleton<IResearchProvenanceStore>(ProvenanceStore);
             });
         }
     }
@@ -540,6 +629,24 @@ public sealed class ResearchApiTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>>([]);
+        }
+    }
+
+    private sealed class InMemoryResearchProvenanceStore : IResearchProvenanceStore
+    {
+        private readonly ConcurrentDictionary<Guid, (ResearchProvenanceReadModel Model, string Owner)> _models = [];
+
+        public void Seed(ResearchProvenanceReadModel model, string ownerSubjectId)
+        {
+            _models[model.ResearchRunId] = (model, ownerSubjectId);
+        }
+
+        public Task<ResearchProvenanceReadModel?> FindAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                _models.TryGetValue(researchRunId, out var value) && value.Owner == ownerSubjectId
+                    ? value.Model
+                    : null);
         }
     }
 
