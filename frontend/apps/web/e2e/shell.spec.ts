@@ -8,6 +8,21 @@ test("application shell loads and navigates to New Research", async ({ page }) =
   await expect(page.getByLabel("Research question")).toBeVisible();
 });
 
+test("application shell has no React runtime or hydration errors", async ({ page }) => {
+  const runtimeErrors: string[] = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      runtimeErrors.push(message.text());
+    }
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+  expect(runtimeErrors.filter((message) => /script tag|hydration failed|hydration mismatch/i.test(message))).toEqual([]);
+});
+
 test("research history loads runs and links to details", async ({ page }) => {
   await page.addInitScript(() => {
     const originalFetch = window.fetch.bind(window);

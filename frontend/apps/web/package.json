@@ -18,7 +18,6 @@
     "@tanstack/react-query": "latest",
     "lucide-react": "latest",
     "next": "latest",
-    "next-themes": "latest",
     "react": "latest",
     "react-dom": "latest",
     "zod": "latest"
