@@ -1,4 +1,5 @@
 using MedResearch.Api.Research;
+using System.Data.Common;
 using MedResearch.Api;
 using MedResearch.Domain;
 using MedResearch.Application.DependencyInjection;
@@ -53,11 +54,13 @@ app.UseExceptionHandler(errorApp =>
 
         var (statusCode, title) = exception switch
         {
+            DbException { IsTransient: true } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
+            Exception { InnerException: DbException { IsTransient: true } } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
             ArgumentException or InvalidOperationException => (StatusCodes.Status400BadRequest, "Invalid request"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
 
-        if (statusCode == StatusCodes.Status500InternalServerError)
+        if (statusCode >= StatusCodes.Status500InternalServerError)
         {
             logger.LogError(exception, "Unhandled exception while processing HTTP request.");
         }

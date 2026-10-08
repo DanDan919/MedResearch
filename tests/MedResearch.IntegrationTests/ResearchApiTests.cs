@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -21,6 +22,34 @@ namespace MedResearch.IntegrationTests;
 
 public sealed class ResearchApiTests
 {
+    [Theory]
+    [InlineData(true, false, HttpStatusCode.ServiceUnavailable)]
+    [InlineData(true, true, HttpStatusCode.ServiceUnavailable)]
+    [InlineData(false, false, HttpStatusCode.InternalServerError)]
+    public async Task DatabaseFailures_AreOperationalErrorsWithoutPrivateDiagnostics(bool transient, bool wrapped, HttpStatusCode expected)
+    {
+        using var factory = new ResearchApiFactory();
+        var failure = new FakeDatabaseException(transient);
+        factory.Store.ReadFailure = wrapped ? new InvalidOperationException("private-wrapper-marker", failure) : failure;
+        using var client = factory.CreateClient();
+        var response = await client.GetAsync($"/api/research/{Guid.NewGuid()}");
+        Assert.Equal(expected, response.StatusCode);
+        Assert.DoesNotContain("private-", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ValidationFailure_RemainsBadRequestRatherThanDatabaseOutage()
+    {
+        using var factory = new ResearchApiFactory();
+        factory.Store.ReadFailure = new InvalidOperationException("Invalid test input");
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/research/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    private sealed class FakeDatabaseException(bool transient) : DbException("private-database-marker")
+    {
+        public override bool IsTransient => transient;
+    }
     [Fact]
     public async Task AnonymousResearchEndpoints_AreRejected()
     {
@@ -706,6 +735,7 @@ public sealed class ResearchApiTests
     private sealed class InMemoryResearchStore : IResearchStore
         , IResearchProgressStore
     {
+        public Exception? ReadFailure { get; set; }
         private readonly ConcurrentDictionary<Guid, ResearchRunDetails> _runs = [];
         private readonly ConcurrentDictionary<Guid, string> _owners = [];
 
@@ -736,6 +766,7 @@ public sealed class ResearchApiTests
 
         public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)
         {
+            if (ReadFailure is not null) throw ReadFailure;
             _runs.TryGetValue(researchRunId, out var result);
             if (result is not null && (!_owners.TryGetValue(researchRunId, out var owner) || owner != ownerSubjectId))
             {

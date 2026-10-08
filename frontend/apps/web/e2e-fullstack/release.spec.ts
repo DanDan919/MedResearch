@@ -103,12 +103,12 @@ test("issuer outage and corrupt session never appear as empty scientific results
 test("API and PostgreSQL outages remain errors, liveness survives database outage", async ({ page }) => {
   test.setTimeout(90_000); await signIn(page);
   try {
-    expect((await page.request.post("/_fixture/control", { data: { action: "postgres-stop" } })).status()).toBe(200);
+    expect((await page.request.post("/_fixture/control", { data: { action: "postgres-pause" } })).status()).toBe(200);
     expect((await page.request.get("http://127.0.0.1:3442/health/live")).status()).toBe(200);
     expect((await page.request.get("/api/backend/health/ready")).status()).toBe(503);
-    expect((await page.request.get(`/api/backend/api/research/${runId}/report`)).status()).not.toBe(200);
+    expect((await page.request.get(`/api/backend/api/research/${runId}/report`)).status()).toBe(503);
   } finally {
-    await page.request.post("/_fixture/control", { data: { action: "postgres-start" } });
+    expect((await page.request.post("/_fixture/control", { data: { action: "postgres-resume" } })).status()).toBe(200);
     await expect.poll(async () => (await page.request.get("/api/backend/health/ready")).status(), { timeout: 30_000 }).toBe(200);
   }
   try {

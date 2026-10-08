@@ -53,6 +53,7 @@ internal static class ApiOpenApiConfiguration
                     operation.Value.Responses ??= new OpenApiResponses();
                     operation.Value.Responses.TryAdd("401", new OpenApiResponse { Description = "Authentication required" });
                     operation.Value.Responses.TryAdd("403", new OpenApiResponse { Description = "Invalid authenticated subject" });
+                    operation.Value.Responses.TryAdd("503", new OpenApiResponse { Description = "Research database temporarily unavailable" });
                 }
             }
             return Task.CompletedTask;

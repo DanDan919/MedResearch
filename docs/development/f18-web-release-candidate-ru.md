@@ -109,7 +109,7 @@ lineage. Отдельные 97 Studies/discoveries расширяют read-model
 Никаких live OpenAI/PubMed/Europe PMC/платных calls. Browser guard допускает
 только loopback. API restart должен вернуть идентичные report/artifact snapshots.
 
-Database outage: live 200, ready 503, scientific read не 200. API outage:
+Database outage: live 200, ready 503, scientific read 503. API outage:
 BFF 503 и видимый error, не empty scientific history. Cleanup ограничен
 собственными processes/container/temp path. Local Docker failure не заменяется
 SQLite/InMemory и не превращается в skip этого runner.
@@ -167,14 +167,14 @@ Development Compose не выдаётся за production deployment template.
 | Domain | 45 | 0 | 0 |
 | Application | 289 | 0 | 0 |
 | Infrastructure | 110 | 0 | 0 |
-| Integration | 47 | 0 | 103 |
+| Integration | 51 | 0 | 103 |
 | Frontend API | 40 | 0 | 0 |
 | Web | 99 | 0 | 0 |
 | Security policy | 5 | 0 | 0 |
 | Scientific Chromium | 15 | 0 | 0 |
 | Production OIDC Chromium | 17 | 0 | 0 |
 
-Backend 491 passed, 103 local Docker skips. Restore/build: success, 0 warnings/
+Backend 495 passed, 103 local Docker skips. Restore/build: success, 0 warnings/
 errors; EF pending-model: нет изменений; Compose config и diff check проходят.
 Docker info: Linux engine pipe недоступен. Новый full-stack runner локально
 явно FAILED на Docker availability, не заявлен как passed. Его Release build
@@ -187,7 +187,7 @@ Native Tauri НЕ проверен. Screenshot production shell 320px просм
 Workflow `.github/workflows/ci.yml`: Ubuntu, .NET10, Node24/pnpm11.19.
 Три jobs: existing strict build-test, frontend и изолированный web-release.
 Required PG suite ожидается 103 выполненных cases, 0 required skips. Backend
-total ожидается 594; эти числа пока ожидание, не утверждение результата CI.
+total ожидается 598; эти числа пока ожидание, не утверждение результата CI.
 Full-stack 17 cases/trusted CA, image builds и diagnostics artifact обязательны.
 Первый commit `20354cd1be259951748b5722ceb98be413c75ffd`, CI `37807605255`:
 frontend/build-test success, 594 backend passed, 0 failed/skipped. Новый
@@ -203,6 +203,20 @@ jobs второго run success. Это ошибки новой fixture подг
 сертификат (ERR_CERT_INVALID). CA/server leaf были одним certificate. Цепочка
 заменена на отдельную CA/serverAuth/SAN leaf; NSS путь актуализирован без
 TLS bypass. До повторного runtime CI это исправление не объявляется verified.
+Четвёртый run `37810208573` на `3236a4835809281f33cd8b12ea8dd8d4dff0f7a7`:
+11 full-stack passed, 6 failed. Trusted HTTPS, actual JWT API, persisted
+report/artifact restart и user isolation прошли. Docker stop/start сменил
+ephemeral host port; recovery health poll не восстановился, следующие mobile
+reads тоже упали. Fault injection теперь pause/unpause с неизменным endpoint.
+Это не проверка PostgreSQL process restart, а реальной временной недоступности.
+API process restart проверяется отдельно с идентичностью persisted snapshots.
+
+При outage обнаружен production HTTP дефект: transient DbException в wrapper
+попадал в 400/validation. Теперь direct/wrapped transient DB error -> 503,
+non-transient -> 500, обычный InvalidOperationException validation -> 400.
+ProblemDetails 503/500 не раскрывают diagnostic marker. Четыре новые HTTP cases
+локально passed; OpenAPI/TS regenerated из backend, 503 объявлен в контракте.
+Итоговый runtime CI ещё pending; scientific validators/stores не изменены.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 

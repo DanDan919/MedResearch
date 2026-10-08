@@ -15,6 +15,16 @@
   CA/server leaf. Full-stack now generates a separate CA and SAN/serverAuth
   leaf, verifies its chain/hostname with OpenSSL and uses Chromium M146+ NSS
   path under an isolated XDG_DATA_HOME. TLS bypass remains disabled.
+- Fourth run 37810208573 passed 11 trusted-HTTPS/full-stack cases. Docker
+  stop/start reallocated the random host database port: subsequent reads used
+  the old endpoint. Fault injection now uses pause/unpause (real unavailability,
+  stable endpoint), not a fake health response. No production reconnect policy
+  is changed to accommodate a test-only dynamic endpoint.
+- The real outage exposed generic InvalidOperationException wrapping transient
+  DbException being reported as validation 400. HTTP handling now returns safe
+  503 for transient direct/wrapped DbException; non-transient remains 500,
+  ordinary validation remains 400. Four HTTP negative controls cover diagnostics
+  non-disclosure and classification. Scientific stores/algorithms are untouched.
 
 - Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped
   published patches 16.3.8/1.2.2 clear production findings. Full audit still

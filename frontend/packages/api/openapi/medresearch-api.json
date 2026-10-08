@@ -3212,6 +3212,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3271,6 +3274,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3333,6 +3339,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3395,6 +3404,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3457,6 +3469,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3522,6 +3537,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [
@@ -3594,6 +3612,9 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
           }
         },
         "security": [

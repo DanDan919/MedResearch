@@ -163,9 +163,9 @@ const webServer = https.createServer({ key: certificates.private, cert: certific
       else if (action === "api-restart") { await stopApi(); await startApi(); }
       else if (action === "issuer-stop") issuerAvailable = false;
       else if (action === "issuer-start") issuerAvailable = true;
-      else if (action === "postgres-stop" || action === "postgres-start") {
+      else if (action === "postgres-pause" || action === "postgres-resume") {
         if (!/^[a-f0-9]{64}$/.test(process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID ?? "")) throw new Error("Invalid fixture container");
-        execFileSync("docker", [action === "postgres-stop" ? "stop" : "start", process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID], { stdio: "ignore" });
+        execFileSync("docker", [action === "postgres-pause" ? "pause" : "unpause", process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID], { stdio: "ignore", timeout: 10_000 });
       }
       else return json(response, 400, { title: "Unknown fixture action" });
       json(response, 200, { ok: true });
