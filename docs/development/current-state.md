@@ -13,9 +13,16 @@ scientific caches; cross-tab checks are bounded, not global revocation.
 Local verification: Domain 45, Application 289, Infrastructure 110, Integration
 36 passed/103 unavailable-Docker skips; zero failures. Frontend API 31/web 99,
 scientific Chromium 14 and production synthetic OIDC Chromium 16 passed.
-Fresh PostgreSQL/JWT owner test awaits strict CI at this checkpoint. EF pending
-model and Compose passed; local Docker pipe remains unavailable.
-External IdP/live science NOT RUN. See F17 report for final CI/Git verification.
+F17 COMPLETE - DETERMINISTIC. Feature commit
+`d7ec8357dcd13f0f90f56183c696dc967678ccb1` passed CI `37788883185`:
+Domain 45, Application 289, Infrastructure 110, Integration 139; all 583
+passed with zero failures/skips. All 103 required PostgreSQL/Testcontainers
+cases actually executed, including the new real signed-JWT owner isolation test.
+EF model, Compose, frontend checks, both Chromium suites and desktop React/Vite
+build passed. Local Docker pipe remains unavailable; native Tauri NOT RUN.
+External IdP/live science NOT RUN. No refresh/global revocation or graceful
+multi-key cookie rotation is claimed. Existing dependency advisories remain a
+release follow-up. See F17 report and the authentication deployment guide.
 
 ## F16 Structured Narrative Claim Grounding
 

@@ -1,7 +1,8 @@
 # F17: production web authentication flow
 
-Дата: 2026-10-08. Статус checkpoint: реализация и локальные deterministic проверки
-готовы; финальный strict CI/Git результат будет записан после push.
+Дата: 2026-10-08. **F17 COMPLETE - DETERMINISTIC**.
+Реализация, локальные проверки и strict Linux CI завершены успешно.
+Реальный внешний OIDC IdP и live scientific workflow: **NOT RUN**.
 
 ## Исходное состояние
 
@@ -153,6 +154,7 @@ test coverage from invented end-to-end deployment claims.
 - Scientific Chromium14 и production synthetic OIDC Chromium16 passed, включая
   access/ID subject mismatch, replay использованного callback и back после logout.
 - Frozen install, SDK generation, typecheck, lint, production build passed.
+- Desktop React/Vite build passed locally; native Tauri build NOT RUN.
 - EF pending-model no changes; Compose config passed; docker info failed
   unavailable Linux pipe. Docker Desktop не ремонтировался.
 
@@ -178,7 +180,8 @@ ID token не заменяет audience-scoped access; Production DevelopmentLoc
 BFF не arbitrary proxy; expired cookie/JWT не авторизует запросы. Logout/switch
 очищают app caches, с указанной bounded multi-tab оговоркой. API JWT независим.
 Проверен только synthetic issuer, не внешний production IdP. Научные алгоритмы
-не изменены. Финальный completion level зависит от strict green CI ниже.
+не изменены. F17 COMPLETE - DETERMINISTIC подтверждён strict green CI ниже,
+но не означает проверенный production deployment или отсутствие всех advisories.
 
 Единственный рекомендуемый следующий milestone: F18 Product/Deployment
 Readiness: сначала scoped dependency advisory remediation, затем реальный
@@ -206,5 +209,50 @@ cache/metadata/dev advisories/source-map-js DoS. Dependency upgrade не вып�
 и server/client boundaries. Нет production credentials, keys/CA генерируются
 только test process. Научные src/migrations/SDK schemas не изменены.
 
-Будет дополнен фактическим run ID, commit, zero-required-skip counts и clean
-status после push; локальные skips не заменяют PostgreSQL runtime verification.
+### Фактически проверенный GitHub Actions результат
+
+Production feature commit: `d7ec8357dcd13f0f90f56183c696dc967678ccb1`,
+`feat: add production OIDC web session and BFF`.
+[CI 37788883185](https://github.com/DanDan919/MedResearch/actions/runs/37788883185):
+completed/success; оба jobs Frontend и Build and test success.
+Runner ubuntu-latest, .NET 10.0.x, Node 24.x. Docker info success.
+
+Фактические backend TRX counters прочитаны через GitHub check annotations:
+
+| Suite | Executed | Passed | Failed | Skipped |
+|---|---:|---:|---:|---:|
+| Domain | 45 | 45 | 0 | 0 |
+| Application | 289 | 289 | 0 | 0 |
+| Infrastructure | 110 | 110 | 0 | 0 |
+| Integration | 139 | 139 | 0 | 0 |
+| Total | 583 | 583 | 0 | 0 |
+
+В Integration входят 103 Docker/PostgreSQL cases и 36 non-DB cases. Все 103
+обязательных DB tests реально выполнены: strict fixture не допускает Docker
+fallback/skip; Integration counters executed=total, skipped=0. Новый signed-JWT
+owner test, прежние migrations/leases/fencing/traceability и scientific
+F15.1/F15.2/F16/M17-M24 regressions зелёные. EF pending-model и Compose success.
+
+Frontend frozen install/generation drift/lint/typecheck/unit/build success;
+оба Chromium suites success: scientific regression (14 cases) и production
+synthetic OIDC/BFF (16 cases). Unit suites соответствуют локально проверенным
+API31/web99; CI job шаги success. Анонимное скачивание полных frontend logs
+через REST вернуло 403: отдельные frontend counters не выдаются за прочитанные
+TRX annotations. Desktop React/Vite CI build success; native Tauri NOT RUN.
+Skipped conditional upload-on-failure step не является skipped test.
+
+В CI нет external IdP/science credentials, live OpenAI/PubMed/Europe PMC calls.
+Synthetic HTTPS issuer использует ephemeral test keys/CA; настоящее production
+Next.js code exchange/BFF проверяется, но external identity deployment нет.
+Actions v4 выдали existing non-blocking Node20 deprecation warning. Установка
+Chromium заняла около семи минут, затем suite завершился успешно; workflow
+не менялся для обхода проверки, CI-fix commits не потребовались.
+
+Feature push в exact origin/main successful; feature tree clean и diff-check
+passed. Эта завершающая запись отправляется отдельным documentation-only
+commit; его hash, повторный CI и окончательный clean status сообщаются в handoff,
+без самоссылочного обещания hash внутри того же commit.
+
+Local preview `http://127.0.0.1:3018/login` запущен отдельно на loopback без
+IdP/secrets: HTTP200, accurate unconfigured state, protected data fail closed.
+Existing server на 3000 не остановлен. Preview не является real OIDC validation.
