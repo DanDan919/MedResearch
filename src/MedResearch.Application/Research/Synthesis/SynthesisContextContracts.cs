@@ -234,7 +234,8 @@ public sealed record SynthesisContext(
     IReadOnlyCollection<SynthesisStudyContext> Studies,
     IReadOnlyCollection<SynthesisOutcomeDirectionSummary> OutcomeDirectionSummaries,
     IReadOnlyCollection<string> DeterministicLimitations,
-    IReadOnlyCollection<SynthesisQuantitativeResultContext> QuantitativeSyntheses)
+    IReadOnlyCollection<SynthesisQuantitativeResultContext> QuantitativeSyntheses,
+    IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>? QuantitativeArtifacts = null)
 {
     public SynthesisContext(
         Guid researchRunId,

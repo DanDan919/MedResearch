@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace MedResearch.Application.Research.Synthesis;
 
 public sealed record ResearchReportDraft(
@@ -18,4 +21,17 @@ public sealed record ResearchReportClaimDraft(
     IReadOnlyCollection<string>? EvidenceIds,
     string? Pmid = null,
     string? Doi = null,
-    string? StudyId = null);
+    string? StudyId = null,
+    string? Kind = null,
+    string? Outcome = null,
+    string? Population = null,
+    string? ExposureOrIntervention = null,
+    string? Comparator = null,
+    string? Timepoint = null,
+    string? NumericEvidenceId = null,
+    string? QuantitativeArtifactId = null,
+    string? Statistic = null)
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnrecognizedFields { get; init; }
+}

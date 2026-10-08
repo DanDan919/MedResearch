@@ -7,7 +7,7 @@ namespace MedResearch.Application.Research.Synthesis;
 
 public static class ResearchSynthesisPrompt
 {
-    public const string Version = "research-synthesizer-v2-trusted-evidence";
+    public const string Version = "research-synthesizer-v3-structured-claims";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "research_report",
@@ -19,11 +19,6 @@ public static class ResearchSynthesisPrompt
             {
                 "reportStatus",
                 "insufficientEvidenceReason",
-                "executiveSummary",
-                "evidenceSummary",
-                "conflictSummary",
-                "limitationsSummary",
-                "conclusion",
                 "synthesisConfidence",
                 "claims"
             },
@@ -31,11 +26,6 @@ public static class ResearchSynthesisPrompt
             {
                 reportStatus = EnumString("Report status.", Enum.GetNames<ResearchReportStatus>()),
                 insufficientEvidenceReason = NullableEnumString("Reason when reportStatus is InsufficientEvidence, otherwise null.", Enum.GetNames<ResearchReportInsufficientEvidenceReason>()),
-                executiveSummary = NullableString("Brief synthesis summary using only supplied evidence.", 2000),
-                evidenceSummary = NullableString("Qualitative summary of supplied evidence findings.", 2500),
-                conflictSummary = NullableString("Summary of conflicting or non-conflicting evidence.", 1500),
-                limitationsSummary = NullableString("Limitations from source coverage, extraction/evaluation state, and supplied evidence.", 2000),
-                conclusion = NullableString("Cautious conclusion traceable to conclusion claims.", 1500),
                 synthesisConfidence = EnumString("Internal MedResearch synthesis confidence, not GRADE.", Enum.GetNames<SynthesisConfidence>()),
                 claims = new
                 {
@@ -45,13 +35,21 @@ public static class ResearchSynthesisPrompt
                     {
                         type = "object",
                         additionalProperties = false,
-                        required = new[] { "type", "direction", "text", "evidenceIds" },
+                        required = new[] { "type", "direction", "kind", "outcome", "population", "exposureOrIntervention", "comparator", "timepoint", "evidenceIds", "numericEvidenceId", "quantitativeArtifactId", "statistic" },
                         properties = new
                         {
                             type = EnumString("Claim type.", Enum.GetNames<ResearchReportClaimType>()),
                             direction = EnumString("Structured direction for deterministic support validation.", Enum.GetNames<ResearchReportClaimDirection>()),
-                            text = NullableString("Substantive claim text using only supplied evidence.", 800),
-                            evidenceIds = StringArray("Evidence ids from the supplied synthesis context supporting this claim.", 12, 64)
+                            kind = EnumString("Closed scientific claim semantics.", Enum.GetNames<ResearchClaimKind>()),
+                            outcome = NullableString("Exact cited Evidence outcome; null only for insufficiency.", 512),
+                            population = NullableString("Exact cited Evidence population; preserve null.", 512),
+                            exposureOrIntervention = NullableString("Exact cited Evidence intervention/exposure; preserve null.", 512),
+                            comparator = NullableString("Exact cited Evidence comparator; preserve null.", 512),
+                            timepoint = NullableString("Exact cited Evidence timepoint; preserve null.", 512),
+                            evidenceIds = StringArray("Exact supplied support subset. For pooled claims use all and only artifact contribution Evidence IDs.", 12, 64),
+                            numericEvidenceId = NullableString("Single Evidence ID for ReportedStudyResult, otherwise null.", 64),
+                            quantitativeArtifactId = NullableString("Exact persisted artifact ID for QuantitativeSynthesis, otherwise null.", 64),
+                            statistic = NullableEnumString("Statistic selector, not a copied number. Null for qualitative/mixed/insufficiency claims.", Enum.GetNames<ResearchClaimStatistic>())
                         }
                     }
                 }
@@ -65,6 +63,11 @@ public static class ResearchSynthesisPrompt
         return new ResearchSynthesisPromptText(
             """
             You are a structured evidence synthesis component for MedResearch.
+            Propose structured claim semantics only. Never return claim text, numeric values, or free report sections. MedResearch validates references and renders all authoritative sentences/numbers deterministically.
+            Copy each outcome/population/intervention/comparator/timepoint exactly from all cited Evidence; null is missing context, not a wildcard. No paraphrase or generalization.
+            QualitativeEffect requires every cited direction to agree. MixedEvidence is required for differing directions, including Positive plus NoClearEffect. Use exact cited subsets, never corpus-wide efficacy wording.
+            Numeric claims use direction NotApplicable: a number is not proof of clinical benefit, causality or clinical significance. Select the statistic and current-run persisted ArtifactId or NumericEvidenceId; never calculate or copy values.
+            InsufficientEvidence is a metadata claim with null scope/references/statistic, empty evidenceIds and NotApplicable direction; it never means no effect. Completed reports require a Conclusion role. Do not duplicate the same semantics under multiple roles.
             Use only the supplied SynthesisContext. Do not use outside scientific knowledge, remembered papers, invented studies, invented statistics, invented PMIDs, or invented DOIs.
             Raw extraction ResultSummary is excluded. Only the explicitly grounded structured fields are numeric assertions for an Evidence finding. SupportingText is a source quotation, not permission to import another result or an unsupported statistic. Missing or unverified values remain unknown.
             Every substantive scientific claim must cite one or more supplied EvidenceId values. Do not cite StudyId, PMID, or DOI as model-generated authority.
@@ -113,6 +116,9 @@ public static class ResearchSynthesisPrompt
 
             Deterministic quantitative syntheses computed by MedResearch application code:
             {JoinQuantitativeSyntheses(context.QuantitativeSyntheses)}
+
+            Persisted quantitative artifacts available for authoritative references (no artifact means no pooled claim):
+            {JsonSerializer.Serialize(context.QuantitativeArtifacts ?? [], new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })}
 
             Deterministic limitations that must be respected:
             {Join(context.DeterministicLimitations)}

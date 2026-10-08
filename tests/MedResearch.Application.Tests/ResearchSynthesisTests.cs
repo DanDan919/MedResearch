@@ -447,7 +447,6 @@ public sealed class ResearchSynthesizerTests
         var draft = CreateValidDraft(positive) with
         {
             Claims = [
-                CreateClaimDraft(ResearchReportClaimType.Conflict, ResearchReportClaimDirection.Mixed, [positive, negative]),
                 CreateClaimDraft(ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Mixed, [positive, negative])
             ]
         };
@@ -455,7 +454,7 @@ public sealed class ResearchSynthesizerTests
 
         var result = await synthesizer.SynthesizeAsync(context, CancellationToken.None);
 
-        Assert.Contains(result.Claims, claim => claim.ClaimType == ResearchReportClaimType.Conflict);
+        Assert.Equal(ResearchClaimKind.MixedEvidence, Assert.Single(result.Claims).Semantics!.Kind);
     }
 
     [Fact]
@@ -531,7 +530,8 @@ public sealed class ResearchSynthesizerTests
 
     private static ResearchReportClaimDraft CreateClaimDraft(ResearchReportClaimType type, ResearchReportClaimDirection direction, IReadOnlyCollection<Guid> evidenceIds)
     {
-        return new ResearchReportClaimDraft(type.ToString(), direction.ToString(), "Evidence-supported claim.", evidenceIds.Select(id => id.ToString()).ToArray());
+        return new ResearchReportClaimDraft(type.ToString(), direction.ToString(), null, evidenceIds.Select(id => id.ToString()).ToArray(),
+            Kind: direction == ResearchReportClaimDirection.Mixed ? "MixedEvidence" : "QualitativeEffect", Outcome: "recall", Population: "adults", ExposureOrIntervention: "sleep", Comparator: "wakefulness");
     }
 
     private sealed class FakeStructuredLlmClient : IStructuredLlmClient

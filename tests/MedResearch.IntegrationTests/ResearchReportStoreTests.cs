@@ -11,6 +11,7 @@ namespace MedResearch.IntegrationTests;
 [Collection(PostgreSqlCollection.Name)]
 public sealed class ResearchReportStoreTests
 {
+    private const string LegacyPromptVersion = "research-synthesizer-v2-trusted-evidence";
     private readonly PostgreSqlFixture _fixture;
 
     public ResearchReportStoreTests(PostgreSqlFixture fixture)
@@ -86,7 +87,7 @@ public sealed class ResearchReportStoreTests
 
         Assert.Equal(ResearchReportStatus.Completed, report.Status);
         Assert.Equal("FakeLLM", report.SynthesizerProvider);
-        Assert.Equal(ResearchSynthesisPrompt.Version, report.PromptVersion);
+        Assert.Equal(LegacyPromptVersion, report.PromptVersion);
         Assert.Equal(2, claims.Length);
         Assert.Equal(3, links.Length);
         Assert.Contains(links, link => link.EvidenceId == seed.EvidenceIds[0]);
@@ -358,6 +359,141 @@ public sealed class ResearchReportStoreTests
         Assert.Empty(await verification.ResearchReports.Where(report => report.ResearchRunId == second.RunId).ToArrayAsync());
     }
 
+    [SkippableFact]
+    public async Task StructuredReport_RoundtripsThroughFreshContextAndProvenance_Idempotently()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var result = await CreateStructuredResultAsync(db, seed.RunId);
+            var store = new EfResearchSynthesisStore(db);
+            await store.PersistReportAsync(result, CancellationToken.None);
+            await store.PersistReportAsync(result, CancellationToken.None);
+        }
+        await using var read = _fixture.CreateDbContext();
+        var report = await new EfResearchSynthesisStore(read).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        var claim = Assert.Single(report!.Claims);
+        Assert.Equal(ResearchClaimGroundingStatus.StructuredValidated, claim.GroundingStatus);
+        Assert.Equal("recall", claim.Semantics!.Outcome);
+        Assert.Null(claim.Semantics.Timepoint);
+        Assert.Equal(seed.EvidenceIds, claim.Semantics.EvidenceIds);
+        Assert.Equal(seed.EvidenceIds[0], Assert.Single(claim.Citations).EvidenceId);
+        var provenance = await new EfResearchProvenanceStore(read).FindAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(claim.Semantics), System.Text.Json.JsonSerializer.Serialize(Assert.Single(provenance!.ReportClaims).Semantics));
+        Assert.Single(await read.ResearchReports.Where(x => x.ResearchRunId == seed.RunId).ToArrayAsync());
+    }
+
+    [SkippableTheory]
+    [InlineData("text")]
+    [InlineData("scope")]
+    [InlineData("sections")]
+    [InlineData("unstructured")]
+    public async Task StructuredPersistence_RevalidatesAcceptedClaimsAndRejectsBypass(string attack)
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var result = await CreateStructuredResultAsync(db, seed.RunId);
+            var claim = Assert.Single(result.Claims);
+            result = attack switch
+            {
+                "text" => result with { Claims = [claim with { Text = "Treatment cures dementia." }] },
+                "scope" => result with { Claims = [claim with { Semantics = claim.Semantics! with { Population = "all patients" } }] },
+                "sections" => result with { Conclusion = "Treatment cures dementia." },
+                _ => result with { Claims = [claim with { Semantics = null }] }
+            };
+            if (attack == "scope")
+                await Assert.ThrowsAsync<ResearchSynthesisValidationException>(() => new EfResearchSynthesisStore(db).PersistReportAsync(result, CancellationToken.None));
+            else
+                await Assert.ThrowsAsync<InvalidOperationException>(() => new EfResearchSynthesisStore(db).PersistReportAsync(result, CancellationToken.None));
+        }
+        await using var read = _fixture.CreateDbContext();
+        Assert.False(await read.ResearchReports.AnyAsync(x => x.ResearchRunId == seed.RunId));
+    }
+
+    [SkippableFact]
+    public async Task StructuredRead_FailsClosedOnChangedAuthoritativeText()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        await using (var db = _fixture.CreateDbContext())
+        {
+            await new EfResearchSynthesisStore(db).PersistReportAsync(await CreateStructuredResultAsync(db, seed.RunId), CancellationToken.None);
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE research_report_claims SET text = 'Unsupported benefit' WHERE research_report_id IN (SELECT id FROM research_reports WHERE research_run_id = {seed.RunId})");
+        }
+        await using var read = _fixture.CreateDbContext();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new EfResearchSynthesisStore(read).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new EfResearchProvenanceStore(read).FindAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task LegacyClaims_RemainExplicitlyUnverifiedAfterMigration()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        await using var db = _fixture.CreateDbContext();
+        await new EfResearchSynthesisStore(db).PersistReportAsync(CreateCompletedResult(seed.RunId, seed.EvidenceIds), CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var report = await new EfResearchSynthesisStore(db).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        Assert.Equal(ResearchClaimGroundingStatus.LegacyUnverified, Assert.Single(report!.Claims).GroundingStatus);
+        Assert.Null(Assert.Single(report.Claims).Semantics);
+    }
+
+    [SkippableFact]
+    public async Task StructuredEmptyCorpus_CompletesWithoutInventedClaimOrModelProse()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(0);
+        await using var db = _fixture.CreateDbContext();
+        var context = await new SynthesisContextBuilder(new EfResearchSynthesisStore(db), new(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(seed.RunId, CancellationToken.None);
+        var result = new ResearchReportDraftValidator(new()).CreateInsufficientEvidenceResult(context);
+        await new EfResearchSynthesisStore(db).PersistReportAsync(result, CancellationToken.None);
+        var report = await new EfResearchSynthesisStore(db).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        Assert.Equal(ResearchReportStatus.InsufficientEvidence, report!.Status);
+        Assert.Empty(report.Claims);
+        Assert.Contains("absence of evidence is not no effect", report.Conclusion);
+    }
+
+    [SkippableFact]
+    public async Task StructuredReport_StaleWorkerCannotPersistAfterLeaseTransfer()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        var now = DateTimeOffset.UtcNow;
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var run = await db.ResearchRuns.SingleAsync(x => x.Id == seed.RunId);
+            run.StartPlanning(now);
+            run.AssignLease("f16-worker-a", now, now.AddMinutes(5), 1);
+            await db.SaveChangesAsync();
+        }
+        await using var stale = _fixture.CreateDbContext();
+        var result = await CreateStructuredResultAsync(stale, seed.RunId);
+        var snapshot = await stale.ResearchRuns.AsNoTracking().SingleAsync(x => x.Id == seed.RunId);
+        var fence = new MedResearch.Infrastructure.Research.Processing.PostgreSqlResearchRunWriteFence(stale);
+        fence.Attach(new MedResearch.Application.Research.Processing.ClaimedResearchRun(snapshot, "question", "f16-worker-a", 1, now.AddMinutes(5), false));
+        await using (var newer = _fixture.CreateDbContext())
+        {
+            var run = await newer.ResearchRuns.SingleAsync(x => x.Id == seed.RunId);
+            run.AssignLease("f16-worker-b", now, now.AddMinutes(5), 2);
+            await newer.SaveChangesAsync();
+        }
+        await Assert.ThrowsAsync<MedResearch.Application.Research.Processing.ResearchRunLeaseLostException>(() => new EfResearchSynthesisStore(stale, fence).PersistReportAsync(result, CancellationToken.None));
+        await using var read = _fixture.CreateDbContext();
+        Assert.False(await read.ResearchReports.AnyAsync(x => x.ResearchRunId == seed.RunId));
+    }
+
+    private static async Task<ResearchSynthesisResult> CreateStructuredResultAsync(MedResearch.Infrastructure.Persistence.MedResearchDbContext db, Guid runId)
+    {
+        var context = await new SynthesisContextBuilder(new EfResearchSynthesisStore(db), new(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(runId, CancellationToken.None);
+        var item = Assert.Single(context.Studies.SelectMany(x => x.Evidence));
+        var proposal = new ResearchReportClaimDraft("Conclusion", "Positive", null, [item.EvidenceId.ToString()], Kind: "QualitativeEffect", Outcome: item.Outcome,
+            Population: item.Population, ExposureOrIntervention: item.ExposureOrIntervention, Comparator: item.Comparator, Timepoint: item.Timepoint);
+        return new ResearchReportDraftValidator(new()).Validate(context, new("Completed", null, null, null, null, null, null, "Limited", [proposal]), "fake", "fake", DateTimeOffset.UtcNow);
+    }
+
     private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount)
     {
         await using var context = _fixture.CreateDbContext();
@@ -435,14 +571,14 @@ public sealed class ResearchReportStoreTests
             ]
             : [new AcceptedResearchReportClaim(ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "A cautious positive conclusion is supported by the finding.", evidenceIds.ToArray(), 0)];
 
-        return new ResearchSynthesisResult(runId, ResearchReportStatus.Completed, null, "Executive summary.", "Evidence summary.", "Conflict summary.", "Limitations summary.", "Conclusion.", SynthesisConfidence.Limited, "FakeLLM", "fake-model", ResearchSynthesisPrompt.Version, DateTimeOffset.UtcNow, statistics, coverage, ["Abstract-level evidence only."], claims);
+        return new ResearchSynthesisResult(runId, ResearchReportStatus.Completed, null, "Executive summary.", "Evidence summary.", "Conflict summary.", "Limitations summary.", "Conclusion.", SynthesisConfidence.Limited, "FakeLLM", "fake-model", LegacyPromptVersion, DateTimeOffset.UtcNow, statistics, coverage, ["Abstract-level evidence only."], claims);
     }
 
     private static ResearchSynthesisResult CreateInsufficientResult(Guid runId)
     {
         var statistics = new SynthesisCorpusStatistics(1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1);
         var coverage = new SynthesisSourceCoverage(["PubMed"], true, false, false, false, 1);
-        return new ResearchSynthesisResult(runId, ResearchReportStatus.InsufficientEvidence, ResearchReportInsufficientEvidenceReason.NoValidatedEvidence, "No evidence.", "No validated evidence.", "No conflicts assessed.", "Abstract-level evidence only.", "No conclusion.", SynthesisConfidence.InsufficientEvidence, null, null, ResearchSynthesisPrompt.Version, DateTimeOffset.UtcNow, statistics, coverage, ["No validated evidence."], []);
+        return new ResearchSynthesisResult(runId, ResearchReportStatus.InsufficientEvidence, ResearchReportInsufficientEvidenceReason.NoValidatedEvidence, "No evidence.", "No validated evidence.", "No conflicts assessed.", "Abstract-level evidence only.", "No conclusion.", SynthesisConfidence.InsufficientEvidence, null, null, LegacyPromptVersion, DateTimeOffset.UtcNow, statistics, coverage, ["No validated evidence."], []);
     }
 
     private static string RandomPmid()

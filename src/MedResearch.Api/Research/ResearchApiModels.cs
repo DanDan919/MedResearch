@@ -95,7 +95,11 @@ public sealed record ResearchReportResponse(
     DateTimeOffset GeneratedAt,
     ResearchReportCoverageResponse Coverage,
     IReadOnlyCollection<string> DeterministicLimitations,
-    IReadOnlyCollection<ResearchReportClaimResponse> Claims);
+    IReadOnlyCollection<ResearchReportClaimResponse> Claims)
+{
+    public string NarrativeAuthority => PromptVersion == MedResearch.Application.Research.Synthesis.ResearchSynthesisPrompt.Version
+        ? "StructuredClaims" : "LegacyUnverified";
+}
 
 public sealed record ResearchReportCoverageResponse(
     int DiscoveredStudyCount,
@@ -118,7 +122,15 @@ public sealed record ResearchReportClaimResponse(
     string Direction,
     string Text,
     int Ordinal,
-    IReadOnlyCollection<ResearchReportCitationResponse> Citations);
+    IReadOnlyCollection<ResearchReportCitationResponse> Citations,
+    string GroundingStatus = "LegacyUnverified",
+    ResearchClaimSemanticsResponse? Semantics = null);
+
+public sealed record ResearchClaimSemanticsResponse(
+    string ProtocolVersion, string Kind, string? Outcome, string? Population, string? ExposureOrIntervention,
+    string? Comparator, string? Timepoint, string Direction, IReadOnlyCollection<Guid> EvidenceIds,
+    Guid? NumericEvidenceId, Guid? QuantitativeArtifactId, string? GroupKey, string? SnapshotFingerprint,
+    string? Statistic, MedResearch.Domain.ResearchClaimNumericSnapshot? Numeric);
 
 public sealed record ResearchReportCitationResponse(
     Guid EvidenceId,

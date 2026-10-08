@@ -111,6 +111,12 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 - Resource creation has no per-user quota or rate limit yet. Authentication prevents cross-user access, but one authenticated actor can still submit many expensive research runs; a narrow resource-abuse policy is a future operational milestone.
 - Existing pre-ownership rows are preserved under `legacy-unowned`. A deliberate administrative migration/ownership assignment tool is still required before those rows can be made user-visible.
 
+## F16 Narrative Authority Limits
+
+F16 closes the demonstrated free-report-claim authority gap using structured scope/direction/reference rules and deterministic rendering. It does not prove arbitrary paraphrase entailment, causal interpretation, clinical magnitude, complex population inclusion, observational-study validity, or the correctness of upstream provider/Evidence metadata. Exact labels intentionally reject some semantically equivalent wording. Historic reports are explicitly LegacyUnverified and are not retrospectively certified. Same-run claim/artifact invariants remain application/store/read checks; direct administrator SQL is not a supported scientific writer protocol.
+
+The checked-in frontend OpenAPI snapshot is still curated. F16 imports the changed report/provenance schemas from an actual worker-disabled backend endpoint and regenerates TS, but normal CI currently checks generation consistency with that snapshot, not whole-backend contract drift. Production web token acquisition is still not wired into `createApiClient`; native Tauri, mobile shell overflow, dependency advisories and source-acquisition outcome provenance remain separate release/audit follow-ups. F16 does not resolve them incidentally.
+
 ## F13 Provenance observability limitations
 
 F15.2 closes the failed literature-search provenance gap using lease-fenced `LiteratureProviderAttempt` history and the owner-scoped provenance projection. LiteratureSearch remains successful scientific provenance. Historical searches have no reconstructed attempt history; crashed Started calls remain unknown, and external HTTP execution is not exactly once. Attempt-history retention/pagination is not yet implemented.

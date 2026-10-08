@@ -1,5 +1,13 @@
 # Current State
 
+## F16 Structured Narrative Claim Grounding
+
+Baseline: `d5d3c5c02bccdbcd37b6ea7f36c9be02566bfe3c`, clean `main` tracking `origin/main`. Ten hostile free-text claims reproduced the old gap before the production fix: all ten expected rejection tests failed because the old validator accepted them.
+
+Authoritative claims now use `structured-claim-v1` scope, closed kinds/directions, exact current-run Evidence references and optional grounded statistic/persisted artifact selectors. Backend validates and renders numbers/sentences; discarded model sections cannot override structured claims. Mixed support is not uniform effect; insufficiency is not no effect. Persistence revalidates, fences, preserves idempotency and exposes legacy claims as unverified. Forward migration: `20261008072325_AddStructuredReportClaims`. ADR-031 and the Russian F16 process report describe the actual limits.
+
+Local F16 matrix: 37 Application and 5 Domain controls added, 9 PostgreSQL cases added; fake E2E extended to Wald/HKSJ/PI artifact claims and GET report/provenance. Frontend API 31, web 33, Chromium 14 passed (including hydration). Docker Linux engine is unavailable; PostgreSQL completion awaits actual strict CI, not local skips. Live workflow is NOT RUN; six opt-in live cases deliberately skipped. Final CI and Git verification will be recorded in the F16 process report.
+
 ## F15.2 Provider/Runtime Integrity
 
 F15.2 removes Europe PMC indexing-date fallback from publication metadata and prevents incompatible Study date-part enrichment. It adds lease-fenced durable LiteratureProviderAttempt history (including zero results, failure, timeout, cancellation and unfinished Started). Successful attempt completion is atomic with scientific search output; existing successful search recovery keys remain authoritative. The owner/run-scoped provenance API and minimal Evidence workspace expose attempts. A forward migration, `20261008053910_AddLiteratureProviderAttempts`, adds metadata only.

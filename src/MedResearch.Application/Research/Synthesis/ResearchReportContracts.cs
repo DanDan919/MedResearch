@@ -7,7 +7,8 @@ public sealed record AcceptedResearchReportClaim(
     ResearchReportClaimDirection Direction,
     string Text,
     IReadOnlyCollection<Guid> EvidenceIds,
-    int Ordinal);
+    int Ordinal,
+    ResearchClaimSemantics? Semantics = null);
 
 public sealed record ResearchSynthesisResult(
     Guid ResearchRunId,
@@ -70,7 +71,9 @@ public sealed record ResearchReportClaimReadModel(
     ResearchReportClaimDirection Direction,
     string Text,
     int Ordinal,
-    IReadOnlyCollection<ResearchReportCitationReadModel> Citations);
+    IReadOnlyCollection<ResearchReportCitationReadModel> Citations,
+    ResearchClaimGroundingStatus GroundingStatus = ResearchClaimGroundingStatus.LegacyUnverified,
+    ResearchClaimSemantics? Semantics = null);
 
 public sealed record ResearchReportCitationReadModel(
     Guid EvidenceId,

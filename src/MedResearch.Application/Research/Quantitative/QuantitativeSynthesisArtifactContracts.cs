@@ -12,7 +12,7 @@ public sealed record QuantitativeSynthesisArtifactReadModel(
 
 public interface IQuantitativeSynthesisArtifactStore
 {
-    Task PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken);
 
     Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(
         Guid researchRunId,

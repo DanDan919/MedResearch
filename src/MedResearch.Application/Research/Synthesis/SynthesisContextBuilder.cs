@@ -159,9 +159,10 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var limitations = BuildLimitations(coverage, statistics, outcomeSummaries, evidenceTruncated).ToList();
         var quantitativeReadiness = _quantitativeEvidenceAssessor.Assess(corpus with { Evidence = selectedEvidence });
         var quantitativeSynthesis = _quantitativeStatisticalSynthesizer.Synthesize(quantitativeReadiness);
+        IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel> artifacts = [];
         if (_quantitativeSynthesisArtifactStore is not null)
         {
-            await _quantitativeSynthesisArtifactStore.PersistAsync(quantitativeSynthesis, cancellationToken);
+            artifacts = await _quantitativeSynthesisArtifactStore.PersistAsync(quantitativeSynthesis, cancellationToken);
         }
         var quantitativeSyntheses = MapQuantitativeSyntheses(quantitativeSynthesis);
         if (quantitativeSyntheses.Count > 0)
@@ -179,7 +180,8 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
             studies,
             outcomeSummaries,
             limitations.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            quantitativeSyntheses);
+            quantitativeSyntheses,
+            artifacts);
 
         _logger.LogInformation(
             "SynthesisContextBuilt. ResearchRunId: {ResearchRunId}; StudyCount: {StudyCount}; EvidenceCount: {EvidenceCount}; EvaluationCount: {EvaluationCount}; ConflictCount: {ConflictCount}; EvidenceTruncated: {EvidenceTruncated}; QuantitativeSynthesisCount: {QuantitativeSynthesisCount}",

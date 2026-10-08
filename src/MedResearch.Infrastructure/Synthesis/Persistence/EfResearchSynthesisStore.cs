@@ -1,5 +1,8 @@
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Quantitative;
+using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,11 +14,13 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
 {
     private readonly MedResearchDbContext _dbContext;
     private readonly IResearchRunWriteFence? _writeFence;
+    private readonly SynthesisOptions _options;
 
-    public EfResearchSynthesisStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null)
+    public EfResearchSynthesisStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null, SynthesisOptions? options = null)
     {
         _dbContext = dbContext;
         _writeFence = writeFence;
+        _options = options ?? new SynthesisOptions();
     }
 
     public async Task<SynthesisCorpusSnapshot> LoadCorpusAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -247,6 +252,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
         }
 
         await ValidateReportCitationsAsync(result, cancellationToken);
+        if (result.PromptVersion == ResearchSynthesisPrompt.Version || result.Claims.Any(claim => claim.Semantics is not null))
+            await ValidateStructuredClaimsAsync(result, cancellationToken);
 
         var reportId = Guid.NewGuid();
         var report = new ResearchReport(
@@ -293,7 +300,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 acceptedClaim.ClaimType,
                 acceptedClaim.Direction,
                 acceptedClaim.Text,
-                acceptedClaim.Ordinal));
+                acceptedClaim.Ordinal,
+                acceptedClaim.Semantics,
+                acceptedClaim.Semantics is null ? null : StructuredResearchClaimRenderer.SemanticKey(acceptedClaim.Semantics)));
 
             var citationOrdinal = 0;
             foreach (var evidenceId in acceptedClaim.EvidenceIds.Distinct())
@@ -313,7 +322,7 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
         ResearchSynthesisResult result,
         CancellationToken cancellationToken)
     {
-        if (result.Claims.Any(claim => claim.EvidenceIds.Count == 0))
+        if (result.Claims.Any(claim => claim.EvidenceIds.Count == 0 && claim.Semantics?.Kind != ResearchClaimKind.InsufficientEvidence))
         {
             throw new InvalidOperationException("Every persisted research report claim must cite at least one Evidence row.");
         }
@@ -364,6 +373,37 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                     $"Research report citation {evidenceId} does not resolve to grounded, same-run Evidence and SourceMaterial lineage.");
             }
         }
+    }
+
+    private async Task ValidateStructuredClaimsAsync(ResearchSynthesisResult result, CancellationToken cancellationToken)
+    {
+        if (result.PromptVersion != ResearchSynthesisPrompt.Version) throw new InvalidOperationException("Structured reports require the current structured prompt contract.");
+        if (result.Claims.Any(claim => claim.Semantics is null)) throw new InvalidOperationException("New reports require structured claim semantics.");
+        var context = await new SynthesisContextBuilder(this, _options, NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(result.ResearchRunId, cancellationToken);
+        var owner = await (from run in _dbContext.ResearchRuns.AsNoTracking()
+            join question in _dbContext.ResearchQuestions.AsNoTracking() on run.ResearchQuestionId equals question.Id
+            where run.Id == result.ResearchRunId select question.OwnerSubjectId).SingleAsync(cancellationToken);
+        context = context with { QuantitativeArtifacts = await new EfQuantitativeSynthesisArtifactStore(_dbContext).FindByResearchRunIdAsync(result.ResearchRunId, owner, cancellationToken) };
+        var drafts = result.Claims.OrderBy(claim => claim.Ordinal).Select(claim => new ResearchReportClaimDraft(
+            claim.ClaimType.ToString(), claim.Direction.ToString(), null, claim.EvidenceIds.Select(id => id.ToString()).ToArray(),
+            Kind: claim.Semantics!.Kind.ToString(), Outcome: claim.Semantics.Outcome, Population: claim.Semantics.Population,
+            ExposureOrIntervention: claim.Semantics.ExposureOrIntervention, Comparator: claim.Semantics.Comparator, Timepoint: claim.Semantics.Timepoint,
+            NumericEvidenceId: claim.Semantics.NumericEvidenceId?.ToString(), QuantitativeArtifactId: claim.Semantics.QuantitativeArtifactId?.ToString(), Statistic: claim.Semantics.Statistic?.ToString())).ToArray();
+        var validated = new ResearchReportDraftValidator(_options).Validate(context,
+            new ResearchReportDraft(result.Status.ToString(), result.InsufficientEvidenceReason?.ToString(), null, null, null, null, null, result.SynthesisConfidence.ToString(), drafts),
+            result.SynthesizerProvider!, result.SynthesizerModel!, result.GeneratedAt);
+        if (result.Statistics != validated.Statistics ||
+            JsonSerializer.Serialize(result.SourceCoverage) != JsonSerializer.Serialize(validated.SourceCoverage))
+            throw new InvalidOperationException("Report coverage must match the trusted bounded corpus.");
+        foreach (var pair in result.Claims.OrderBy(claim => claim.Ordinal).Zip(validated.Claims))
+        {
+            if (pair.First.Text != pair.Second.Text || pair.First.Ordinal != pair.Second.Ordinal ||
+                JsonSerializer.Serialize(pair.First.Semantics) != JsonSerializer.Serialize(pair.Second.Semantics))
+                throw new InvalidOperationException("Persisted claim must exactly match validated authoritative semantics and deterministic rendering.");
+        }
+        if (result.ExecutiveSummary != validated.ExecutiveSummary || result.EvidenceSummary != validated.EvidenceSummary || result.ConflictSummary != validated.ConflictSummary ||
+             result.LimitationsSummary != validated.LimitationsSummary || result.Conclusion != validated.Conclusion)
+            throw new InvalidOperationException("Free model prose cannot replace deterministic report sections.");
     }
 
     public async Task<ResearchReportReadModel?> FindReportAsync(
@@ -495,10 +535,15 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                         row.Ordinal))
                     .ToArray());
 
+        var artifactIds = claims.Where(claim => claim.QuantitativeArtifactId.HasValue).Select(claim => claim.QuantitativeArtifactId!.Value).ToArray();
+        var artifacts = await _dbContext.QuantitativeSynthesisArtifacts.AsNoTracking()
+            .Where(artifact => artifact.ResearchRunId == researchRunId && artifactIds.Contains(artifact.Id))
+            .ToDictionaryAsync(artifact => artifact.Id, cancellationToken);
         var claimModels = claims.Select(claim =>
         {
             citationsByClaimId.TryGetValue(claim.Id, out var citations);
             citations ??= [];
+            StructuredClaimReadGuard.AssertValid(claim, citations.Select(citation => citation.EvidenceId).ToArray(), artifacts);
 
             return new ResearchReportClaimReadModel(
                 claim.Id,
@@ -506,7 +551,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 claim.Direction,
                 claim.Text,
                 claim.Ordinal,
-                citations);
+                citations,
+                claim.GroundingStatus,
+                claim.Semantics);
         }).ToArray();
         var coverage = new ResearchReportCoverageReadModel(
             reportEntity.DiscoveredStudyCount,

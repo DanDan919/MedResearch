@@ -638,9 +638,9 @@ public sealed class ResearchApiTests
 
     private sealed class InMemoryQuantitativeStore : IQuantitativeSynthesisArtifactStore
     {
-        public Task PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
+        public Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>>([]);
         }
 
         public Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(

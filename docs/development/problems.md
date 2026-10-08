@@ -1,5 +1,11 @@
 # Problems
 
+## F16: citations did not constrain scientific narrative (2026-10-08)
+
+Before production changes, ten deterministic negative tests showed accepted unsupported free text: direction/outcome/population/intervention/comparator/timepoint swaps, incorrect number/statistic, mixed-to-uniform and insufficient-to-positive claims. The red baseline was 10 failed rejection tests, not an invented defect. Existing valid citation checks and partial direction checks did not validate sentence entailment.
+
+F16 removes free scientific sentences from the proposal authority path, adds scope/direction/reference validators, copies grounded/persisted numbers and renders backend text. Persistence repeats validation; legacy rows remain unverified. A local intermediate API build failed on a missing import and was corrected before committing. Local Docker remains unavailable, so database runtime validation is CI-authoritative. See the F16 process report for final results and residual semantic limitations.
+
 ## F15.2: provider metadata, outcomes and success-body boundaries (2026-10-08)
 
 - Reproduced Europe PMC date defect before production fix: fixture pubYear=1998 and firstIndexDate=2025-03-17 returned year 2025. Removed index-date fallback; date matrix is deterministic.

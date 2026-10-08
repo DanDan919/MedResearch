@@ -10,6 +10,12 @@ This repository currently contains the documentation system, layered .NET soluti
 
 A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one selected SourceMaterial snapshot and study metadata to the configured OpenAI provider, validates strict structured output, and persists source-grounded evidence with explicit source scope. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, modified/ad-hoc HKSJ, forest plots, formal GRADE, or formal risk-of-bias frameworks. It now includes narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval quantitative synthesis read models for eligible compatible ratio-measure evidence.
 
+## Authoritative Report Claims
+
+New synthesis uses structured claim proposals, not model-authored scientific sentences. Application validates exact Evidence scope and direction; numeric proposals select a grounded study statistic or an immutable current-run quantitative artifact by ID. Backend code copies the authoritative values and renders the sentence. CI, PI, Wald and HKSJ remain separate selectors; the LLM cannot recalculate them. Report sections are deterministic and do not promote discarded model prose.
+
+Reports and provenance expose `GroundingStatus`, structured `Semantics`, and numeric lineage. Pre-F16 claims remain `LegacyUnverified`; migration does not fabricate semantics for historical text. The UI displays this distinction. This is a constrained support guarantee under the implemented Evidence rules, not universal natural-language entailment or clinical/causal validation. See ADR-031 and `docs/development/f16-structured-narrative-claim-grounding-ru.md`.
+
 ## Stack Direction
 
 - C# and .NET 10

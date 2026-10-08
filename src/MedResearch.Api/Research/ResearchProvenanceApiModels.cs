@@ -174,7 +174,9 @@ public sealed record ResearchReportClaimProvenanceResponse(
     string Direction,
     string Text,
     int Ordinal,
-    IReadOnlyCollection<Guid> EvidenceIds);
+    IReadOnlyCollection<Guid> EvidenceIds,
+    string GroundingStatus = "LegacyUnverified",
+    ResearchClaimSemanticsResponse? Semantics = null);
 
 public sealed record QuantitativeContributionProvenanceResponse(
     Guid ArtifactId,

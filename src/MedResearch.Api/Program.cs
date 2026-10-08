@@ -1,4 +1,5 @@
 using MedResearch.Api.Research;
+using MedResearch.Domain;
 using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
 using MedResearch.Application.Research.Quantitative;
@@ -374,8 +375,12 @@ static ResearchReportResponse ToReportResponse(ResearchReportReadModel report)
                         citation.SourceMaterial.AccessStatus,
                         citation.SourceMaterial.WasTruncated,
                         citation.SourceMaterial.SectionNames),
-                citation.Ordinal)).ToArray())).ToArray());
+                citation.Ordinal)).ToArray(), claim.GroundingStatus.ToString(), ToClaimSemanticsResponse(claim.Semantics))).ToArray());
 }
+
+static ResearchClaimSemanticsResponse? ToClaimSemanticsResponse(ResearchClaimSemantics? claim) => claim is null ? null : new(
+    claim.ProtocolVersion, claim.Kind.ToString(), claim.Outcome, claim.Population, claim.ExposureOrIntervention, claim.Comparator, claim.Timepoint,
+    claim.Direction.ToString(), claim.EvidenceIds, claim.NumericEvidenceId, claim.QuantitativeArtifactId, claim.GroupKey, claim.SnapshotFingerprint, claim.Statistic?.ToString(), claim.Numeric);
 
 static ResearchRunProgressResponse ToProgressResponse(ResearchRunProgress progress)
 {
@@ -570,7 +575,7 @@ static ResearchProvenanceResponse ToProvenanceResponse(ResearchProvenanceReadMod
             claim.Direction.ToString(),
             claim.Text,
             claim.Ordinal,
-            claim.EvidenceIds)).ToArray(),
+            claim.EvidenceIds, claim.GroundingStatus.ToString(), ToClaimSemanticsResponse(claim.Semantics))).ToArray(),
         provenance.QuantitativeContributions.Select(contribution => new QuantitativeContributionProvenanceResponse(
             contribution.ArtifactId,
             contribution.GroupKey,

@@ -20,6 +20,8 @@ describe("ResearchReport", () => {
     expect(screen.getByText("Executive summary from persisted report.")).toBeInTheDocument();
     expect(screen.getByText("Authoritative study title")).toBeInTheDocument();
     expect(screen.queryByText("92%")).not.toBeInTheDocument();
+    expect(screen.getByText("Legacy narrative unverified")).toBeInTheDocument();
+    expect(screen.getByText("Legacy claim unverified")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Authoritative study title"));
 
@@ -30,6 +32,35 @@ describe("ResearchReport", () => {
       "https://pubmed.ncbi.nlm.nih.gov/12345678/"
     );
     expect(screen.getByText(/Abstract from PubMed via SearchMetadataAbstract/)).toBeInTheDocument();
+  });
+
+  it.each(["QualitativeEffect", "MixedEvidence", "InsufficientEvidence", "QuantitativeSynthesis"])("preserves %s backend claim and exposes declared support", async (kind) => {
+    const report = reportResponse();
+    const source = report.claims[0];
+    const numeric = kind === "QuantitativeSynthesis";
+    const insufficient = kind === "InsufficientEvidence";
+    const direction = numeric || insufficient ? "NotApplicable" : kind === "MixedEvidence" ? "Mixed" : "Positive";
+    const text = kind === "MixedEvidence" ? "The cited Evidence has mixed directions, not consistent benefit."
+      : insufficient ? "Insufficient Evidence is not evidence of no effect."
+      : numeric ? "Random-effects HKSJ OddsRatio = 0.73; 95% confidence interval [0.40, 1.20]."
+      : "Within the cited Evidence, findings have a positive reported direction.";
+    fetchMock.mockResolvedValue(jsonResponse({ ...report, narrativeAuthority: "StructuredClaims", claims: [{ ...source, text, direction,
+      groundingStatus: "StructuredValidated", citations: insufficient ? [] : source.citations,
+      semantics: { protocolVersion: "structured-claim-v1", kind, outcome: insufficient ? null : "recall", population: insufficient ? null : "adults",
+        exposureOrIntervention: insufficient ? null : "sleep", comparator: insufficient ? null : "wakefulness", timepoint: insufficient ? null : "6 weeks", direction,
+        evidenceIds: insufficient ? [] : [source.citations[0].evidenceId], numericEvidenceId: null,
+        quantitativeArtifactId: numeric ? report.researchReportId : null, groupKey: numeric ? "group" : null,
+        snapshotFingerprint: numeric ? "a".repeat(64) : null, statistic: numeric ? "RandomEffectsHksj" : null,
+        numeric: numeric ? { label: "OddsRatio", studyValue: null, artifactValue: 0.73, studyLower: null, studyUpper: null,
+          artifactLower: 0.40, artifactUpper: 1.20, confidenceLevel: 0.95, operator: "=", degreesOfFreedom: 2, algorithmVersion: "hksj-v1" } : null
+      } }] }));
+    renderWithClient(<ResearchReport researchRunId={runId} />);
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByText("Structured validated")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Claim support"));
+    expect(screen.getByRole("link", { name: "Evidence and source provenance" })).toHaveAttribute("href", `/research/${runId}/evidence`);
+    if (numeric) expect(screen.getByRole("link", { name: /Quantitative artifact:/ })).toHaveAttribute("href", `/research/${runId}/quantitative`);
+    expect(screen.queryByText("Legacy claim unverified")).not.toBeInTheDocument();
   });
 
   it("treats a known run without a report as not ready, not failed", async () => {
@@ -94,6 +125,7 @@ function reportResponse({ missingStudyData = false }: { missingStudyData?: boole
     conclusion: "The persisted report supports the claim.",
     synthesisConfidence: "Limited",
     promptVersion: "synthesis-v1",
+    narrativeAuthority: "LegacyUnverified",
     generatedAt: "2026-09-28T12:05:00Z",
     coverage: {
       discoveredStudyCount: 1,
@@ -115,6 +147,8 @@ function reportResponse({ missingStudyData = false }: { missingStudyData?: boole
       {
         claimId: "33333333-3333-4333-8333-333333333333",
         claimType: "Conclusion",
+        groundingStatus: "LegacyUnverified",
+        semantics: null,
         direction: "Positive",
         text: "Sleep improved recall in the cited finding.",
         ordinal: 0,

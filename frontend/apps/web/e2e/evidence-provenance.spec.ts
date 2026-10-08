@@ -99,7 +99,7 @@ function provenanceResponse(withEvidence: boolean) {
       evidence: withEvidence ? [{ evidenceId, evidenceExtractionId: extractionId, outcome: "recall", resultSummary: "Recall improved.", supportingText: "Persisted supporting excerpt.", direction: "Positive", sourceScope: "Abstract", extractedAt: now, groundingValidated: true, population: "adults", exposureOrIntervention: "sleep", comparator: "wakefulness", studyDesign: "trial", sampleSize: 120, effectMeasure: null, effectValue: null, confidenceIntervalLower: null, confidenceIntervalUpper: null, confidenceLevel: null, reportedStandardError: null, pValue: null }] : [],
       evaluations: []
     }],
-    reportClaims: withEvidence ? [{ researchReportId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", researchReportClaimId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", claimType: "Conclusion", direction: "Positive", text: "Sleep improved recall.", ordinal: 0, evidenceIds: [evidenceId] }] : [],
+    reportClaims: withEvidence ? [{ researchReportId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", researchReportClaimId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", claimType: "Conclusion", direction: "Positive", text: "Sleep improved recall.", ordinal: 0, evidenceIds: [evidenceId], groundingStatus: "LegacyUnverified", semantics: null }] : [],
     quantitativeContributions: withEvidence ? [{ artifactId: "ffffffff-ffff-4fff-8fff-ffffffffffff", groupKey: "recall", analysisMethod: "Fixed", ordinal: 0, evidenceId, studyId, evidenceExtractionId: extractionId, sourceMaterialId }] : []
   };
 }

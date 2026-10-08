@@ -23,7 +23,7 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
         _writeFence = writeFence;
     }
 
-    public async Task PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> PersistAsync(QuantitativeSynthesisReadiness readiness, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(readiness);
         if (readiness.ResearchRunId == Guid.Empty)
@@ -101,6 +101,11 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
             await transaction.RollbackAsync(CancellationToken.None);
             await VerifyExistingSnapshotsAsync(readiness.ResearchRunId, snapshots, cancellationToken);
         }
+        var persistedKeys = results.Select(result => result.GroupKey).ToArray();
+        var persisted = await _dbContext.QuantitativeSynthesisArtifacts.AsNoTracking()
+            .Where(artifact => artifact.ResearchRunId == readiness.ResearchRunId && persistedKeys.Contains(artifact.GroupKey))
+            .OrderBy(artifact => artifact.GroupKey).ToArrayAsync(cancellationToken);
+        return await ReadModelsAsync(persisted, readiness.ResearchRunId, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> FindByResearchRunIdAsync(
@@ -132,6 +137,12 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
             .ThenBy(artifact => artifact.Id)
             .ToArrayAsync(cancellationToken);
 
+        return await ReadModelsAsync(entities, researchRunId, cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<QuantitativeSynthesisArtifactReadModel>> ReadModelsAsync(
+        QuantitativeSynthesisArtifactEntity[] entities, Guid researchRunId, CancellationToken cancellationToken)
+    {
         var artifactIds = entities.Select(entity => entity.Id).ToArray();
         var contributionRows = artifactIds.Length == 0
             ? []

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using MedResearch.Api.Research;
 using MedResearch.Application.Research.Ai;
@@ -117,7 +118,7 @@ public sealed partial class FullFakePipelineTests
                 join link in db.ResearchReportClaimEvidence on claim.Id equals link.ResearchReportClaimId
                 join evidence in db.Evidence on link.EvidenceId equals evidence.Id
                 join study in db.Studies on evidence.StudyId equals study.Id
-                where reportEntity.ResearchRunId == created.ResearchRunId
+                where reportEntity.ResearchRunId == created.ResearchRunId && claim.ClaimType == ResearchReportClaimType.Conclusion
                 select new { claim, link, evidence, study })
                 .SingleAsync(CancellationToken.None);
 
@@ -135,7 +136,9 @@ public sealed partial class FullFakePipelineTests
         Assert.Equal(question, report.Question);
         Assert.Equal(1, report.Coverage.SearchQueryCount);
         Assert.Contains("PubMed", report.Coverage.SearchedSources);
-        var returnedClaim = Assert.Single(report.Claims);
+        var returnedClaim = Assert.Single(report.Claims, claim => claim.ClaimType == "Conclusion");
+        Assert.Equal("StructuredClaims", report.NarrativeAuthority);
+        Assert.All(report.Claims, claim => Assert.Equal("StructuredValidated", claim.GroundingStatus));
         var returnedCitation = Assert.Single(returnedClaim.Citations);
         Assert.Equal("99123456", returnedCitation.Pmid);
         Assert.Equal("10.1000/medresearch-e2e-sleep-recall", returnedCitation.Doi);
@@ -151,6 +154,19 @@ public sealed partial class FullFakePipelineTests
         Assert.NotNull(quantitativeArtifact.Result.RandomEffects);
         Assert.NotNull(quantitativeArtifact.Result.RandomEffects!.HksjInference);
         Assert.NotNull(quantitativeArtifact.Result.RandomEffects.PredictionInterval);
+        foreach (var claim in report.Claims.Where(claim => claim.Semantics!.Kind == "QuantitativeSynthesis"))
+        {
+            Assert.Equal(quantitativeArtifact.ArtifactId, claim.Semantics!.QuantitativeArtifactId);
+            Assert.Equal(quantitativeArtifact.SnapshotFingerprint, claim.Semantics.SnapshotFingerprint);
+            Assert.Equal(quantitativeArtifact.Result.Contributions.Select(x => x.EvidenceId).Order(), claim.Citations.Select(x => x.EvidenceId).Order());
+            Assert.Equal(quantitativeArtifact.Result.RandomEffects.ReportedScaleEffect, claim.Semantics.Numeric!.ArtifactValue);
+            Assert.Equal(3, claim.Citations.Count);
+        }
+        Assert.Contains(report.Claims, claim => claim.Text.Contains("HKSJ", StringComparison.Ordinal) && claim.Text.Contains("confidence interval", StringComparison.Ordinal));
+        Assert.Contains(report.Claims, claim => claim.Text.Contains("prediction interval", StringComparison.Ordinal));
+        var provenanceResponse = await client.GetAsync($"/api/research/{created.ResearchRunId}/provenance");
+        Assert.Equal(HttpStatusCode.OK, provenanceResponse.StatusCode);
+        Assert.Contains("StructuredValidated", await provenanceResponse.Content.ReadAsStringAsync());
         Assert.All(quantitativeArtifact.Result.Contributions, contribution => Assert.NotEqual(Guid.Empty, contribution.EvidenceId));
 
         Assert.Equal(1, fakeLlm.RequestedTypes.Count(type => type == typeof(ResearchPlanDraft)));
@@ -605,7 +621,7 @@ public sealed partial class FullFakePipelineTests
         {
             var evidenceId = RequiredMatch(request.UserPrompt, "EvidenceId: ([0-9a-fA-F-]{36})");
 
-            return new ResearchReportDraft(
+            var report = new ResearchReportDraft(
                 "Completed",
                 null,
                 "Three fake source-grounded studies reported quantitative outcomes; synthesis remains narrative.",
@@ -617,8 +633,21 @@ public sealed partial class FullFakePipelineTests
                 [new ResearchReportClaimDraft(
                     "Conclusion",
                     "Positive",
-                    "The supplied fake study supports improved depression severity after structured sleep compared with placebo.",
-                    [evidenceId])]);
+                    null,
+                    [evidenceId], Kind: "QualitativeEffect",
+                    Outcome: RequiredMatch(request.UserPrompt, "EvidenceId: [0-9a-fA-F-]{36}; Outcome: ([^;]+)"),
+                    Population: RequiredMatch(request.UserPrompt, "EvidenceId: [0-9a-fA-F-]{36};[^\\r\\n]+?Population: ([^;]+)"),
+                    ExposureOrIntervention: RequiredMatch(request.UserPrompt, "EvidenceId: [0-9a-fA-F-]{36};[^\\r\\n]+?ExposureOrIntervention: ([^;]+)"),
+                    Comparator: RequiredMatch(request.UserPrompt, "EvidenceId: [0-9a-fA-F-]{36};[^\\r\\n]+?Comparator: ([^;]+)"),
+                    Timepoint: RequiredMatch(request.UserPrompt, "EvidenceId: [0-9a-fA-F-]{36};[^\\r\\n]+?Timepoint: ([^;]+)"))]);
+            using var json = JsonDocument.Parse(RequiredMatch(request.UserPrompt, "Persisted quantitative artifacts[^\\r\\n]*[\\r\\n]+(\\[[^\\r\\n]+\\])"));
+            var artifact = json.RootElement.EnumerateArray().Single(item => item.GetProperty("Result").GetProperty("Status").GetString() == "Synthesized");
+            var ids = artifact.GetProperty("Result").GetProperty("Contributions").EnumerateArray().Select(item => item.GetProperty("EvidenceId").GetString()!).ToArray();
+            var template = report.Claims!.Single();
+            return report with { Claims = new[] { template }.Concat(new[] { "RandomEffectsWald", "RandomEffectsHksj", "RandomEffectsPredictionInterval" }.Select(statistic => template with {
+                Type = "Finding", Kind = "QuantitativeSynthesis", Direction = "NotApplicable", EvidenceIds = ids,
+                QuantitativeArtifactId = artifact.GetProperty("ArtifactId").GetString(), Statistic = statistic
+            })).ToArray() };
         }
 
         private static string RequiredMatch(string text, string pattern)

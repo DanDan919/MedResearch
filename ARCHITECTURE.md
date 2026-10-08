@@ -4,6 +4,16 @@ For a short Russian onboarding guide, read `docs/architecture-overview.md`. For 
 
 MedResearch is a modular, layered monolith. The system should remain simple until concrete needs justify more infrastructure.
 
+## Structured Claim Authority (F16)
+
+`ResearchSynthesisPrompt` v3 requests scope/category/reference-only claims. `ResearchReportDraftValidator` delegates to `StructuredResearchClaimValidator`: exact normalized outcome, population, intervention, comparator and timepoint must match every cited current-run finding. Missing fields are not wildcards. Uniform qualitative direction requires every cited direction to agree; mixed support is explicitly mixed. Insufficient reports can carry only insufficiency metadata claims or no claims, never an effect assertion.
+
+`ReportedStudyResult` selects reverified grounded Evidence fields; `QuantitativeSynthesis` selects a persisted artifact ID and its exact contribution Evidence set. `IQuantitativeSynthesisArtifactStore.PersistAsync` returns actual persisted IDs/fingerprints, not invented context identifiers. Numeric snapshots retain original decimal or double values. `StructuredResearchClaimRenderer` distinguishes study vs pooled results, CI vs PI and Wald vs HKSJ and renders deterministic core sentences/sections. No model numeric field or free claim text is authoritative.
+
+`EfResearchSynthesisStore` reconstructs trusted corpus and persisted artifacts and revalidates accepted semantics/text before its lease-fenced transaction writes them. Reports are still idempotent by run/prompt version. JSONB semantics have an explicit legacy default, FK columns for numeric Evidence/artifact, a shape/reference coherence check and a report-scoped semantic uniqueness key. Same-run identity is enforced by application/store/read guards, not by a cross-table PostgreSQL constraint. Read guards reject incoherent structured text, filtered citation sets and foreign artifact linkage; historical claims retain unverified status.
+
+Report and F13 provenance APIs carry semantics/status without raw SourceMaterial content. Zod validates closed categories; frontend displays backend text/support without reconstructing effect meaning. F12 uses the same immutable prompt/support during at most one repair and validates the replacement from scratch. M17-M24 statistical implementations are unchanged. These rules do not independently establish causal direction, synonym entailment, population generalization or provider correctness. ADR-031 records this boundary.
+
 ## Dependency Direction
 
 ```text

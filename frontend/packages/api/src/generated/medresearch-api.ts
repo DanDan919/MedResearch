@@ -246,7 +246,7 @@ export interface components {
             /** Format: uuid */
             researchReportId: string;
             status: string;
-            insufficientEvidenceReason: string | null;
+            insufficientEvidenceReason: null | string;
             question: string;
             executiveSummary: string;
             evidenceSummary: string;
@@ -260,6 +260,7 @@ export interface components {
             coverage: components["schemas"]["ResearchReportCoverageResponse"];
             deterministicLimitations: string[];
             claims: components["schemas"]["ResearchReportClaimResponse"][];
+            narrativeAuthority?: null | string;
         };
         ResearchReportCoverageResponse: {
             discoveredStudyCount: number;
@@ -282,8 +283,12 @@ export interface components {
             claimType: string;
             direction: string;
             text: string;
-            ordinal: number;
+            /** Format: int32 */
+            ordinal: number | string;
             citations: components["schemas"]["ResearchReportCitationResponse"][];
+            /** @default LegacyUnverified */
+            groundingStatus: string;
+            semantics?: null | components["schemas"]["ResearchClaimSemanticsResponse"];
         };
         ResearchReportCitationResponse: {
             /** Format: uuid */
@@ -622,14 +627,18 @@ export interface components {
         };
         ResearchReportClaimProvenanceResponse: {
             /** Format: uuid */
-            researchReportId?: string;
+            researchReportId: string;
             /** Format: uuid */
-            researchReportClaimId?: string;
-            claimType?: string;
-            direction?: string;
-            text?: string;
-            ordinal?: number;
-            evidenceIds?: string[];
+            researchReportClaimId: string;
+            claimType: string;
+            direction: string;
+            text: string;
+            /** Format: int32 */
+            ordinal: number | string;
+            evidenceIds: string[];
+            /** @default LegacyUnverified */
+            groundingStatus: string;
+            semantics?: null | components["schemas"]["ResearchClaimSemanticsResponse"];
         };
         QuantitativeContributionProvenanceResponse: {
             /** Format: uuid */
@@ -712,6 +721,46 @@ export interface components {
             instance?: string;
         } & {
             [key: string]: unknown;
+        };
+        ResearchClaimSemanticsResponse: {
+            protocolVersion: string;
+            kind: string;
+            outcome: null | string;
+            population: null | string;
+            exposureOrIntervention: null | string;
+            comparator: null | string;
+            timepoint: null | string;
+            direction: string;
+            evidenceIds: string[];
+            /** Format: uuid */
+            numericEvidenceId: null | string;
+            /** Format: uuid */
+            quantitativeArtifactId: null | string;
+            groupKey: null | string;
+            snapshotFingerprint: null | string;
+            statistic: null | string;
+            numeric: null | components["schemas"]["ResearchClaimNumericSnapshot"];
+        };
+        ResearchClaimNumericSnapshot: {
+            label: string;
+            /** Format: double */
+            studyValue: null | number | string;
+            /** Format: double */
+            artifactValue: null | number | string;
+            /** Format: double */
+            studyLower: null | number | string;
+            /** Format: double */
+            studyUpper: null | number | string;
+            /** Format: double */
+            artifactLower: null | number | string;
+            /** Format: double */
+            artifactUpper: null | number | string;
+            /** Format: double */
+            confidenceLevel: null | number | string;
+            operator: null | string;
+            /** Format: int32 */
+            degreesOfFreedom: null | number | string;
+            algorithmVersion: null | string;
         };
     };
     responses: {

@@ -145,14 +145,57 @@ export const researchReportCitationSchema = z.object({
   ordinal: z.number()
 });
 
+const claimDirectionSchema = z.enum(["Positive", "Negative", "NoClearEffect", "Mixed", "NotReported", "NotApplicable"]);
+const claimRoleSchema = z.enum(["Finding", "Conflict", "Limitation", "Conclusion"]);
+const claimGroundingSchema = z.enum(["LegacyUnverified", "StructuredValidated"]);
+export const researchClaimSemanticsSchema = z.object({
+  protocolVersion: z.literal("structured-claim-v1"),
+  kind: z.enum(["QualitativeEffect", "MixedEvidence", "ReportedStudyResult", "QuantitativeSynthesis", "InsufficientEvidence"]),
+  outcome: z.string().max(512).nullable(),
+  population: z.string().max(512).nullable(),
+  exposureOrIntervention: z.string().max(512).nullable(),
+  comparator: z.string().max(512).nullable(),
+  timepoint: z.string().max(512).nullable(),
+  direction: claimDirectionSchema,
+  evidenceIds: z.array(z.string().uuid()).max(12),
+  numericEvidenceId: z.string().uuid().nullable(),
+  quantitativeArtifactId: z.string().uuid().nullable(),
+  groupKey: z.string().nullable(),
+  snapshotFingerprint: z.string().regex(/^[a-f0-9]{64}$/i).nullable(),
+  statistic: z.enum(["StudyEffect", "StudyConfidenceInterval", "StudyStandardError", "StudyPValue", "StudySampleSize", "FixedEffectWald", "RandomEffectsWald", "RandomEffectsHksj", "RandomEffectsPredictionInterval", "CochransQ", "ISquared", "TauSquared"]).nullable(),
+  numeric: z.object({
+    label: z.string().min(1), studyValue: z.number().finite().nullable(), artifactValue: z.number().finite().nullable(),
+    studyLower: z.number().finite().nullable(), studyUpper: z.number().finite().nullable(),
+    artifactLower: z.number().finite().nullable(), artifactUpper: z.number().finite().nullable(),
+    confidenceLevel: z.number().gt(0).lt(1).nullable(), operator: z.enum(["=", "<", "<=", ">", ">="]).nullable(),
+    degreesOfFreedom: z.number().int().nonnegative().nullable(), algorithmVersion: z.string().nullable()
+  }).strict().nullable()
+}).strict().superRefine((claim, context) => {
+  const numeric = claim.kind === "ReportedStudyResult" || claim.kind === "QuantitativeSynthesis";
+  const valid = new Set(claim.evidenceIds).size === claim.evidenceIds.length &&
+    (numeric ? claim.numeric !== null && claim.statistic !== null && claim.direction === "NotApplicable" : claim.numeric === null && claim.statistic === null) &&
+    (claim.kind === "ReportedStudyResult" ? claim.numericEvidenceId !== null && claim.quantitativeArtifactId === null && claim.evidenceIds.length === 1 && claim.evidenceIds[0] === claim.numericEvidenceId : claim.numericEvidenceId === null) &&
+    (claim.kind === "QuantitativeSynthesis" ? claim.quantitativeArtifactId !== null && claim.groupKey !== null && claim.snapshotFingerprint !== null : claim.quantitativeArtifactId === null && claim.groupKey === null && claim.snapshotFingerprint === null) &&
+    (claim.kind === "MixedEvidence" ? claim.direction === "Mixed" : true) &&
+    (claim.kind === "InsufficientEvidence" ? claim.evidenceIds.length === 0 && claim.direction === "NotApplicable" : claim.evidenceIds.length > 0);
+  if (!valid) context.addIssue({ code: "custom", message: "Incoherent structured claim authority." });
+});
+
+const groundingFields = { groundingStatus: claimGroundingSchema, semantics: researchClaimSemanticsSchema.nullable() };
+function validGrounding(claim: { groundingStatus: string; direction: string; semantics: z.infer<typeof researchClaimSemanticsSchema> | null }) {
+  return claim.groundingStatus === "StructuredValidated" ? claim.semantics !== null && claim.direction === claim.semantics.direction : claim.semantics === null;
+}
+
 export const researchReportClaimSchema = z.object({
   claimId: z.string().uuid(),
-  claimType: z.string(),
-  direction: z.string(),
+  claimType: claimRoleSchema,
+  direction: claimDirectionSchema,
   text: z.string(),
   ordinal: z.number(),
-  citations: z.array(researchReportCitationSchema)
-});
+  citations: z.array(researchReportCitationSchema),
+  ...groundingFields
+}).refine(validGrounding, "Incoherent claim grounding status.").refine(claim => claim.semantics === null ||
+  [...new Set(claim.citations.map(citation => citation.evidenceId))].sort().join(",") === [...claim.semantics.evidenceIds].sort().join(","), "Incoherent claim citation set.");
 
 export const researchReportCoverageSchema = z.object({
   discoveredStudyCount: z.number(),
@@ -171,6 +214,7 @@ export const researchReportCoverageSchema = z.object({
 });
 
 export const researchReportResponseSchema = z.object({
+  narrativeAuthority: z.enum(["StructuredClaims", "LegacyUnverified"]),
   researchRunId: z.string().uuid(),
   researchReportId: z.string().uuid(),
   status: z.string(),
@@ -461,12 +505,14 @@ const evidenceEvaluationProvenanceSchema = z.object({
 const researchReportClaimProvenanceSchema = z.object({
   researchReportId: z.string().uuid(),
   researchReportClaimId: z.string().uuid(),
-  claimType: z.string(),
-  direction: z.string(),
+  claimType: claimRoleSchema,
+  direction: claimDirectionSchema,
   text: z.string(),
   ordinal: z.number().int(),
-  evidenceIds: z.array(z.string().uuid())
-});
+  evidenceIds: z.array(z.string().uuid()),
+  ...groundingFields
+}).refine(validGrounding, "Incoherent provenance claim grounding status.").refine(claim => claim.semantics === null ||
+  [...new Set(claim.evidenceIds)].sort().join(",") === [...claim.semantics.evidenceIds].sort().join(","), "Incoherent provenance citation set.");
 
 const quantitativeContributionProvenanceSchema = z.object({
   artifactId: z.string().uuid(),

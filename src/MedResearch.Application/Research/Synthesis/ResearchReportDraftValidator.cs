@@ -5,8 +5,7 @@ namespace MedResearch.Application.Research.Synthesis;
 
 public sealed class ResearchReportDraftValidator
 {
-    private const int MaxSectionLength = 2_500;
-    private const int MaxClaimTextLength = 800;
+    private const int MaxClaimTextLength = 4_000;
     private const int MaxEvidencePerClaim = 12;
 
     private readonly SynthesisOptions _options;
@@ -19,8 +18,8 @@ public sealed class ResearchReportDraftValidator
     public ResearchSynthesisResult Validate(
         SynthesisContext context,
         ResearchReportDraft draft,
-        string provider,
-        string model,
+        string? provider,
+        string? model,
         DateTimeOffset generatedAt)
     {
         ValidateContext(context);
@@ -39,12 +38,22 @@ public sealed class ResearchReportDraftValidator
             throw new ResearchSynthesisValidationException("Insufficient-evidence research reports require a reason.");
         }
 
-        var executiveSummary = NormalizeRequired(draft.ExecutiveSummary, "Executive summary is required.", MaxSectionLength);
-        var evidenceSummary = NormalizeRequired(draft.EvidenceSummary, "Evidence summary is required.", MaxSectionLength);
-        var conflictSummary = NormalizeRequired(draft.ConflictSummary, "Conflict summary is required.", MaxSectionLength);
-        var limitationsSummary = NormalizeRequired(draft.LimitationsSummary, "Limitations summary is required.", MaxSectionLength);
-        var conclusion = NormalizeRequired(draft.Conclusion, "Conclusion is required.", MaxSectionLength);
+        if (reason == ResearchReportInsufficientEvidenceReason.NoValidatedEvidence && context.Statistics.IncludedEvidenceFindingCount != 0)
+            throw new ResearchSynthesisValidationException("NoValidatedEvidence requires an empty validated context.");
+
         var claims = ValidateClaims(context, draft.Claims, status);
+        // No model-authored prose is promoted into another authoritative report field.
+        var executiveSummary = status == ResearchReportStatus.InsufficientEvidence
+            ? "Validated Evidence is insufficient for an effect conclusion; absence of evidence is not no effect."
+            : $"This bounded evidence synthesis contains {claims.Count} structured claims about the cited Evidence.";
+        var evidenceSummary = $"The bounded synthesis context contains {context.Statistics.IncludedEvidenceFindingCount} validated findings across {context.Statistics.IncludedStudyCount} studies.";
+        var conflictSummary = claims.Any(x => x.Semantics?.Kind == ResearchClaimKind.MixedEvidence)
+            ? "Cited Evidence includes differing reported directions. Mixed claims do not establish a uniform effect."
+            : "No mixed claim was proposed for the cited subsets; this does not prove corpus-wide consistency.";
+        var limitationsSummary = "Claims describe the supplied, bounded Evidence, not causal effects, clinical significance, or clinical recommendations. See the persisted source coverage and deterministic limitations.";
+        var conclusion = status == ResearchReportStatus.InsufficientEvidence
+            ? executiveSummary
+            : "The scoped structured claims below are the scientific assertions. No broader effect conclusion is inferred.";
 
         if (status == ResearchReportStatus.Completed && confidence == SynthesisConfidence.InsufficientEvidence)
         {
@@ -78,29 +87,9 @@ public sealed class ResearchReportDraftValidator
 
     public ResearchSynthesisResult CreateInsufficientEvidenceResult(SynthesisContext context)
     {
-        const string summary = "MedResearch found no validated source-grounded evidence findings for this research run, so it did not ask the synthesis model to infer an answer from prior knowledge.";
-        var limitations = context.DeterministicLimitations.Count == 0
-            ? "No validated evidence findings are available for synthesis."
-            : string.Join(" ", context.DeterministicLimitations);
-
-        return new ResearchSynthesisResult(
-            context.ResearchRunId,
-            ResearchReportStatus.InsufficientEvidence,
-            ResearchReportInsufficientEvidenceReason.NoValidatedEvidence,
-            summary,
-            "No validated persisted Evidence records are available for the current research run.",
-            "No evidence conflict can be assessed because no validated evidence findings are available.",
-            limitations,
-            "No evidence-supported conclusion can be drawn from the persisted MedResearch corpus for this run.",
-            SynthesisConfidence.InsufficientEvidence,
-            null,
-            null,
-            ResearchSynthesisPrompt.Version,
-            DateTimeOffset.UtcNow,
-            context.Statistics,
-            context.SourceCoverage,
-            context.DeterministicLimitations,
-            []);
+        return Validate(context, new ResearchReportDraft(
+            nameof(ResearchReportStatus.InsufficientEvidence), nameof(ResearchReportInsufficientEvidenceReason.NoValidatedEvidence),
+            null, null, null, null, null, nameof(SynthesisConfidence.InsufficientEvidence), []), null, null, DateTimeOffset.UtcNow);
     }
 
     private IReadOnlyCollection<AcceptedResearchReportClaim> ValidateClaims(
@@ -123,6 +112,7 @@ public sealed class ResearchReportDraftValidator
             .SelectMany(study => study.Evidence)
             .ToDictionary(evidence => evidence.EvidenceId);
         var claims = new List<AcceptedResearchReportClaim>();
+        var semanticKeys = new HashSet<string>(StringComparer.Ordinal);
 
         for (var index = 0; index < drafts.Length; index++)
         {
@@ -140,10 +130,9 @@ public sealed class ResearchReportDraftValidator
 
             var type = ParseEnum<ResearchReportClaimType>(draft.Type, nameof(draft.Type));
             var direction = ParseEnum<ResearchReportClaimDirection>(draft.Direction, nameof(draft.Direction));
-            var text = NormalizeRequired(draft.Text, "Report claim text is required.", MaxClaimTextLength);
             var evidenceIds = ParseEvidenceIds(draft.EvidenceIds);
 
-            if (evidenceIds.Length == 0)
+            if (evidenceIds.Length == 0 && draft.Kind != nameof(ResearchClaimKind.InsufficientEvidence))
             {
                 throw new ResearchSynthesisValidationException("Every persisted report claim must cite at least one supplied EvidenceId.");
             }
@@ -169,8 +158,13 @@ public sealed class ResearchReportDraftValidator
                 return evidence;
             }).ToArray();
 
-            ValidateClaimDirection(type, direction, supportingEvidence);
-            claims.Add(new AcceptedResearchReportClaim(type, direction, text, evidenceIds, index));
+            var semantics = StructuredResearchClaimValidator.Validate(context, draft, direction, evidenceIds, status, index);
+            if (type == ResearchReportClaimType.Conflict && semantics.Kind != ResearchClaimKind.MixedEvidence)
+                throw new ResearchSynthesisValidationException("A conflict role requires MixedEvidence semantics.");
+            if (!semanticKeys.Add(StructuredResearchClaimRenderer.SemanticKey(semantics)))
+                throw new ResearchSynthesisValidationException("Duplicate structured claim semantics are not accepted.");
+            var text = NormalizeRequired(StructuredResearchClaimRenderer.Render(semantics), "Rendered claim is required.", MaxClaimTextLength);
+            claims.Add(new AcceptedResearchReportClaim(type, direction, text, evidenceIds, index, semantics));
         }
 
         if (status == ResearchReportStatus.Completed && claims.All(claim => claim.ClaimType != ResearchReportClaimType.Conclusion))
@@ -183,6 +177,13 @@ public sealed class ResearchReportDraftValidator
 
     public void ValidateContext(SynthesisContext context)
     {
+        if ((context.QuantitativeArtifacts ?? []).Any(artifact => artifact.ArtifactId == Guid.Empty || artifact.Result.ResearchRunId != context.ResearchRunId ||
+            artifact.SnapshotFingerprint != MedResearch.Application.Research.Quantitative.QuantitativeSynthesisArtifactSnapshot.ComputeFingerprint(artifact.Result)))
+            throw new ResearchSynthesisValidationException("Synthesis context contains a foreign or corrupt quantitative artifact.",
+                new ValidationIssue(ValidationIssueCodes.QuantitativeArtifactMismatch, "context.quantitativeArtifacts", "Current-run persisted artifact identity and fingerprint must be valid.", ValidationIssueDisposition.NonRepairable));
+        if (context.Statistics.IncludedEvidenceFindingCount != context.Studies.Sum(x => x.Evidence.Count) ||
+            context.Studies.SelectMany(x => x.Evidence).Select(x => x.EvidenceId).Distinct().Count() != context.Statistics.IncludedEvidenceFindingCount)
+            throw new ResearchSynthesisValidationException("Synthesis context evidence count/identity is inconsistent.");
         if (context.Studies.SelectMany(study => study.Evidence).Any(evidence => evidence.ResearchRunId != context.ResearchRunId))
         {
             throw new ResearchSynthesisValidationException(
@@ -209,84 +210,10 @@ public sealed class ResearchReportDraftValidator
             .ToArray();
     }
 
-    private static void ValidateClaimDirection(
-        ResearchReportClaimType type,
-        ResearchReportClaimDirection direction,
-        IReadOnlyCollection<SynthesisEvidenceContext> evidence)
-    {
-        var directions = evidence.Select(item => item.Direction).Distinct().ToArray();
-
-        if (type == ResearchReportClaimType.Conflict || direction == ResearchReportClaimDirection.Mixed)
-        {
-            if (!directions.Contains(EvidenceDirection.Mixed)
-                && !(directions.Contains(EvidenceDirection.Positive) && directions.Contains(EvidenceDirection.Negative)))
-            {
-                throw new ResearchSynthesisValidationException(
-                    "Mixed or conflict claims require mixed evidence or opposing positive and negative evidence directions.",
-                    new ValidationIssue(
-                        ValidationIssueCodes.MixedClaimConflict,
-                        "claims[].direction",
-                        "Use a non-mixed claim direction supported by the cited evidence, or cite the supplied opposing evidence needed for a mixed/conflict claim.",
-                        ValidationIssueDisposition.Repairable));
-            }
-
-            return;
-        }
-
-        if (direction == ResearchReportClaimDirection.NotApplicable)
-        {
-            return;
-        }
-
-        if (direction == ResearchReportClaimDirection.Positive && !directions.Contains(EvidenceDirection.Positive))
-        {
-            throw new ResearchSynthesisValidationException(
-                "Positive report claims require at least one positive supporting evidence direction.",
-                new ValidationIssue(
-                    ValidationIssueCodes.InvalidDirection,
-                    "claims[].direction",
-                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
-                    ValidationIssueDisposition.Repairable));
-        }
-
-        if (direction == ResearchReportClaimDirection.Negative && !directions.Contains(EvidenceDirection.Negative))
-        {
-            throw new ResearchSynthesisValidationException(
-                "Negative report claims require at least one negative supporting evidence direction.",
-                new ValidationIssue(
-                    ValidationIssueCodes.InvalidDirection,
-                    "claims[].direction",
-                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
-                    ValidationIssueDisposition.Repairable));
-        }
-
-        if (direction == ResearchReportClaimDirection.NoClearEffect && !directions.Contains(EvidenceDirection.NoClearEffect))
-        {
-            throw new ResearchSynthesisValidationException(
-                "NoClearEffect report claims require at least one no-clear-effect supporting evidence direction.",
-                new ValidationIssue(
-                    ValidationIssueCodes.InvalidDirection,
-                    "claims[].direction",
-                    "Set direction to a value supported by the cited evidence; do not infer a direction that is not present.",
-                    ValidationIssueDisposition.Repairable));
-        }
-
-        if (direction == ResearchReportClaimDirection.NotReported && directions.Any(item => item != EvidenceDirection.NotReported))
-        {
-            throw new ResearchSynthesisValidationException(
-                "NotReported report claims cannot cite evidence with reported effect directions.",
-                new ValidationIssue(
-                    ValidationIssueCodes.InvalidDirection,
-                    "claims[].direction",
-                    "Use NotReported only when all cited evidence directions are NotReported.",
-                    ValidationIssueDisposition.Repairable));
-        }
-    }
-
     private static TEnum ParseEnum<TEnum>(string? value, string propertyName)
         where TEnum : struct, Enum
     {
-        if (string.IsNullOrWhiteSpace(value) || !Enum.TryParse<TEnum>(value.Trim(), ignoreCase: false, out var parsed))
+        if (string.IsNullOrWhiteSpace(value) || !Enum.TryParse<TEnum>(value.Trim(), ignoreCase: false, out var parsed) || !Enum.IsDefined(parsed) || Enum.GetName(parsed) != value.Trim())
         {
             throw new ResearchSynthesisValidationException($"Unsupported or missing report category for {propertyName}.");
         }

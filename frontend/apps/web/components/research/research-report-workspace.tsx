@@ -38,6 +38,7 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={report.status === "Completed" ? "success" : "warning"}>{report.status}</Badge>
+          <Badge tone={report.narrativeAuthority === "StructuredClaims" ? "info" : "warning"}>{report.narrativeAuthority === "StructuredClaims" ? "Structured claims" : "Legacy narrative unverified"}</Badge>
           <p className="text-xs text-muted-foreground">Generated {formatTimestamp(report.generatedAt)}</p>
           {quantitativeQuery.data && quantitativeQuery.data.length > 0 ? <Button asChild variant="secondary" size="sm"><Link href={`/research/${researchRunId}/quantitative`}>Quantitative results</Link></Button> : null}
         </div>
@@ -79,9 +80,26 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
                 <CardHeader>
                   <div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="text-base">{claim.claimType}</CardTitle><Badge tone="info">{claim.direction}</Badge></div>
                   <CardDescription>Claim {claim.ordinal + 1} · {claim.citations.length} cited {claim.citations.length === 1 ? "finding" : "findings"}</CardDescription>
+                  <Badge tone={claim.groundingStatus === "StructuredValidated" ? "info" : "warning"}>{claim.groundingStatus === "StructuredValidated" ? "Structured validated" : "Legacy claim unverified"}</Badge>
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm">
                   <p className="leading-6">{claim.text}</p>
+                  {claim.semantics ? <details className="border-t border-border pt-3">
+                    <summary className="cursor-pointer font-medium">Claim support</summary>
+                    <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+                      <MetadataField label="Kind" value={claim.semantics.kind} />
+                      <MetadataField label="Outcome" value={claim.semantics.outcome} />
+                      <MetadataField label="Population" value={claim.semantics.population} />
+                      <MetadataField label="Intervention / exposure" value={claim.semantics.exposureOrIntervention} />
+                      <MetadataField label="Comparator" value={claim.semantics.comparator} />
+                      <MetadataField label="Timepoint" value={claim.semantics.timepoint} />
+                      <MetadataField label="Statistic" value={claim.semantics.statistic} />
+                      <MetadataField label="Artifact fingerprint" value={claim.semantics.snapshotFingerprint} />
+                    </dl>
+                    <Link className="mt-3 block break-all text-primary underline" href={`/research/${researchRunId}/evidence`}>Evidence and source provenance</Link>
+                    {claim.semantics.quantitativeArtifactId ? <Link className="mt-2 block break-all text-primary underline" href={`/research/${researchRunId}/quantitative`}>Quantitative artifact: {claim.semantics.quantitativeArtifactId}</Link> : null}
+                    <p className="mt-2 break-all text-xs text-muted-foreground">Evidence IDs: {claim.semantics.evidenceIds.join(", ") || "None"}</p>
+                  </details> : null}
                   {claim.citations.map((citation) => <EvidenceDisclosure key={`${claim.claimId}-${citation.evidenceId}`} citation={citation} />)}
                 </CardContent>
               </Card>
@@ -127,7 +145,7 @@ function EvidenceDisclosure({ citation }: { citation: Citation }) {
       <span className="min-w-0"><span className="block font-medium">{citation.title}</span><span className="mt-1 block text-xs text-muted-foreground">{citation.studySource ?? "Source not available"} · {citation.sourceScope} evidence · {citation.evidenceDirection}</span></span>
       <span className="shrink-0 text-xs text-primary group-open:hidden">View evidence</span><span className="hidden shrink-0 text-xs text-primary group-open:inline">Hide evidence</span>
     </summary>
-    <div className="space-y-4 border-t border-border p-4"><StudyMetadata citation={citation} />{citation.resultSummary ? <ReportSection title="Result" value={citation.resultSummary} /> : null}{citation.supportingText ? <ReportSection title="Extracted supporting text" value={citation.supportingText} /> : null}<EvidenceDetails citation={citation} />{citation.sourceMaterial ? <SourceMaterialMetadata citation={citation} /> : null}</div>
+    <div className="space-y-4 border-t border-border p-4"><StudyMetadata citation={citation} />{citation.resultSummary ? <ReportSection title="Unverified extracted summary" value={citation.resultSummary} /> : null}{citation.supportingText ? <ReportSection title="Extracted supporting text" value={citation.supportingText} /> : null}<EvidenceDetails citation={citation} />{citation.sourceMaterial ? <SourceMaterialMetadata citation={citation} /> : null}</div>
   </details>;
 }
 

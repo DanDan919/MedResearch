@@ -544,7 +544,6 @@
         }
       },
       "ResearchReportResponse": {
-        "type": "object",
         "required": [
           "researchRunId",
           "researchReportId",
@@ -563,29 +562,73 @@
           "deterministicLimitations",
           "claims"
         ],
-        "additionalProperties": false,
+        "type": "object",
         "properties": {
-          "researchRunId": { "type": "string", "format": "uuid" },
-          "researchReportId": { "type": "string", "format": "uuid" },
-          "status": { "type": "string" },
-          "insufficientEvidenceReason": { "type": ["string", "null"] },
-          "question": { "type": "string" },
-          "executiveSummary": { "type": "string" },
-          "evidenceSummary": { "type": "string" },
-          "conflictSummary": { "type": "string" },
-          "limitationsSummary": { "type": "string" },
-          "conclusion": { "type": "string" },
-          "synthesisConfidence": { "type": "string" },
-          "promptVersion": { "type": "string" },
-          "generatedAt": { "type": "string", "format": "date-time" },
-          "coverage": { "$ref": "#/components/schemas/ResearchReportCoverageResponse" },
+          "researchRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "researchReportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "insufficientEvidenceReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "executiveSummary": {
+            "type": "string"
+          },
+          "evidenceSummary": {
+            "type": "string"
+          },
+          "conflictSummary": {
+            "type": "string"
+          },
+          "limitationsSummary": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "synthesisConfidence": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ResearchReportCoverageResponse"
+          },
           "deterministicLimitations": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "claims": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ResearchReportClaimResponse" }
+            "items": {
+              "$ref": "#/components/schemas/ResearchReportClaimResponse"
+            }
+          },
+          "narrativeAuthority": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -627,18 +670,56 @@
         }
       },
       "ResearchReportClaimResponse": {
+        "required": [
+          "claimId",
+          "claimType",
+          "direction",
+          "text",
+          "ordinal",
+          "citations"
+        ],
         "type": "object",
-        "required": ["claimId", "claimType", "direction", "text", "ordinal", "citations"],
-        "additionalProperties": false,
         "properties": {
-          "claimId": { "type": "string", "format": "uuid" },
-          "claimType": { "type": "string" },
-          "direction": { "type": "string" },
-          "text": { "type": "string" },
-          "ordinal": { "type": "integer" },
+          "claimId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "claimType": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "ordinal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
           "citations": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ResearchReportCitationResponse" }
+            "items": {
+              "$ref": "#/components/schemas/ResearchReportCitationResponse"
+            }
+          },
+          "groundingStatus": {
+            "type": "string",
+            "default": "LegacyUnverified"
+          },
+          "semantics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
+              }
+            ]
           }
         }
       },
@@ -1018,15 +1099,63 @@
         }
       },
       "ResearchReportClaimProvenanceResponse": {
+        "required": [
+          "researchReportId",
+          "researchReportClaimId",
+          "claimType",
+          "direction",
+          "text",
+          "ordinal",
+          "evidenceIds"
+        ],
         "type": "object",
         "properties": {
-          "researchReportId": { "type": "string", "format": "uuid" },
-          "researchReportClaimId": { "type": "string", "format": "uuid" },
-          "claimType": { "type": "string" },
-          "direction": { "type": "string" },
-          "text": { "type": "string" },
-          "ordinal": { "type": "integer" },
-          "evidenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+          "researchReportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "researchReportClaimId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "claimType": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "ordinal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "groundingStatus": {
+            "type": "string",
+            "default": "LegacyUnverified"
+          },
+          "semantics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
+              }
+            ]
+          }
         }
       },
       "QuantitativeContributionProvenanceResponse": {
@@ -1110,6 +1239,221 @@
           "status": { "type": "integer" },
           "detail": { "type": "string" },
           "instance": { "type": "string" }
+        }
+      },
+      "ResearchClaimSemanticsResponse": {
+        "required": [
+          "protocolVersion",
+          "kind",
+          "outcome",
+          "population",
+          "exposureOrIntervention",
+          "comparator",
+          "timepoint",
+          "direction",
+          "evidenceIds",
+          "numericEvidenceId",
+          "quantitativeArtifactId",
+          "groupKey",
+          "snapshotFingerprint",
+          "statistic",
+          "numeric"
+        ],
+        "type": "object",
+        "properties": {
+          "protocolVersion": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "population": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exposureOrIntervention": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comparator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timepoint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "direction": {
+            "type": "string"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "numericEvidenceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "quantitativeArtifactId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "groupKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "snapshotFingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statistic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "numeric": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimNumericSnapshot"
+              }
+            ]
+          }
+        }
+      },
+      "ResearchClaimNumericSnapshot": {
+        "required": [
+          "label",
+          "studyValue",
+          "artifactValue",
+          "studyLower",
+          "studyUpper",
+          "artifactLower",
+          "artifactUpper",
+          "confidenceLevel",
+          "operator",
+          "degreesOfFreedom",
+          "algorithmVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "studyValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "artifactValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "studyLower": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "studyUpper": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "artifactLower": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "artifactUpper": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "confidenceLevel": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "operator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "degreesOfFreedom": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "algorithmVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
         }
       }
     }

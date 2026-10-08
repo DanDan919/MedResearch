@@ -176,7 +176,9 @@ public sealed record ResearchReportClaimProvenance(
     ResearchReportClaimDirection Direction,
     string Text,
     int Ordinal,
-    IReadOnlyCollection<Guid> EvidenceIds);
+    IReadOnlyCollection<Guid> EvidenceIds,
+    ResearchClaimGroundingStatus GroundingStatus = ResearchClaimGroundingStatus.LegacyUnverified,
+    ResearchClaimSemantics? Semantics = null);
 
 public sealed record QuantitativeContributionProvenance(
     Guid ArtifactId,

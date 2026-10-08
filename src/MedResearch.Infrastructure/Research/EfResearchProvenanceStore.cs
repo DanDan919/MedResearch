@@ -249,6 +249,12 @@ public sealed class EfResearchProvenanceStore : IResearchProvenanceStore
                 group => group.Key,
                 group => (IReadOnlyCollection<Guid>)group.Select(link => link.EvidenceId).ToArray());
 
+        var claimArtifactIds = claims.Where(item => item.Claim.QuantitativeArtifactId.HasValue).Select(item => item.Claim.QuantitativeArtifactId!.Value).ToArray();
+        var claimArtifacts = await _dbContext.QuantitativeSynthesisArtifacts.AsNoTracking()
+            .Where(artifact => artifact.ResearchRunId == researchRunId && claimArtifactIds.Contains(artifact.Id))
+            .ToDictionaryAsync(artifact => artifact.Id, cancellationToken);
+        foreach (var item in claims)
+            MedResearch.Infrastructure.Synthesis.Persistence.StructuredClaimReadGuard.AssertValid(item.Claim, evidenceIdsByClaim.GetValueOrDefault(item.Claim.Id, []), claimArtifacts);
         var claimReadModels = claims
             .Select(item => new ResearchReportClaimProvenance(
                 item.ReportId,
@@ -257,7 +263,7 @@ public sealed class EfResearchProvenanceStore : IResearchProvenanceStore
                 item.Claim.Direction,
                 item.Claim.Text,
                 item.Claim.Ordinal,
-                evidenceIdsByClaim.GetValueOrDefault(item.Claim.Id, [])))
+                evidenceIdsByClaim.GetValueOrDefault(item.Claim.Id, []), item.Claim.GroundingStatus, item.Claim.Semantics))
             .OrderBy(claim => claim.Ordinal)
             .ThenBy(claim => claim.ResearchReportClaimId)
             .ToArray();

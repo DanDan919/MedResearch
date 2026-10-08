@@ -20,6 +20,33 @@ test("report workspace exposes persisted claims and expandable evidence", async 
   await expect(page.getByText(/Abstract from PubMed via SearchMetadataAbstract/)).toBeVisible();
 });
 
+test("structured mixed claim stays mixed and exposes persisted support", async ({ page }) => {
+  const report = reportResponse();
+  const source = report.claims[0];
+  await mockReportApi(page, { ...report, narrativeAuthority: "StructuredClaims", claims: [{ ...source, direction: "Mixed", groundingStatus: "StructuredValidated",
+    text: "The cited Evidence has mixed directions; it does not establish consistent benefit.",
+    semantics: { protocolVersion: "structured-claim-v1", kind: "MixedEvidence", outcome: "recall", population: "adults", exposureOrIntervention: "sleep",
+      comparator: "wakefulness", timepoint: "6 weeks", direction: "Mixed", evidenceIds: [source.citations[0].evidenceId], numericEvidenceId: null,
+      quantitativeArtifactId: null, groupKey: null, snapshotFingerprint: null, statistic: null, numeric: null }
+  }] });
+  await page.goto(`/research/${runId}/report`);
+  await expect(page.getByText("Structured validated")).toBeVisible();
+  await expect(page.getByText(/mixed directions; it does not establish consistent benefit/)).toBeVisible();
+  await page.getByText("Claim support").click();
+  await expect(page.getByText("6 weeks", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Evidence and source provenance" })).toHaveAttribute("href", `/research/${runId}/evidence`);
+  await page.getByText("Authoritative study title").click();
+  await expect(page.getByRole("heading", { name: "Source material lineage" })).toBeVisible();
+});
+
+test("legacy citation is not presented as structured validation", async ({ page }) => {
+  await mockReportApi(page, reportResponse());
+  await page.goto(`/research/${runId}/report`);
+  await expect(page.getByText("Legacy claim unverified")).toBeVisible();
+  await expect(page.getByText("Legacy narrative unverified")).toBeVisible();
+  await expect(page.getByText("Structured validated")).toHaveCount(0);
+});
+
 test("report workspace presents a not-ready state for a known run without a report", async ({ page }) => {
   await mockReportApi(page, null, 409);
   await page.goto(`/research/${runId}/report`);
@@ -81,6 +108,7 @@ function reportResponse(missingStudyData = false) {
     conclusion: "The persisted report supports the claim.",
     synthesisConfidence: "Limited",
     promptVersion: "synthesis-v1",
+    narrativeAuthority: "LegacyUnverified",
     generatedAt: "2026-09-28T12:05:00Z",
     coverage: {
       discoveredStudyCount: 1,
@@ -101,6 +129,8 @@ function reportResponse(missingStudyData = false) {
     claims: [{
       claimId: "33333333-3333-4333-8333-333333333333",
       claimType: "Conclusion",
+      groundingStatus: "LegacyUnverified",
+      semantics: null,
       direction: "Positive",
       text: "Sleep improved recall in the cited finding.",
       ordinal: 0,
