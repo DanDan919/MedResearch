@@ -8,8 +8,7 @@ export default function SettingsPage() {
         <CardDescription>Runtime configuration is currently supplied through environment variables.</CardDescription>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
-        Configure the API URL with <code>NEXT_PUBLIC_MEDRESEARCH_API_URL</code> for web and{" "}
-        <code>VITE_MEDRESEARCH_API_URL</code> for desktop.
+        Browser requests use the same-origin authenticated session. Runtime settings are managed by the operator.
       </CardContent>
     </Card>
   );

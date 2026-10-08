@@ -23,7 +23,7 @@ describe("ResearchDetail", () => {
     expect(screen.getByText("Active until 2026-09-28T12:05:00Z")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /open report/i })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/api/research/11111111-1111-4111-8111-111111111111/progress",
+      "/api/backend/api/research/11111111-1111-4111-8111-111111111111/progress",
       expect.objectContaining({ method: "GET" })
     );
   });

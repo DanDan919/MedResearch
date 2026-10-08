@@ -9,6 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @medresearch/web test:e2e",
+    "test:auth-e2e": "pnpm --filter @medresearch/web test:auth-e2e",
     "api:generate": "pnpm --filter @medresearch/api generate",
     "desktop:dev": "pnpm --filter @medresearch/desktop tauri dev",
     "desktop:build": "pnpm --filter @medresearch/desktop tauri build",

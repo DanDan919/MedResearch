@@ -29,7 +29,7 @@ describe("ResearchHistory", () => {
 
     expect(await screen.findByText("No research yet")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/api/research?page=1&pageSize=20",
+      "/api/backend/api/research?page=1&pageSize=20",
       expect.objectContaining({ method: "GET" })
     );
   });
@@ -78,7 +78,7 @@ describe("ResearchHistory", () => {
 
     expect(await screen.findByText("No research matches this status")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/api/research?page=3&pageSize=20&status=Failed",
+      "/api/backend/api/research?page=3&pageSize=20&status=Failed",
       expect.objectContaining({ method: "GET" })
     );
 

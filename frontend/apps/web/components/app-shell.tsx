@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FlaskConical, Home, Microscope, Settings } from "lucide-react";
-import { cn, Separator } from "@medresearch/ui";
+import { Activity, ClipboardList, FlaskConical, Home, LogOut, Microscope, Settings } from "lucide-react";
+import { Button, cn, Separator } from "@medresearch/ui";
 import { ApiStatusIndicator } from "./api-status-indicator";
 import { ThemeToggle } from "./theme-toggle";
+import { useWebSession } from "./web-session-provider";
+import { useState } from "react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -17,6 +19,9 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { session, endSession } = useWebSession();
+  const [logoutFailed, setLogoutFailed] = useState(false);
+  if (pathname === "/login") return <>{children}</>;
 
   return (
     <div className="min-h-screen">
@@ -27,8 +32,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             MedResearch
           </Link>
           <div className="flex items-center gap-3">
+            <span className="hidden max-w-40 truncate text-sm sm:block">{session.displayName}</span>
             <ApiStatusIndicator />
             <ThemeToggle />
+            {logoutFailed && <span role="alert" className="text-sm">Sign out failed. Retry.</span>}
+            {session.mode === "oidc" && <form action="/api/auth/logout" method="post" onSubmit={async event => {
+              event.preventDefault(); setLogoutFailed(false);
+              try {
+                const response = await fetch("/api/auth/logout", { method: "POST", headers: { Accept: "application/json" }, credentials: "same-origin", cache: "no-store" });
+                if (!response.ok) throw new Error("Sign out failed");
+                endSession(); window.location.assign("/login?reason=signed-out");
+              } catch { setLogoutFailed(true); }
+            }}>
+              <Button type="submit" variant="ghost" size="sm" aria-label="Sign out" title="Sign out"><LogOut className="h-4 w-4" /></Button>
+            </form>}
           </div>
         </div>
       </header>

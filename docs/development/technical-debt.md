@@ -1,5 +1,33 @@
 # Technical Debt
 
+## F17 Authentication Limits
+
+Observed 2026-10-08: pnpm audit --prod reports 7 existing advisories: 2 high,
+4 moderate, 1 low (Next16.3.6/source-map-js; no new auth library in that report).
+Next Image SSRF GHSA-cjq9-62q9-8jv4 requires configured remotePatterns, absent
+here; this is not clearance of other advisories. Scoped patched versions and
+full regressions remain required before release, not silently solved by auth.
+
+F17 closes production web token acquisition through OIDC/BFF, not desktop login.
+External IdP registration, real audience/scopes, TLS/reverse-proxy topology and
+key rotation remain deployment verification, not certified by synthetic CI.
+Currently requires confidential client_secret_post, RS256 ID tokens and a
+separately audience-scoped asymmetric JWT access token. Opaque tokens/basic-only
+providers are incompatible without a deliberate adapter.
+
+Stateless encrypted cookies have no revocation list/session database. No refresh
+or IdP global logout; stolen cookies/access tokens can replay until expiry.
+Replacing the cookie secret logs out all sessions; multi-key graceful rotation
+is not configured. Cookie size is bounded at 4KB, access JWT at 3000 characters;
+large tokens may fail sealing. Logout/switch clear scientific queries; dormant
+tabs may retain rendered data until notification/focus/polling, but cannot bypass
+server authorization. Browser JS is required for login/logout fetch.
+
+Deployment needs Next.js server, HTTPS and preserved exact configured Host;
+static export is unsupported. Full script CSP/XSS prevention, creation quotas,
+native Tauri, mobile shell overflow, dependency advisories and whole-backend
+OpenAPI drift remain release work. Historical scientific limits below remain.
+
 ## F15.1 Remaining Scientific Limits
 
 - Tuple binding is an intentionally narrow deterministic grammar, not biomedical
@@ -107,7 +135,7 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 
 - Planning and successful search execution retries are now idempotent for the current run/plan contract. Failed provider attempts in a partial multi-source search are still operationally logged rather than persisted as first-class LiteratureSearch status records.
 - Local Docker unavailability still prevents execution of PostgreSQL/Testcontainers tests. The GitHub Actions workflow remains the authoritative runtime check and now includes the deterministic Playwright browser suite.
-- F10 authentication is intentionally bearer-based and stateless. There is no refresh-token/session lifecycle, localStorage token persistence, cookie auth, or CSRF workflow until a concrete identity-provider/client product is selected.
+- F10 API authentication stays bearer-based and independent. F17 adds web OIDC/session/CSRF/BFF; refresh/global revocation and production desktop auth remain unimplemented.
 - Resource creation has no per-user quota or rate limit yet. Authentication prevents cross-user access, but one authenticated actor can still submit many expensive research runs; a narrow resource-abuse policy is a future operational milestone.
 - Existing pre-ownership rows are preserved under `legacy-unowned`. A deliberate administrative migration/ownership assignment tool is still required before those rows can be made user-visible.
 
@@ -115,7 +143,7 @@ M18 adds deterministic Cochran's Q, df, and I-squared, but several quantitative 
 
 F16 closes the demonstrated free-report-claim authority gap using structured scope/direction/reference rules and deterministic rendering. It does not prove arbitrary paraphrase entailment, causal interpretation, clinical magnitude, complex population inclusion, observational-study validity, or the correctness of upstream provider/Evidence metadata. Exact labels intentionally reject some semantically equivalent wording. Historic reports are explicitly LegacyUnverified and are not retrospectively certified. Same-run claim/artifact invariants remain application/store/read checks; direct administrator SQL is not a supported scientific writer protocol.
 
-The checked-in frontend OpenAPI snapshot is still curated. F16 imports the changed report/provenance schemas from an actual worker-disabled backend endpoint and regenerates TS, but normal CI currently checks generation consistency with that snapshot, not whole-backend contract drift. Production web token acquisition is still not wired into `createApiClient`; native Tauri, mobile shell overflow, dependency advisories and source-acquisition outcome provenance remain separate release/audit follow-ups. F16 does not resolve them incidentally.
+The checked-in frontend OpenAPI snapshot is still curated. F16 imports changed report/provenance schemas from an actual worker-disabled backend and regenerates TS, but CI checks snapshot generation, not whole-backend drift. F17 routes browser requests through server-side OIDC/BFF rather than exposing `getAccessToken` to browser JS. Native Tauri, mobile shell overflow, dependency advisories and source-acquisition provenance remain separate release follow-ups.
 
 ## F13 Provenance observability limitations
 

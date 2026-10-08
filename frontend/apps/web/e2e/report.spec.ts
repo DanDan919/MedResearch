@@ -59,8 +59,9 @@ test("report workspace distinguishes an unauthenticated response", async ({ page
   await mockReportApi(page, { title: "Unauthorized", status: 401 }, 401);
   await page.goto(`/research/${runId}/report`);
 
-  await expect(page.getByText("Authentication required")).toBeVisible();
-  await expect(page.getByText(/Sign in to view this research report/i)).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?reason=session-expired/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByText("Your session ended. Sign in again.")).toBeVisible();
 });
 
 test("report workspace keeps missing study identifiers absent", async ({ page }) => {

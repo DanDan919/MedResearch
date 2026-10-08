@@ -1,5 +1,22 @@
 # Current State
 
+## F17 Production Web Authentication
+
+Implemented configurable OIDC code/PKCE/state/nonce with pinned
+openid-client/iron-session/jose, encrypted host-only HttpOnly browser sessions,
+private same-origin Next.js BFF and protected workspace navigation. Access JWT is
+independently validated by BFF and unchanged ASP.NET middleware. Owner identity
+remains the configured issuer's stable sub. No refresh storage, scientific or
+schema changes; no production DevelopmentLocal bypass. Logout/expiry/switch clear
+scientific caches; cross-tab checks are bounded, not global revocation.
+
+Local verification: Domain 45, Application 289, Infrastructure 110, Integration
+36 passed/103 unavailable-Docker skips; zero failures. Frontend API 31/web 99,
+scientific Chromium 14 and production synthetic OIDC Chromium 16 passed.
+Fresh PostgreSQL/JWT owner test awaits strict CI at this checkpoint. EF pending
+model and Compose passed; local Docker pipe remains unavailable.
+External IdP/live science NOT RUN. See F17 report for final CI/Git verification.
+
 ## F16 Structured Narrative Claim Grounding
 
 Baseline: `d5d3c5c02bccdbcd37b6ea7f36c9be02566bfe3c`, clean `main` tracking `origin/main`. Ten hostile free-text claims reproduced the old gap before the production fix: all ten expected rejection tests failed because the old validator accepted them.

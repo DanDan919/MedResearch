@@ -118,9 +118,39 @@ fails authorization closed.
 For local Docker development only, `Authentication:Mode=DevelopmentLocal`
 creates the explicit deterministic subject `local-development-user`. Startup
 rejects this mode outside the `Development` environment. Integration tests use
-a test-only ASP.NET authentication handler and never contact an identity
-provider. The frontend API client has one optional bearer-token transport hook;
-it does not invent localStorage token persistence.
+a test-only ASP.NET authentication handler for focused tests. F17 also exercises
+the actual JWT handler using ephemeral signed tokens/static test-only metadata,
+and owner-scoped EF stores using PostgreSQL. No external IdP is called by CI.
+The unchanged backend framework clock skew is five minutes; BFF access-token
+expiry validation is stricter (zero skew).
+
+### Production Web Session (F17)
+
+Browser -> Secure HttpOnly encrypted cookie -> Next.js route handlers/BFF ->
+API-audience access JWT -> independent ASP.NET JWT/policy -> owner-scoped EF SQL.
+`openid-client` 6.8.8 handles discovery, authorization code, S256 PKCE, state,
+nonce and ID-token signature checks. `jose` separately validates access signature,
+exact issuer, API audience, expiry and matching subject; ID-token/client audience
+cannot substitute. `iron-session` 9.0.1 seals bounded host-only cookies. Only a
+safe public session projection crosses the server/client boundary. No refresh
+token is requested or retained. Reauthentication is required at bounded expiry.
+
+Next.js Proxy gates dashboard/research/studies/settings optimistically. BFF
+revalidates near data access and forwards only existing GET research paths,
+GET readiness and POST create to one server-configured API origin. Browser
+identity, Authorization, cookies and forwarding headers are discarded. Origin,
+Host and fetch metadata constrain mutations. Return paths are allowlisted;
+upstream redirects are rejected and response bodies/deadlines bounded. Responses
+are private/no-store. POST login/logout use same-origin fetch before navigation:
+the retained no-referrer policy makes native form Origin null.
+
+Session IDs scope separate QueryClients; logout/401/account switch cancel and
+clear old caches. BroadcastChannel plus focus/20-second polling/bfcache checks
+improve other-tab handling, without instantaneous global erasure or revocation.
+Stateless cookie replay remains possible until expiry. Missing configuration
+fails closed; DevelopmentLocal remains development-only. No schema/scientific
+changes. ADR-032 and `docs/frontend/authentication.md` specify compatibility,
+topology, trust assumptions and verification limitations.
 
 `ResearchQuestion.OwnerSubjectId` is the ownership root. `ResearchRun` and all
 run-scoped scientific outputs inherit access through the question relationship;

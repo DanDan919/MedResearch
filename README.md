@@ -82,7 +82,9 @@ The frontend workspace lives under `frontend/`. The web app is a Next.js/React/T
 
 ```bash
 cd frontend
-pnpm install
+pnpm install --frozen-lockfile
+# WEB_AUTH_MODE=DevelopmentLocal only for NODE_ENV=development;
+# WEB_AUTH_ORIGIN=http://127.0.0.1:3000; MEDRESEARCH_API_INTERNAL_URL=http://localhost:8080.
 pnpm dev
 ```
 
@@ -107,10 +109,33 @@ password store.
 Local Docker development uses the explicit `DevelopmentLocal` mode with a
 deterministic `local-development-user` subject. This mode is rejected outside
 the `Development` environment and is not a production authentication bypass.
-The test suite uses a test-only authentication handler and never calls an
-external identity provider. Bearer transport is the intended client boundary;
-there is no localStorage token persistence or cookie authentication in this
-milestone, so cookie-specific CSRF protection is not invented here.
+The original test-only authentication handler remains for focused API tests.
+F17 additionally tests the real JWT handler with ephemeral signed tokens and
+real PostgreSQL owner stores. No external identity provider is used by CI.
+
+The web app uses OIDC authorization code + S256 PKCE, state and nonce through
+`openid-client`, encrypted HttpOnly `iron-session` cookies and a Next.js BFF.
+Browser SDK calls `/api/backend`; only the server attaches the API access token.
+Tokens never enter public session DTOs, React props or browser storage. Missing
+production configuration fails closed. Sessions expire no later than the access
+token or one hour; refresh tokens are not retained, so reauthentication is required.
+Login/logout/research mutations check exact configured Host/Origin. Logout and
+account switching clear session-scoped scientific caches; polling/focus and
+cross-tab notification supplement independent server authorization.
+
+See [production web authentication setup](docs/frontend/authentication.md),
+[ADR-032](docs/architecture/decisions/ADR-032-oidc-web-session-and-bff.md) and the
+[Russian F17 verification report](docs/development/f17-production-web-authentication-flow-ru.md).
+Production requires a Next.js server, HTTPS and a real confidential OIDC client
+that issues a distinct JWT access token for the API audience. Static export
+cannot run this BFF. The desktop bearer hook is unchanged, not certified as
+a production desktop login flow by F17.
+
+`pnpm test:auth-e2e` (after `pnpm build`, from `frontend/`) runs production Next.js
+against an isolated synthetic HTTPS issuer/API. CI runs this alongside scientific
+UI tests and strict PostgreSQL tests. Browser synthetic API checks and actual
+ASP.NET/PostgreSQL checks are separate layers, not an external IdP deployment.
+Normal CI needs no OIDC, OpenAI, PubMed or Europe PMC credentials.
 
 Anonymous endpoints are `/health/live` and `/health/ready`. Research creation,
 history, progress, report, and quantitative endpoints require authentication.

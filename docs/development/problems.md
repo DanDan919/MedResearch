@@ -1,5 +1,21 @@
 # Problems
 
+## F17: production auth browser verification (2026-10-08)
+
+- First production browser run rejected ordinary login POST forms: trace showed
+  exact Host but Origin=null. The new no-referrer policy suppresses Origin for
+  non-CORS form navigation (MDN documents this). Retained policy/strict CSRF;
+  login/logout now use same-origin fetch followed by navigation. No null-Origin
+  exception or security-header relaxation.
+- Minimal-host test configuration hooks applied too late for synchronous
+  production auth setup. Test factory now supplies early host settings and
+  only replaces discovery metadata with ephemeral keys, not principals.
+- Initial lockfile generation re-resolved unrelated existing latest dependencies.
+  Before commit the generated change was scoped to the new auth/test closure,
+  retaining baseline Next 16.3.6 and all existing versions. Frozen install passed.
+- Local Docker Linux pipe remains unavailable; strict CI must execute PostgreSQL
+  owner verification instead of treating local skips as runtime confidence.
+
 ## F16: citations did not constrain scientific narrative (2026-10-08)
 
 Before production changes, ten deterministic negative tests showed accepted unsupported free text: direction/outcome/population/intervention/comparator/timepoint swaps, incorrect number/statistic, mixed-to-uniform and insufficient-to-positive claims. The red baseline was 10 failed rejection tests, not an invented defect. Existing valid citation checks and partial direction checks did not validate sentence entailment.

@@ -60,6 +60,18 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
+      - name: Production OIDC and BFF browser tests (synthetic HTTPS issuer)
+        working-directory: frontend
+        run: pnpm test:auth-e2e
+
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-browser-results
+          path: frontend/apps/web/test-results
+          if-no-files-found: ignore
+
       - name: Build desktop React shell
         working-directory: frontend
         run: pnpm --filter @medresearch/desktop vite:build
