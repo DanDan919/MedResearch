@@ -15,8 +15,10 @@ survived in raw LLM `ResultSummary`. Green tests did not prove these predicates.
 
 Keep exact immutable SourceMaterial anchors and `source-text-v1` normalization.
 Resolve overlapping occurrences conservatively. A bounded deterministic binder
-selects exactly one explicit measure/signed-value expression with a preceding
-outcome label. It does not choose nearest/first results. Explicit contrast clauses
+selects exactly one explicit measure/signed-value expression with an outcome
+label linked by a bounded reporting-connector grammar, not arbitrary prefix
+presence. Joint and/or outcome labels are not resolved by guessing. It does not
+choose nearest/first results. Explicit contrast clauses
 may separate results; multiple expressions in an unseparated clause or multiple
 plausible results are ambiguous. CI/level, SE, and p/operator must be attached
 through a restricted statistical-expression grammar, not arbitrary prose.
@@ -37,7 +39,9 @@ is not a wildcard, including when both are absent. No clinical synonym matching
 or unit/time equivalence is inferred. Multiple sample scopes are ambiguous;
 participant roles with explicit enrollment/randomization/analysis/overall scope
 are distinct from hospital counts and arm/subgroup counts.
-An explicit n= still requires a participant role; a following nonparticipant
+An explicit n= still requires an immediately bound participant label (with
+limited enrollment/analysis connectors), not a participant word elsewhere in
+the clause; a following nonparticipant
 unit cannot qualify just because the clause mentions randomization. One numeric
 occurrence represented as both n= and a participant count is counted once.
 

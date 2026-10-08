@@ -151,12 +151,12 @@ public sealed class SourceAnchoredNumericGroundingTests
     [Fact]
     public void Validator_PreservesStrictPValueOperatorSemantics()
     {
-        const string source = "The odds ratio was 0.73 (95% CI 0.55 to 0.96, p < 0.03).";
+        const string source = "Mortality: the odds ratio was 0.73 (95% CI 0.55 to 0.96, p < 0.03).";
         var accepted = new EvidenceExtractionDraftValidator().Validate(
             CreateContext(source),
             new EvidenceExtractionDraft([
                 new EvidenceFindingDraft(
-                    "odds ratio",
+                    "Mortality",
                     "The odds ratio was 0.73.",
                     source,
                     "Positive",
@@ -183,12 +183,12 @@ public sealed class SourceAnchoredNumericGroundingTests
     [Fact]
     public void Validator_DoesNotTrustConflictingPValueOperatorFromLlm()
     {
-        const string source = "The odds ratio was 0.73 (95% CI 0.55 to 0.96, p < 0.03).";
+        const string source = "Mortality: the odds ratio was 0.73 (95% CI 0.55 to 0.96, p < 0.03).";
         var accepted = new EvidenceExtractionDraftValidator().Validate(
             CreateContext(source),
             new EvidenceExtractionDraft([
                 new EvidenceFindingDraft(
-                    "odds ratio",
+                    "Mortality",
                     "The odds ratio was 0.73.",
                     source,
                     "Positive",

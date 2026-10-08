@@ -9,6 +9,13 @@ The follow-up fix requires participant role even for n=, excludes attached
 nonparticipant units and adds negative/positive controls. The red result and
 subsequent CI verification are recorded in the F15.1 process report.
 
+Extended probes then disproved participant-word/prefix-label co-occurrence:
+`Hospitals (n=63) enrolled patients` still qualified as N, and `Mortality was
+unchanged, infection OR...` qualified as a Mortality effect. The final refinement
+binds explicit n= to the participant label and outcome to the measure through
+limited reporting syntax. Red runs, positive controls and subsequent independent
+CI are recorded, rather than treating either earlier green run as proof.
+
 ## 2026-10-08 F15.1: audited P1 predicates and raw snapshot bypass
 
 The 2026-10-07 audit's P1 failures were reproduced first as twelve red repository

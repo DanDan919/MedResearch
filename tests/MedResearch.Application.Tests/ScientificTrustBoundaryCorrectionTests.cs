@@ -16,6 +16,9 @@ public sealed class ScientificTrustBoundaryCorrectionTests
     [InlineData("Mortality or infection had HR = 0.73 (95% CI 0.55 to 0.96).", "Mortality", "OR", "0.73", "0.55", "0.96", NumericGroundingField.EffectMeasure)]
     [InlineData("Mortality was 0.55 or 0.73 (95% CI 0.55 to 0.96).", "Mortality", "OR", "0.73", "0.55", "0.96", NumericGroundingField.EffectMeasure)]
     [InlineData("Mortality OR 0.73. Infection OR 1.42 (95% CI 1.10 to 1.85).", "Mortality", "OR", "1.42", "1.10", "1.85", NumericGroundingField.EffectEstimate)]
+    [InlineData("Mortality was unchanged, infection OR 0.73 (95% CI 0.55 to 0.96).", "Mortality", "OR", "0.73", "0.55", "0.96", NumericGroundingField.EffectEstimate)]
+    [InlineData("Mortality and infection OR 0.73 (95% CI 0.55 to 0.96).", "Mortality", "OR", "0.73", "0.55", "0.96", NumericGroundingField.EffectEstimate)]
+    [InlineData("Mortality and infection OR 0.73 (95% CI 0.55 to 0.96).", "infection", "OR", "0.73", "0.55", "0.96", NumericGroundingField.EffectEstimate)]
     public void Verifier_DoesNotVerifyCrossBoundOrMislabelledStatistics(
         string source, string outcome, string measure, string effect, string lower, string upper, NumericGroundingField field)
     {
@@ -34,6 +37,8 @@ public sealed class ScientificTrustBoundaryCorrectionTests
     [InlineData("Overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
     [InlineData("Patients were observed; overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
     [InlineData("Patients were observed and overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
+    [InlineData("Patients were observed in randomized hospitals (n = 63). Mortality OR 0.73.")]
+    [InlineData("Hospitals (n = 63) enrolled patients. Mortality OR 0.73.")]
     public void Verifier_ExplicitNForRandomizedHospitalsIsNotParticipantCount(string source)
     {
         var draft = Finding(source) with { SampleSize = 63 };
@@ -43,6 +48,8 @@ public sealed class ScientificTrustBoundaryCorrectionTests
     [Theory]
     [InlineData("Participants were randomized (n = 247). Mortality OR 0.73.")]
     [InlineData("Overall n = 247 participants were randomized. Mortality OR 0.73.")]
+    [InlineData("Adults (n = 247) were randomized. Mortality OR 0.73.")]
+    [InlineData("Participants were analyzed, n = 247. Mortality OR 0.73.")]
     public void Verifier_ExplicitParticipantNWithOneScopeIsVerified(string source)
     {
         Assert.Equal(NumericGroundingStatus.Verified, Fact(Finding(source) with { SampleSize = 247 }, NumericGroundingField.SampleSize).Status);

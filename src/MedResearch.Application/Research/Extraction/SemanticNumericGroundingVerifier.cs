@@ -18,7 +18,7 @@ public sealed class SemanticNumericGroundingVerifier
     private static readonly Regex PValue = new($@"\bp\s*(?<operator><=|>=|=|<|>|≤|≥)\s*(?<value>{Number})(?!\d|[.,]\d)", Flags);
     private static readonly Regex Participants = new(@"\b(?<value>\d+)\s+(?:participants?|patients?|subjects?|individuals?|adults?)\b", Flags);
     private static readonly Regex ExplicitN = new(@"\bn\s*=\s*(?<value>\d+)\b", Flags);
-    private static readonly Regex ParticipantRole = new(@"\b(?:participants?|patients?|subjects?|individuals?|adults?)\b", Flags);
+    private static readonly Regex ParticipantNPrefix = new(@"\b(?:participants?|patients?|subjects?|individuals?|adults?)\s*(?:(?:were\s+)?(?:randomi[sz]ed|enrolled|analy[sz]ed)\s*)?[(:,]*\s*$", Flags);
     private static readonly Regex OtherCountUnit = new(@"\G\s+(?:hospitals?|clinics?|centres?|centers?|sites?|clusters?|wards?|visits?|events?|observations?|trials?|studies)\b", Flags);
     private static readonly Regex LimitedScope = new(@"\b(?:intervention|control|treatment|placebo|arm|subgroup)\b", Flags);
     private static readonly Regex StatisticalSeparator = new(@"\G[\s(),:\[\]]*(?:(?:with(?:\s+a)?|and)\s+)?", Flags);
@@ -37,7 +37,7 @@ public sealed class SemanticNumericGroundingVerifier
         var selected = expressions.Where(context => context.Effects.Length == 1
             && NormalizeMeasure(context.Effects[0].Groups["measure"].Value) == NormalizeMeasure(finding.EffectMeasure)
             && finding.EffectValue.HasValue && Equal(context.Effects[0].Groups["value"].Value, finding.EffectValue.Value)
-            && ContainsPhrase(context.Text[..(context.Effects[0].Index + context.Effects[0].Groups["measure"].Length)], finding.Outcome)).ToArray();
+            && BindsOutcome(context.Text[..context.Effects[0].Index], finding.Outcome)).ToArray();
         var multiple = selected.Length > 1 || expressions.Any(context => context.Effects.Length > 1
             && ContainsPhrase(context.Text, finding.Outcome));
         var tuple = !multiple && selected.Length == 1 ? selected[0] : null;
@@ -95,8 +95,9 @@ public sealed class SemanticNumericGroundingVerifier
             var scoped = contexts.Where(text => !LimitedScope.IsMatch(text)).ToArray();
             var scopedCounts = scoped.Where(text => Regex.IsMatch(text, @"\b(?:overall|total|randomi[sz]ed|enrolled|analy[sz]ed)\b", Flags))
                 .SelectMany(text => Participants.Matches(text).Cast<Match>()
-                    .Concat(ParticipantRole.IsMatch(text) ? ExplicitN.Matches(text).Cast<Match>()
-                        .Where(match => !OtherCountUnit.IsMatch(text, match.Index + match.Length)) : [])
+                    .Concat(ExplicitN.Matches(text).Cast<Match>()
+                        .Where(match => ParticipantNPrefix.IsMatch(text[..match.Index])
+                            && !OtherCountUnit.IsMatch(text, match.Index + match.Length)))
                     .DistinctBy(match => match.Groups["value"].Index))
                 .ToArray();
             var matches = scopedCounts.Where(match => Equal(match.Groups["value"].Value, finding.SampleSize.Value)).ToArray();
@@ -135,6 +136,15 @@ public sealed class SemanticNumericGroundingVerifier
 
     private static bool ContainsPhrase(string? text, string? value) => !string.IsNullOrWhiteSpace(text) && !string.IsNullOrWhiteSpace(value)
         && Regex.IsMatch(text, $@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(SourceAnchorResolver.Normalize(value))}(?![\p{{L}}\p{{N}}])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static bool BindsOutcome(string prefix, string? outcome)
+    {
+        if (string.IsNullOrWhiteSpace(outcome)) return false;
+        // Only explicit outcome -> reporting connector -> measure syntax qualifies.
+        // Merely mentioning another outcome earlier in the clause is not proof.
+        var match = Regex.Match(prefix, $@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(SourceAnchorResolver.Normalize(outcome))}(?![\p{{L}}\p{{N}}])[\s,:]*(?:(?:the|was|were|showed|had|reported|improved|reduced|increased|decreased|lower|higher|with)\b[\s,:]*)*$", Flags);
+        return match.Success && !Regex.IsMatch(prefix[..match.Index], @"\b(?:and|or)\s*$", Flags);
+    }
 
     private static bool Equal(string text, decimal value) => decimal.TryParse(text.Replace('−', '-').Replace('–', '-').Replace(',', '.'),
         NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed) && parsed == value;

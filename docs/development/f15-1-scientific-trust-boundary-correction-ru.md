@@ -50,6 +50,23 @@ were randomized` также оказался красным (**1 failed**, `expl
 `Participants were randomized (n=247)` / `n=247 participants`. Совпадающее
 numeric occurrence в этих двух синтаксических ролях учитывается один раз.
 
+Расширение этого теста нашло остаточную co-occurrence ошибку: `Patients were
+observed in randomized hospitals (n=63)` и `Hospitals (n=63) enrolled patients`
+ещё проходили (**2 failed / 3 passed**, `n-context-red.trx`). Final rule требует
+непосредственный participant label перед n= (с ограниченными enrollment/analysis
+connectors), либо явный numeric participant count после n=. Любое patient-слово
+в той же фразе не считается proof. Добавлены положительные варианты с Adults
+и analyzed participants.
+
+Другая дополнительная red-проверка: `Mortality was unchanged, infection OR...`
+и `Mortality and infection OR...` поддерживали неправильный Mortality effect
+(**2 failed / 5 passed**, `outcome-role-red.trx`). Final outcome rule требует
+explicit label -> bounded reporting connector -> measure, а не любое упоминание
+label в prefix. Совместное and/or перечисление labels не разбирается выбором
+ближайшего outcome. Старые p-value fixtures называли саму measure `odds ratio`
+outcome: они исправлены на явно указанный Mortality, без изменения чисел/operator
+assertions. Это устраняет ложный positive control, не ослабляет проверку.
+
 Не все 17 проверок внешнего harness импортированы механически. Все конкретные
 P1-контрпримеры перенесены в focused tests; proof corruption, unsupported level,
 enum и overlap добавлены как необходимые defense-in-depth гарантии.
@@ -59,7 +76,8 @@ enum и overlap добавлены как необходимые defense-in-dept
 `SemanticNumericGroundingVerifier`, версия `statistical-tuple-v1`:
 
 - выбирает ровно одно явно обозначенное measure/signed-value выражение;
-- outcome должен предшествовать этому выражению в выбранном локальном контексте;
+- outcome непосредственно связан с выражением через limited reporting connectors,
+  не просто встречается раньше в том же локальном контексте;
 - explicit contrast clauses (`whereas`, `while`, `but`) разделяют результаты;
 - несколько plausible tuples или несколько выражений в неразделённом контексте
   дают `Ambiguous`, без выбора ближайшего/первого числа;
@@ -207,14 +225,14 @@ Fresh migration test требует новую миграцию в applied histo
 | Набор | Passed | Failed | Skipped | Условия |
 | --- | ---: | ---: | ---: | --- |
 | Domain Debug / Release | 32 / 32 | 0 / 0 | 0 / 0 | полный набор |
-| Application Debug / Release | 238 / 238 | 0 / 0 | 0 / 0 | полный набор, adversarial + M17-M24 |
+| Application Debug / Release | 245 / 245 | 0 / 0 | 0 / 0 | полный набор, adversarial + M17-M24 |
 | Infrastructure Debug / Release | 73 / 73 | 0 / 0 | 0 / 0 | fake HTTP/providers |
 | Integration Debug / Release | 26 / 26 | 0 / 0 | 81 / 81 | Docker unavailable |
 | API frontend | 14 | 0 | 0 | Vitest |
 | Web frontend | 22 | 0 | 0 | Vitest |
 | Playwright Chromium | 11 | 0 | 0 | deterministic local/browser fixtures |
 
-Итого backend на одну configuration: **369 passed, 0 failed, 81 skipped**.
+Итого backend на одну configuration: **376 passed, 0 failed, 81 skipped**.
 Локальный SDK: `10.0.401`. Debug и Release restore/build успешны, 0 warnings/errors. EF pending-model check
 успешен, Compose config успешен, diff check успешен. `docker info` падает из-за
 отсутствующего `dockerDesktopLinuxEngine` pipe. Это не PostgreSQL runtime proof.
@@ -258,6 +276,11 @@ steps и Playwright success. 81 тест, пропускаемый локаль�
 Первый green run **не объявлен окончательным**: после него найден и исправлен
 explicit hospital n= контрпример. Final corrected commit/run и его counters
 добавляются после следующей независимой проверки, не экстраполируются из первого CI.
+
+Промежуточный commit `1bd81778ec69f2e552d6311ce604d06ddcac897c`
+(`fix: require participant role for explicit sample counts`) также прошёл CI
+`37729643468`. Но после него расширенные отрицательные тесты нашли co-occurrence
+контрпримеры для n= и outcome. Поэтому и этот green run не является final proof.
 
 Перед feature commit reviewed staged scope/diff, whitespace check и search по
 api_key/ApiKey/OPENAI_API_KEY/Authorization/Bearer/secret/password; credentials
