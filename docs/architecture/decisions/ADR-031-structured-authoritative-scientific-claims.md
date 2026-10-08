@@ -13,7 +13,7 @@ LLM synthesis proposes closed structured claim kinds, directions, exact scope la
 
 Study numeric claims select reverified grounded Evidence. Pooled/diagnostic claims select actual persisted artifact IDs and all-and-only contribution Evidence IDs. Backend copies original decimal/double values and method/interval semantics and renders deterministic text. No automatic inference/model choice, new statistics or free-text entailment engine is introduced.
 
-F12 repair reuses the same trusted context, typed issues and schema with one bounded replacement; failed repair cannot weaken validation. Persistence reconstructs support and revalidates before a short fenced transaction; no external I/O occurs within that transaction. Read guards preserve structured/citation/artifact coherence. JSONB semantics and optional FK columns supplement, not replace, same-run application checks.
+F12 repair reuses the same trusted context, typed issues and schema under its existing bounded budget: one replacement by default, configurable zero through two. Every replacement is validated from scratch; failed repair cannot weaken validation. F16 does not change that budget. Persistence reconstructs support and revalidates before a short fenced transaction; no external I/O occurs within that transaction. Read guards preserve structured/citation/artifact coherence. JSONB semantics and optional FK columns supplement, not replace, same-run application checks.
 
 Historical claims remain LegacyUnverified. Migration does not synthesize scope or numeric proof for old prose. APIs/UI expose authority status and support; raw SourceMaterial content remains absent. Optional old extracted summaries are visibly unverified and cannot override the structured core.
 

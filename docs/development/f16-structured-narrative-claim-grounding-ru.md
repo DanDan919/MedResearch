@@ -73,7 +73,7 @@ Semantic key: SHA-256 canonical structured semantics со sorted Evidence IDs и
 
 Используются существующие ValidationIssue/ValidationGuidedLlmRepairService. Новые реально применённые codes: ClaimOutcomeMismatch, ClaimPopulationMismatch, ClaimInterventionMismatch, ClaimComparatorMismatch, ClaimTimepointMismatch, MixedEvidenceOverstated, UnsupportedNumericAssertion, QuantitativeArtifactMismatch, InsufficientEvidenceOverclaim. UnknownEvidenceReference/InvalidDirection/SynthesisContractViolation и другие существующие codes сохранены.
 
-Один initial candidate + максимум один replacement. Тот же trusted prompt/context, Evidence/artifacts и schema; в repair добавляются typed instructions, не внешняя поддержка. Replacement валидируется с нуля. Невалидный второй candidate fails closed; третьего запроса нет. Provider failures/cross-run corpus не исправляются моделью.
+По default-конфигурации один initial candidate + максимум один replacement. Тот же trusted prompt/context, Evidence/artifacts и schema; в repair добавляются typed instructions, не внешняя поддержка. Replacement валидируется с нуля. При default budget=1 невалидабельный второй candidate fails closed, третьего запроса нет. Существующий F12 `AI:ValidationGuidedRepair:MaxSemanticRepairAttempts` намеренно не изменён: allowed 0..2. При явном budget=2 разрешён ещё один replacement, также валидируемый с нуля; это не обход validation и не бесконечный retry. Не утверждается безусловный cap в один repair для любой конфигурации. Provider failures/cross-run corpus не исправляются моделью.
 
 ## 8. Persistence, legacy и concurrency
 
@@ -101,7 +101,7 @@ Zod закрывает новые kind/direction/role/status/statistic values, U
 
 ## 10. Тесты и локальная верификация
 
-37 новых Application cases: исходные 10 prose attacks, valid constrained qualitative, exact field mismatches, missing scope, differing direction/mixed subset controls, insufficiency/absence, grounded tuple selection, model numeric fields, wrong statistic/reference, exact pooled selectors, Wald/HKSJ/PI shared-point/different-interval controls, unknown/cross-run refs, duplicate semantics, bounded repair success/failure без third attempt.
+37 новых Application cases: исходные 10 prose attacks, valid constrained qualitative, exact field mismatches, missing scope, differing direction/mixed subset controls, insufficiency/absence, grounded tuple selection, model numeric fields, wrong statistic/reference, exact pooled selectors, Wald/HKSJ/PI shared-point/different-interval controls, unknown/cross-run refs, duplicate semantics, bounded repair success/failure без third attempt при default budget=1.
 
 5 новых Domain cases: explicit historical authority и incoherent kind/ref/direction/numeric shape. 9 новых PostgreSQL cases: structured fresh-context/provenance roundtrip+idempotency, четыре bypass attacks (Text/scope/sections/unstructured), corrupt stored text fails read, legacy preservation, empty corpus truthful completion, stale report writer after takeover.
 
@@ -127,17 +127,38 @@ Zod закрывает новые kind/direction/role/status/statistic values, U
 | Desktop React/Vite build | passed; native Tauri НЕ проверена |
 | Live projects build/gates | 0 passed, 0 failed, 6 deliberate opt-in skips |
 
-Debug/Release TRX сохранены локально под ignored TestResults. После последних Domain-only shape controls полный regression повторяется перед commit. Local skips не являются PostgreSQL verification. CI требуется отдельно.
+Полный Debug/Release regression завершён: 470 passed, 0 failed, 102 unavailable-Docker skips. После последних production store/coverage checks повторён полный Release regression; TRX сохранены локально под ignored TestResults/F16-VerifiedRelease. Production Next build повторён после окончательных transport/UI правок и снова passed. Local skips сами по себе не являются PostgreSQL verification; фактический CI результат ниже.
 
 ## 11. Live claim audit
 
 **NOT RUN**. Локальный Docker/изолированный PostgreSQL stack недоступен. Не запускался реальный Codex/OpenAI/PubMed/Europe PMC workflow. ResearchRunId, report status, claim count и manually audited live claims: N/A. Live false-positive/false-negative rate не измерен, а не «равен нулю». Детерминированные positive/negative controls не называются live scientific validation.
 
-## 12. CI и Git (заполняется после проверки)
+## 12. Фактический CI и Git
 
-Production implementation ещё не объявляется COMPLETE до реального green CI. Workflow `.github/workflows/ci.yml`, ubuntu-latest, .NET 10.0.x, Node 24.x, pnpm 11.19, PostgreSQL/Testcontainers с `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`. Стандартный workflow не содержит live providers/keys и запрещает required backend skips.
+Production commit: `e20c2ff32b2a34324a071a0f4be7af2705d9f8f8`, `feat: ground report claims in structured scientific support`. Отправлен обычным `git push origin main` в точный разрешённый remote. Force-push/переписывание истории не применялись.
 
-Ожидаемые counts не считаются результатом: окончательные counters/CI ID/commit будут прочитаны из GitHub после push. Final classification и exact Git state будут записаны здесь отдельным verification update.
+[CI 37751521860](https://github.com/DanDan919/MedResearch/actions/runs/37751521860): **completed / success**, attempt 1. Workflow `.github/workflows/ci.yml`, `ubuntu-latest`, .NET 10.0.x, Node 24.x, pnpm 11.19. Docker info реально passed; `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true`, PostgreSQL 17/Testcontainers. Значения ниже прочитаны из GitHub check-run TRX annotations, а не выведены из ожидаемых counts.
+
+| CI suite | executed | passed | failed | skipped |
+| --- | ---: | ---: | ---: | ---: |
+| Domain | 45 | 45 | 0 | 0 |
+| Application | 289 | 289 | 0 | 0 |
+| Infrastructure | 110 | 110 | 0 | 0 |
+| Integration | 128 | 128 | 0 | 0 |
+| Backend total | 572 | 572 | 0 | 0 |
+| PostgreSQL/Testcontainers subset of Integration | 102 | 102 | 0 | 0 |
+
+Остальные 26 Integration cases не требуют Docker. Все 102 Docker cases, которые локально честно skipped, выполнены в CI; required skips ноль. Проверена свежая empty-database migration chain, включая `AddStructuredReportClaims`, structured roundtrip/idempotency, real artifact/citation graph, persistence bypass attacks, stale-owner fencing и fake full vertical pipeline. EF pending-model и Docker Compose steps passed.
+
+Оба CI jobs, Build and test и Frontend, success. Frontend прошёл frozen install, generation/diff gate, lint, typecheck, unit tests, Chromium/Playwright, web production build и desktop React/Vite build. Локальные точные frontend counters: API 31, web 33, Chromium 14; CI step success отдельно проверен, frontend TRX workflow не публикует. Hydration regression входит в Chromium suite. Native Tauri здесь не проверен.
+
+F15.1 все 61 case прошли отдельно локально и входят в green full Application suite; F15.2 provider/date/HTTP/fencing regressions также входят в полный green suite. В CI нет live Codex/OpenAI/PubMed/Europe PMC calls или provider keys. Fake E2E использует только deterministic providers/fixtures. Live opt-in projects отсутствуют в обычной solution/CI.
+
+После первого CI production fixes не потребовались. Финальная сверка исправила документационный overclaim: default F12 budget=1 ранее был описан как абсолютный максимум, хотя неизменённый контракт допускает 0..2. README, architecture, ADR и журнал теперь явно различают default-тест и configured budget. GitHub сообщил non-blocking warning об actions/*@v4 с Node 20 runtime и notice о будущей смене ubuntu-latest; jobs выполнены успешно. Эти workflow/dependency updates не включены в scientific trust-boundary scope.
+
+Перед production commit staged diff/security review выполнен: реальных keys/passwords/auth credentials, SourceMaterial transcripts или новых statistical formulas нет. Build-generated изменение next-env.d.ts возвращено к исходным tracked paths; unrelated files не включены. Это verification-only update документации; final docs commit, его CI и финальный clean Git state проверяются отдельно и приводятся в итоговом сообщении, чтобы не записывать самоссылочный hash этого файла.
+
+Уровень завершения проверенного implementation: **F16 COMPLETE - DETERMINISTIC**. Не LIVE CLAIM VERIFIED: реальный scientific workflow не запускался. Этот результат означает исполнение конечного implemented contract, а не независимое доказательство истинности каждого upstream Evidence.
 
 ## 13. Самокритика и remaining risks
 
