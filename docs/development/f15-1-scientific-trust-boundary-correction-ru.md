@@ -42,6 +42,14 @@ black-box harness. Первый запуск дал **12 failed, 0 passed, 0 ski
 Тест до lexical fix: **1 failed / 4 passed**, `lexical-red.trx`.
 Это не замалчивается как будто первый regex сразу решил проблему.
 
+После первого green CI независимый дополнительный тест `Overall n = 63 hospitals
+were randomized` также оказался красным (**1 failed**, `explicit-n-red.trx`).
+Голое n= плюс слово randomized ещё не доказывает participant-role. Второй fix
+требует явную participant-role, исключает непосредственно обозначенную другую
+единицу counts (hospitals/clusters/events и т.п.) и сохраняет positive controls
+`Participants were randomized (n=247)` / `n=247 participants`. Совпадающее
+numeric occurrence в этих двух синтаксических ролях учитывается один раз.
+
 Не все 17 проверок внешнего harness импортированы механически. Все конкретные
 P1-контрпримеры перенесены в focused tests; proof corruption, unsupported level,
 enum и overlap добавлены как необходимые defense-in-depth гарантии.
@@ -61,7 +69,7 @@ enum и overlap добавлены как необходимые defense-in-dept
 - CI требует точную пару lower/upper; confidence level принадлежит тому же CI;
 - знак является частью значения, включая ASCII minus и Unicode minus/dash;
 - p сохраняет точный оператор, включая `<`, `<=`, `=`, `>` и `>=`;
-- N требует participant/patient/subject/individual/adult либо explicit n= роль
+- N требует participant/patient/subject/individual/adult роль, в том числе при n=,
   и явно указанную overall/enrollment/randomization/analysis область;
 - hospitals, arm/control/treatment/placebo/subgroup count не становятся общим N;
 - несколько разных sample scopes или результатов не разрешаются угадыванием.
@@ -199,14 +207,14 @@ Fresh migration test требует новую миграцию в applied histo
 | Набор | Passed | Failed | Skipped | Условия |
 | --- | ---: | ---: | ---: | --- |
 | Domain Debug / Release | 32 / 32 | 0 / 0 | 0 / 0 | полный набор |
-| Application Debug / Release | 233 / 233 | 0 / 0 | 0 / 0 | полный набор, adversarial + M17-M24 |
+| Application Debug / Release | 238 / 238 | 0 / 0 | 0 / 0 | полный набор, adversarial + M17-M24 |
 | Infrastructure Debug / Release | 73 / 73 | 0 / 0 | 0 / 0 | fake HTTP/providers |
 | Integration Debug / Release | 26 / 26 | 0 / 0 | 81 / 81 | Docker unavailable |
 | API frontend | 14 | 0 | 0 | Vitest |
 | Web frontend | 22 | 0 | 0 | Vitest |
 | Playwright Chromium | 11 | 0 | 0 | deterministic local/browser fixtures |
 
-Итого backend на одну configuration: **364 passed, 0 failed, 81 skipped**.
+Итого backend на одну configuration: **369 passed, 0 failed, 81 skipped**.
 Локальный SDK: `10.0.401`. Debug и Release restore/build успешны, 0 warnings/errors. EF pending-model check
 успешен, Compose config успешен, diff check успешен. `docker info` падает из-за
 отсутствующего `dockerDesktopLinuxEngine` pipe. Это не PostgreSQL runtime proof.
@@ -229,7 +237,7 @@ live Verified/Ambiguous/Unsupported counts, groups и ручная выборк�
 не получены. Никаких результатов не фабриковали. Никакой OpenAI key или paid API
 не использовался. Live Codex/OpenAI/PubMed/Europe PMC вызовов не было.
 
-## CI и git: ожидает независимую проверку
+## CI и git
 
 Workflow `.github/workflows/ci.yml` не изменён: ubuntu-latest, .NET 10.0.x,
 Node 24.x/pnpm 11.19, Docker/Testcontainers PostgreSQL; strict
@@ -237,8 +245,23 @@ Node 24.x/pnpm 11.19, Docker/Testcontainers PostgreSQL; strict
 Normal CI не вызывает live научные сервисы. Build/frontend/browser/EF/Compose,
 fresh migrations, recovery/fencing/auth/provenance/repair должны пройти.
 
-На момент feature commit новый CI ещё не выполнен. F15.1 не объявлен COMPLETE
-до green CI и нуля required skips. Actual run IDs/counts будут записаны после push.
+Первый feature commit: `3d9dc999f27d3275d774cd265367b3f886a5a654`,
+`fix: enforce bound scientific evidence and estimand compatibility`.
+Push в origin/main успешен. Первый реальный CI
+[37729129674](https://github.com/DanDan919/MedResearch/actions/runs/37729129674)
+завершился success. TRX annotations: Domain 32, Application 233, Infrastructure
+73, Integration 107; все executed/passed, failed=0, skipped=0. Всего 445.
+Docker info, fresh migration/runtime suite, EF pending model, Compose, все frontend
+steps и Playwright success. 81 тест, пропускаемый локально из-за Docker, выполнен
+в составе 107 Integration tests. GitHub Node20-action warning не блокировал run.
+
+Первый green run **не объявлен окончательным**: после него найден и исправлен
+explicit hospital n= контрпример. Final corrected commit/run и его counters
+добавляются после следующей независимой проверки, не экстраполируются из первого CI.
+
+Перед feature commit reviewed staged scope/diff, whitespace check и search по
+api_key/ApiKey/OPENAI_API_KEY/Authorization/Bearer/secret/password; credentials
+не добавлены. Нет provider, auth, frontend или M17-M24 calculator changes.
 
 ## Остаточные риски и следующий milestone
 

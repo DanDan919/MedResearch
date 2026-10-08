@@ -1,5 +1,14 @@
 # Problems
 
+## 2026-10-08: explicit n= hospital count survived the first F15.1 fix
+
+An additional adversarial test after the first green CI reproduced another
+sample-role false positive: `Overall n = 63 hospitals were randomized` was
+Verified as participant N. A green CI did not establish that missing predicate.
+The follow-up fix requires participant role even for n=, excludes attached
+nonparticipant units and adds negative/positive controls. The red result and
+subsequent CI verification are recorded in the F15.1 process report.
+
 ## 2026-10-08 F15.1: audited P1 predicates and raw snapshot bypass
 
 The 2026-10-07 audit's P1 failures were reproduced first as twelve red repository

@@ -30,6 +30,24 @@ public sealed class ScientificTrustBoundaryCorrectionTests
         Assert.NotEqual(NumericGroundingStatus.Verified, Fact(draft, NumericGroundingField.SampleSize).Status);
     }
 
+    [Theory]
+    [InlineData("Overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
+    [InlineData("Patients were observed; overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
+    [InlineData("Patients were observed and overall n = 63 hospitals were randomized. Mortality OR 0.73.")]
+    public void Verifier_ExplicitNForRandomizedHospitalsIsNotParticipantCount(string source)
+    {
+        var draft = Finding(source) with { SampleSize = 63 };
+        Assert.NotEqual(NumericGroundingStatus.Verified, Fact(draft, NumericGroundingField.SampleSize).Status);
+    }
+
+    [Theory]
+    [InlineData("Participants were randomized (n = 247). Mortality OR 0.73.")]
+    [InlineData("Overall n = 247 participants were randomized. Mortality OR 0.73.")]
+    public void Verifier_ExplicitParticipantNWithOneScopeIsVerified(string source)
+    {
+        Assert.Equal(NumericGroundingStatus.Verified, Fact(Finding(source) with { SampleSize = 247 }, NumericGroundingField.SampleSize).Status);
+    }
+
     [Fact]
     public void Verifier_DoesNotBorrowConfidenceLevelFromAnotherResult()
     {

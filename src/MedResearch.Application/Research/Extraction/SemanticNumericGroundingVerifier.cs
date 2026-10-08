@@ -18,6 +18,8 @@ public sealed class SemanticNumericGroundingVerifier
     private static readonly Regex PValue = new($@"\bp\s*(?<operator><=|>=|=|<|>|≤|≥)\s*(?<value>{Number})(?!\d|[.,]\d)", Flags);
     private static readonly Regex Participants = new(@"\b(?<value>\d+)\s+(?:participants?|patients?|subjects?|individuals?|adults?)\b", Flags);
     private static readonly Regex ExplicitN = new(@"\bn\s*=\s*(?<value>\d+)\b", Flags);
+    private static readonly Regex ParticipantRole = new(@"\b(?:participants?|patients?|subjects?|individuals?|adults?)\b", Flags);
+    private static readonly Regex OtherCountUnit = new(@"\G\s+(?:hospitals?|clinics?|centres?|centers?|sites?|clusters?|wards?|visits?|events?|observations?|trials?|studies)\b", Flags);
     private static readonly Regex LimitedScope = new(@"\b(?:intervention|control|treatment|placebo|arm|subgroup)\b", Flags);
     private static readonly Regex StatisticalSeparator = new(@"\G[\s(),:\[\]]*(?:(?:with(?:\s+a)?|and)\s+)?", Flags);
 
@@ -93,7 +95,9 @@ public sealed class SemanticNumericGroundingVerifier
             var scoped = contexts.Where(text => !LimitedScope.IsMatch(text)).ToArray();
             var scopedCounts = scoped.Where(text => Regex.IsMatch(text, @"\b(?:overall|total|randomi[sz]ed|enrolled|analy[sz]ed)\b", Flags))
                 .SelectMany(text => Participants.Matches(text).Cast<Match>()
-                    .Concat(Regex.IsMatch(text, @"\b(?:overall|total|randomi[sz]ed|enrolled|analy[sz]ed)\b", Flags) ? ExplicitN.Matches(text).Cast<Match>() : []))
+                    .Concat(ParticipantRole.IsMatch(text) ? ExplicitN.Matches(text).Cast<Match>()
+                        .Where(match => !OtherCountUnit.IsMatch(text, match.Index + match.Length)) : [])
+                    .DistinctBy(match => match.Groups["value"].Index))
                 .ToArray();
             var matches = scopedCounts.Where(match => Equal(match.Groups["value"].Value, finding.SampleSize.Value)).ToArray();
             var unknownScope = matches.Length == 0 && scoped.Any(text => Participants.Matches(text).Cast<Match>()

@@ -37,6 +37,9 @@ is not a wildcard, including when both are absent. No clinical synonym matching
 or unit/time equivalence is inferred. Multiple sample scopes are ambiguous;
 participant roles with explicit enrollment/randomization/analysis/overall scope
 are distinct from hospital counts and arm/subgroup counts.
+An explicit n= still requires a participant role; a following nonparticipant
+unit cannot qualify just because the clause mentions randomization. One numeric
+occurrence represented as both n= and a participant count is counted once.
 
 The internal synthesis corpus loads authoritative content only for exact
 extraction source IDs. Source identity, known normalization, immutable content
