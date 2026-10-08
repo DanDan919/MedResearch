@@ -15,7 +15,7 @@ public sealed partial class FullFakePipelineTests
     {
         using var factory = new FakePipelineApiFactory(connectionString, new FakeStructuredLlmClient(), new FakeScientificLiteratureSource(), "UserA");
         using var client = factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest("Deterministic web release scenario"));
+        var response = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest(FakeResearchQuestion));
         response.EnsureSuccessStatusCode();
         var run = (await response.Content.ReadFromJsonAsync<CreateResearchResponse>())!;
         using var scope = factory.Services.CreateScope();

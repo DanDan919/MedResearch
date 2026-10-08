@@ -30,6 +30,7 @@ namespace MedResearch.IntegrationTests;
 [Collection(PostgreSqlCollection.Name)]
 public sealed partial class FullFakePipelineTests
 {
+    private const string FakeResearchQuestion = "Does structured sleep improve recall in adults?";
     private readonly PostgreSqlFixture _fixture;
 
     public FullFakePipelineTests(PostgreSqlFixture fixture)
@@ -62,7 +63,7 @@ public sealed partial class FullFakePipelineTests
         var fakeLiterature = new FakeScientificLiteratureSource();
         using var factory = new FakePipelineApiFactory(_fixture.ConnectionString!, fakeLlm, fakeLiterature);
         using var client = factory.CreateClient();
-        const string question = "Does structured sleep improve recall in adults?";
+        const string question = FakeResearchQuestion;
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
@@ -503,7 +504,7 @@ public sealed partial class FullFakePipelineTests
             object value = typeof(T).Name switch
             {
                 nameof(ResearchPlanDraft) => new ResearchPlanDraft(
-                    "Does structured sleep improve recall in adults?",
+                    FakeResearchQuestion,
                     "adults",
                     "structured sleep",
                     "wakefulness",

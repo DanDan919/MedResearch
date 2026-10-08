@@ -50,7 +50,7 @@ test("actual database ownership rejects B on every read and ignores forged ident
     for (const suffix of suffixes) {
       const denied = await b.request.get(`/api/backend/api/research/${runId}${suffix}`, {
         headers: { "X-Owner-Id": "UserA", "X-Authenticated-Subject": "UserA", Authorization: "Bearer forged" } });
-      expect(denied.status()).toBe(404); expect(await denied.text()).not.toContain("Deterministic web release scenario");
+      expect(denied.status()).toBe(404); expect(await denied.text()).not.toContain("Does structured sleep improve recall");
       expect((await a.request.get(`/api/backend/api/research/${runId}${suffix}`)).status()).toBe(200);
     }
     expect((await (await b.request.get("/api/backend/api/research")).json()).items).toEqual([]);

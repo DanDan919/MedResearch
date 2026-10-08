@@ -7,6 +7,9 @@
   so WebApplicationFactory inferred a missing root-level MedResearch.Api.
   Fixed by setting the actual src/MedResearch.Api test content root explicitly.
   PostgreSQL cleanup ran; other CI jobs passed. This was not a scientific failure.
+- Second full-stack run 37808486190 reached Planning and correctly rejected a
+  seed question differing from the fixed fake planner question. Seed and fake
+  now share the same constant. No scientific validator was relaxed.
 
 - Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped
   published patches 16.3.8/1.2.2 clear production findings. Full audit still

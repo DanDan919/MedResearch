@@ -191,6 +191,11 @@ frontend/build-test success, 594 backend passed, 0 failed/skipped. Новый
 web-release runner FAILED до браузера: неверный content root WebApplicationFactory
 в console entrypoint (без normal test manifest). Явный src/MedResearch.Api test
 root исправляет этот harness дефект; итоговый runtime CI остаётся pending.
+Второй run `37808486190` на `596f22aa1688c3d170ef2b6b4e7635813052557e`
+дошёл до Planning, где неизменённый validator отверг несовпадающий seed question.
+Seed/fake planner используют общий constant; validator не ослаблен. Остальные
+jobs второго run success. Это ошибки новой fixture подготовки, не основание
+изменять научные инварианты или объявлять full-stack passed.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 
