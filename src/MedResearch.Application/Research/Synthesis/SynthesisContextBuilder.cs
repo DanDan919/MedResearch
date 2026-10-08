@@ -41,7 +41,7 @@ public sealed class SynthesisContextBuilder : ISynthesisContextBuilder
         var corpus = await _evidenceCorpusBuilder.BuildAsync(researchRunId, cancellationToken);
         var snapshot = corpus.Snapshot;
 
-        var validatedEvidence = snapshot.Evidence
+        var validatedEvidence = corpus.Evidence
             .Where(evidence => evidence.EvidenceId != Guid.Empty)
             .OrderBy(evidence => evidence.ExtractedAt)
             .ThenBy(evidence => evidence.StudyId)

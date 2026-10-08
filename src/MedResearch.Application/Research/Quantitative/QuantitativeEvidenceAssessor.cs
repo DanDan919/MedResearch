@@ -7,7 +7,7 @@ namespace MedResearch.Application.Research.Quantitative;
 
 public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
 {
-    public const string AlgorithmVersion = "quantitative-eligibility-v1";
+    public const string AlgorithmVersion = "quantitative-eligibility-v2-bound-estimand";
 
     public QuantitativeEvidenceReadiness Assess(EvidenceCorpus corpus)
     {
@@ -15,10 +15,13 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
 
         var sourcesById = corpus.SourceMaterials.ToDictionary(source => source.SourceMaterialId);
         var extractionSources = corpus.Extractions
-            .Where(extraction => extraction.SourceMaterialId.HasValue)
-            .ToDictionary(extraction => extraction.ExtractionId, extraction => extraction.SourceMaterialId!.Value);
+            .Where(extraction => extraction.SourceMaterialId.HasValue && extraction.ResearchRunId == corpus.ResearchRunId
+                && extraction.Status == EvidenceExtractionStatus.Completed && extraction.GroundingValidated)
+            .ToDictionary(extraction => extraction.ExtractionId);
 
         var assessments = corpus.Evidence
+            .Select(evidence => evidence.ResearchRunId == corpus.ResearchRunId ? evidence
+                : throw new ResearchSynthesisValidationException("Quantitative Evidence belongs to another run."))
             .OrderBy(evidence => evidence.StudyId)
             .ThenBy(evidence => evidence.EvidenceId)
             .Select(evidence => AssessEvidence(evidence, extractionSources, sourcesById))
@@ -49,7 +52,9 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
                     ordered.Length,
                     studyIds.Length,
                     hasDependentEvidence,
-                    ordered.Length >= 2 && !hasDependentEvidence);
+                    ordered.Length >= 2 && !hasDependentEvidence,
+                    first.InterventionCompatibilityKey,
+                    first.TimepointCompatibilityKey);
             })
             .ToArray();
 
@@ -64,12 +69,13 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
 
     private static QuantitativeEvidenceAssessment AssessEvidence(
         SynthesisEvidenceContext evidence,
-        IReadOnlyDictionary<Guid, Guid> extractionSources,
+        IReadOnlyDictionary<Guid, SynthesisExtractionSnapshot> extractionSources,
         IReadOnlyDictionary<Guid, SynthesisSourceMaterialSnapshot> sourcesById)
     {
         var reasons = new List<QuantitativeIneligibilityReason>();
-        var sourceMaterialId = extractionSources.TryGetValue(evidence.EvidenceExtractionId, out var linkedSourceMaterialId)
-            ? linkedSourceMaterialId
+        var sourceMaterialId = extractionSources.TryGetValue(evidence.EvidenceExtractionId, out var extraction)
+            && extraction.StudyId == evidence.StudyId && extraction.SourceScope == evidence.SourceScope
+            ? extraction.SourceMaterialId!.Value
             : Guid.Empty;
         var sourceWasTruncated = sourceMaterialId != Guid.Empty
             && sourcesById.TryGetValue(sourceMaterialId, out var source)
@@ -99,6 +105,17 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
             reasons.Add(QuantitativeIneligibilityReason.StudyDesignNotCompatible);
         }
 
+        var interventionKey = NormalizeCompatibilityKey(evidence.ExposureOrIntervention);
+        if (interventionKey is null)
+        {
+            reasons.Add(QuantitativeIneligibilityReason.InterventionNotCompatible);
+        }
+        var timepointKey = NormalizeCompatibilityKey(evidence.Timepoint);
+        if (timepointKey is null)
+        {
+            reasons.Add(QuantitativeIneligibilityReason.TimepointNotCompatible);
+        }
+
         var effectMeasureType = ClassifyEffectMeasure(evidence.EffectMeasure);
         if (string.IsNullOrWhiteSpace(evidence.EffectMeasure))
         {
@@ -118,23 +135,26 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
             reasons.Add(QuantitativeIneligibilityReason.MissingEffectValue);
         }
 
-        if (evidence.NumericGrounding is not null)
-        {
-            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectMeasure, reasons, !string.IsNullOrWhiteSpace(evidence.EffectMeasure));
-            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectEstimate, reasons, evidence.EffectValue.HasValue);
-            RequireVerifiedNumericGrounding(
-                evidence,
-                NumericGroundingField.ConfidenceInterval,
-                reasons,
-                evidence.ConfidenceIntervalLower.HasValue || evidence.ConfidenceIntervalUpper.HasValue);
-            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.StandardError, reasons, evidence.ReportedStandardError.HasValue);
-            RequireVerifiedNumericGrounding(evidence, NumericGroundingField.SampleSize, reasons, effectMeasureType == EffectMeasureType.Correlation);
-        }
+        evidence = evidence with { NumericGrounding = EvidenceNumericProof.Revalidate(evidence, sourcesById.GetValueOrDefault(sourceMaterialId)) };
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.Outcome, reasons, true);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.Population, reasons, populationKey is not null);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.ExposureOrIntervention, reasons, interventionKey is not null);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.Comparator, reasons, comparatorKey is not null);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.Timepoint, reasons, timepointKey is not null);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectMeasure, reasons, !string.IsNullOrWhiteSpace(evidence.EffectMeasure));
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.EffectEstimate, reasons, evidence.EffectValue.HasValue);
+        RequireVerifiedNumericGrounding(
+            evidence,
+            NumericGroundingField.ConfidenceInterval,
+            reasons,
+            evidence.ConfidenceIntervalLower.HasValue || evidence.ConfidenceIntervalUpper.HasValue);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.StandardError, reasons, evidence.ReportedStandardError.HasValue);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.SampleSize, reasons, effectMeasureType == EffectMeasureType.Correlation);
+        RequireVerifiedNumericGrounding(evidence, NumericGroundingField.ConfidenceLevel, reasons,
+            !evidence.ReportedStandardError.HasValue && effectMeasureType != EffectMeasureType.Correlation && evidence.ConfidenceLevel.HasValue);
 
         NormalizedStatistic? statistic = null;
-        if (reasons.Count == 0 || reasons.All(reason => reason is QuantitativeIneligibilityReason.PopulationNotCompatible
-                or QuantitativeIneligibilityReason.ComparatorNotCompatible
-                or QuantitativeIneligibilityReason.StudyDesignNotCompatible))
+        if (!reasons.Contains(QuantitativeIneligibilityReason.NumericGroundingNotVerified))
         {
             statistic = TryNormalize(evidence, effectMeasureType, reasons);
         }
@@ -163,7 +183,9 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
             statistic?.NormalizedEffectOrigin,
             statistic?.StandardErrorOrigin,
             sourceWasTruncated,
-            reasons.Distinct().OrderBy(reason => reason).ToArray());
+            reasons.Distinct().OrderBy(reason => reason).ToArray(),
+            interventionKey,
+            timepointKey);
     }
 
     public static EffectMeasureType ClassifyEffectMeasure(string? reportedMeasure)
@@ -362,12 +384,14 @@ public sealed class QuantitativeEvidenceAssessor : IQuantitativeEvidenceAssessor
             assessment.PopulationCompatibilityKey ?? string.Empty,
             assessment.ComparatorCompatibilityKey ?? string.Empty,
             assessment.StudyDesignCompatibilityKey ?? string.Empty,
-            assessment.EffectMeasureType.ToString()
+            assessment.EffectMeasureType.ToString(),
+            assessment.InterventionCompatibilityKey ?? string.Empty,
+            assessment.TimepointCompatibilityKey ?? string.Empty
         };
 
         // Compatibility keys are untrusted normalized text. Length-prefixing prevents
         // delimiter collisions from combining otherwise incompatible evidence groups.
-        return string.Join('|', components.Select(component =>
+        return "estimand-v2|" + string.Join('|', components.Select(component =>
             $"{component.Length.ToString(CultureInfo.InvariantCulture)}:{component}"));
     }
 

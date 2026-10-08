@@ -22,4 +22,5 @@ public sealed record EvidenceFindingDraft(
     [property: JsonPropertyName("pValue")] decimal? PValue,
     [property: JsonPropertyName("confidenceLevel")] decimal? ConfidenceLevel = null,
     [property: JsonPropertyName("reportedStandardError")] decimal? ReportedStandardError = null,
-    [property: JsonPropertyName("pValueOperator")] string? PValueOperator = null);
+    [property: JsonPropertyName("pValueOperator")] string? PValueOperator = null,
+    [property: JsonPropertyName("timepoint")] string? Timepoint = null);

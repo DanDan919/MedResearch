@@ -113,6 +113,10 @@ internal sealed class EvidenceConfiguration : IEntityTypeConfiguration<Evidence>
             .HasColumnName("p_value_operator")
             .HasMaxLength(2);
 
+        builder.Property(evidence => evidence.Timepoint)
+            .HasColumnName("timepoint")
+            .HasMaxLength(100);
+
         builder.Property(evidence => evidence.NumericGrounding)
             .HasColumnName("numeric_grounding")
             .HasColumnType("jsonb")

@@ -38,6 +38,12 @@ public sealed class EvidenceCorpusBuilder : IEvidenceCorpusBuilder
             .ThenBy(source => source.SourceMaterialId)
             .ToArray();
         var evidence = snapshot.Evidence
+            .Select(item => item with
+            {
+                NumericGrounding = EvidenceNumericProof.Revalidate(item, sourceMaterials.FirstOrDefault(source =>
+                    source.SourceMaterialId == snapshot.Extractions.First(extraction => extraction.ExtractionId == item.EvidenceExtractionId).SourceMaterialId)),
+            })
+            .Select(SynthesisEvidenceProjection.Create)
             .OrderBy(item => item.ExtractedAt)
             .ThenBy(item => item.StudyId)
             .ThenBy(item => item.EvidenceId)
@@ -175,6 +181,10 @@ public sealed class EvidenceCorpusBuilder : IEvidenceCorpusBuilder
             {
                 if (grounding.Anchor is null)
                 {
+                    if (grounding.Status == NumericGroundingStatus.Verified)
+                    {
+                        throw new ResearchSynthesisValidationException("Verified numeric grounding requires an exact source anchor.");
+                    }
                     continue;
                 }
 
@@ -182,7 +192,7 @@ public sealed class EvidenceCorpusBuilder : IEvidenceCorpusBuilder
                     || grounding.Anchor.StartOffset < 0
                     || grounding.Anchor.EndOffset <= grounding.Anchor.StartOffset
                     || grounding.Anchor.EndOffset - grounding.Anchor.StartOffset != grounding.Anchor.Text.Length
-                    || !SourceAnchorIntegrity.IsValid(grounding.Anchor))
+                    || !EvidenceNumericProof.IsSourceMember(grounding.Anchor, sourcesById[extraction.SourceMaterialId.Value], evidence.SupportingText))
                 {
                     throw new ResearchSynthesisValidationException("Evidence numeric grounding anchor does not preserve the exact extraction SourceMaterial lineage or valid span bounds.");
                 }

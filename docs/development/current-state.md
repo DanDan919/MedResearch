@@ -1,5 +1,34 @@
 # Current State
 
+## F15.1 Scientific Trust Boundary Correction
+
+Baseline after the separately authorized audit-document commit: `360e38a`.
+The independent audit is retained unchanged. ADR-029 supersedes the disproved
+sentence-level protection in ADR-028.
+
+- Explicit signed measure/estimate tuples bind outcome, CI/confidence level,
+  SE and p/operator under a conservative local grammar. Unknown or ambiguous
+  relationships are not guessed; sample roles/scopes exclude hospital counts.
+  Source-derived lexical case distinguishes bare OR from ordinary lowercase or;
+  canonical historical offsets/hashes remain unchanged.
+- Evidence has nullable bounded `Timepoint`, migration
+  `20261008041640_AddEvidenceTimepoint`. Intervention, comparator and explicit
+  timepoint are mandatory compatible quantitative dimensions; missing values
+  are not wildcards. GroupKey semantics are versioned `estimand-v2`.
+- Corpus/assessor recheck canonical membership against the immutable exact source
+  content/hash and required persisted proof. Known normalization, lineage, scope,
+  overlap uniqueness and confidence-level derivation proof are enforced.
+- SynthesisContext uses revalidated corpus Evidence, not raw snapshot Evidence.
+  Unverified statistics are nulled; raw ResultSummary is excluded from synthesis
+  and evaluation provider prompts. Source quotation is not additional numeric
+  authority. General numeric entailment of final free text remains unverified.
+- Prompt versions: extractor `evidence-extractor-v3-bound-tuples`, evaluator
+  `evidence-evaluator-v2-no-raw-summary`, synthesizer
+  `research-synthesizer-v2-trusted-evidence`. F12 repair budgets, worker fencing,
+  ownership and M17-M24 formulas are unchanged.
+- Detailed red baseline, tests, CI outcome and residual limits:
+  `f15-1-scientific-trust-boundary-correction-ru.md`.
+
 ## F8 adversarial verification
 
 The F8 audit is recorded in `docs/audits/f8-full-system-adversarial-verification-ru.md`. It found and fixed a stage-write fencing gap: the existing lease version previously protected ResearchRun lifecycle updates but not every scientific persistence store. Production DI now attaches a PostgreSQL `IResearchRunWriteFence` to the worker scope, and stage stores check owner/version, active status, and lease expiry inside their own short write transactions. No transaction spans external provider calls.
@@ -138,7 +167,7 @@ advisory lock.
 - Source-grounded evidence extraction:
   - `IEvidenceExtractor` and `EvidenceExtractor` in Application.
   - `IEvidenceExtractionStore` implemented by `EfEvidenceExtractionStore` in Infrastructure.
-  - Prompt version `evidence-extractor-v2-source-anchors` with strict structured output and an exact `pValueOperator` field.
+  - Prompt version `evidence-extractor-v3-bound-tuples` with strict structured output, exact `pValueOperator` and nullable reported `timepoint`.
   - LLM input scope is limited to the current question, bounded plan context, and one study title/abstract/metadata item.
   - Studies with no usable abstract are recorded as skipped with `NoExtractableText` and are not sent to the LLM.
   - Supporting excerpts are resolved uniquely against the exact selected SourceMaterial using versioned `source-text-v1` normalization, canonical offsets, normalized span text, and a SHA-256 span hash.
@@ -149,7 +178,7 @@ advisory lock.
 - Structured evidence evaluation:
   - `IEvidenceEvaluator` and `EvidenceEvaluator` in Application.
   - `IEvidenceEvaluationStore` implemented by `EfEvidenceEvaluationStore` in Infrastructure.
-  - Prompt version `evidence-evaluator-v1` with strict structured output.
+  - Prompt version `evidence-evaluator-v2-no-raw-summary` with strict structured output.
   - Creates one study-level `EvidenceEvaluation` per research run, study, and evaluator prompt version.
   - Stores evaluated evidence ids, source scope, provider/model/prompt provenance, categorical methodological domains, deterministic signal booleans, reporting limitations, author-reported limitations, and bounded overall methodological confidence.
   - Uses `Unknown`, `InsufficientSource`, and `NotApplicable` to distinguish missing validated information, inadequate current source scope, and conceptually irrelevant domains.
@@ -161,7 +190,7 @@ advisory lock.
   - `ISynthesisCorpusStore`, `ISynthesisContextBuilder`, `IResearchSynthesizer`, and `IResearchReportStore` in Application.
   - `SynthesisContextBuilder` validates current-run corpus identity, discovered-study membership, evidence/evaluation/extraction/search run scope, and evaluation EvidenceIds.
   - Context selection is deterministic and bounded by `Synthesis:MaxStudies`, `Synthesis:MaxEvidenceFindings`, and `Synthesis:MaxClaims`.
-  - Prompt version `research-synthesizer-v1` with strict structured output.
+  - Prompt version `research-synthesizer-v2-trusted-evidence` with strict structured output and no raw extraction ResultSummary.
   - Every persisted completed-report claim must cite supplied EvidenceIds from the same ResearchRun.
   - Citation authority comes from persisted Evidence and Study rows; model-supplied PMID, DOI, and StudyId are rejected.
   - No validated evidence produces a deterministic `InsufficientEvidence` report without an LLM call.

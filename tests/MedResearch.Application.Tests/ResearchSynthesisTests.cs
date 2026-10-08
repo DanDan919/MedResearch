@@ -235,6 +235,7 @@ public sealed class SynthesisContextBuilderTests
         var sourceMaterialIds = studies.ToDictionary(study => study.StudyId, _ => Guid.NewGuid());
         var evidenceWithLineage = evidence
             .Select(item => item with { EvidenceExtractionId = extractionIds[item.StudyId] })
+            .Select(item => item.EffectValue.HasValue ? GroundedEvidenceFixture.Create(item, sourceMaterialIds[item.StudyId]) : item)
             .ToArray();
         var extractions = studies.Select(study => new SynthesisExtractionSnapshot(
             extractionIds[study.StudyId],
@@ -252,10 +253,11 @@ public sealed class SynthesisContextBuilderTests
             SourceMaterialType.Abstract,
             study.Source,
             study.Pmid,
-            SourceMaterial.ComputeContentHash("reported result"),
+            SourceMaterial.ComputeContentHash(evidenceWithLineage.FirstOrDefault(item => item.StudyId == study.StudyId)?.SupportingText ?? "reported result"),
             1,
             false,
-            true)).ToArray();
+            true,
+            evidenceWithLineage.FirstOrDefault(item => item.StudyId == study.StudyId)?.SupportingText ?? "reported result")).ToArray();
 
         return new SynthesisCorpusSnapshot(
             runId,

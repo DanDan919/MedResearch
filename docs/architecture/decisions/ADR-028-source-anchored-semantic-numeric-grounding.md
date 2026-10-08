@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-029 (2026-10-08).
+
+The independent 2026-10-07 audit disproved the original sentence-level
+Frankenstein-protection claim below. The original decision text is retained as
+historical evidence; ADR-029 describes the corrected implemented boundary.
 
 ## Context
 

@@ -104,7 +104,8 @@ public sealed class EvidenceExtractionDraftValidator
                 KeepGroundedConfidenceLevel(numericGrounding.Facts, finding.ConfidenceLevel),
                 KeepGroundedDecimal(numericGrounding.Facts, NumericGroundingField.StandardError, finding.ReportedStandardError),
                 numericGrounding.PValueOperator,
-                numericGrounding.Facts));
+                numericGrounding.Facts,
+                NormalizeOptional(finding.Timepoint, 100)));
         }
 
         return accepted;
@@ -117,7 +118,7 @@ public sealed class EvidenceExtractionDraftValidator
             return EvidenceDirection.NotReported;
         }
 
-        if (Enum.TryParse<EvidenceDirection>(value.Trim(), ignoreCase: true, out var direction))
+        if (Enum.TryParse<EvidenceDirection>(value.Trim(), ignoreCase: true, out var direction) && Enum.IsDefined(direction))
         {
             return direction;
         }

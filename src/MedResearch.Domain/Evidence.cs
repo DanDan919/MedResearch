@@ -27,7 +27,8 @@ public sealed class Evidence
         decimal? confidenceLevel = null,
         decimal? reportedStandardError = null,
         string? pValueOperator = null,
-        IReadOnlyCollection<NumericGroundingFact>? numericGrounding = null)
+        IReadOnlyCollection<NumericGroundingFact>? numericGrounding = null,
+        string? timepoint = null)
     {
         if (id == Guid.Empty)
         {
@@ -89,6 +90,17 @@ public sealed class Evidence
             throw new ArgumentException("P-value operator is not supported.", nameof(pValueOperator));
         }
 
+        if (!Enum.IsDefined(direction))
+        {
+            throw new ArgumentOutOfRangeException(nameof(direction), "Evidence direction must be a defined value.");
+        }
+
+        if (timepoint?.Length > 100)
+        {
+            throw new ArgumentException("Timepoint exceeds 100 characters.", nameof(timepoint));
+        }
+
+        Timepoint = NormalizeOptional(timepoint);
         Id = id;
         ResearchRunId = researchRunId;
         StudyId = studyId;
@@ -114,7 +126,8 @@ public sealed class Evidence
         ReportedStandardError = reportedStandardError;
         PValueOperator = NormalizeOptional(pValueOperator);
         NumericGrounding = numericGrounding?.ToArray() ?? [];
-        if (NumericGrounding.Any(fact => fact.Anchor is not null && !SourceAnchorIntegrity.IsValid(fact.Anchor)))
+        if (NumericGrounding.Any(fact => (fact.Status == NumericGroundingStatus.Verified && fact.Anchor is null)
+            || (fact.Anchor is not null && !SourceAnchorIntegrity.IsValid(fact.Anchor))))
         {
             throw new ArgumentException("Evidence numeric grounding contains an invalid source anchor.", nameof(numericGrounding));
         }
@@ -167,6 +180,8 @@ public sealed class Evidence
     public decimal? ReportedStandardError { get; }
 
     public string? PValueOperator { get; }
+
+    public string? Timepoint { get; }
 
     public IReadOnlyCollection<NumericGroundingFact> NumericGrounding { get; }
 

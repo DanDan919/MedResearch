@@ -200,16 +200,7 @@ public sealed class QuantitativeEvidenceAssessorTests
         var runId = Guid.NewGuid();
         var legacy = CreateEvidence(runId, Guid.NewGuid(), "Depression severity", "Odds Ratio", 1.75m, 1.20m, 2.55m, confidenceLevel: 0.95m)
             with { NumericGrounding = [] };
-        var verified = CreateEvidence(runId, Guid.NewGuid(), "Depression severity", "Odds Ratio", 1.40m, 1.05m, 1.90m, confidenceLevel: 0.95m)
-            with
-            {
-                NumericGrounding =
-                [
-                    new NumericGroundingFact(NumericGroundingField.EffectMeasure, NumericGroundingStatus.Verified, null, null),
-                    new NumericGroundingFact(NumericGroundingField.EffectEstimate, NumericGroundingStatus.Verified, null, null),
-                    new NumericGroundingFact(NumericGroundingField.ConfidenceInterval, NumericGroundingStatus.Verified, null, null)
-                ]
-            };
+        var verified = CreateEvidence(runId, Guid.NewGuid(), "Depression severity", "Odds Ratio", 1.40m, 1.05m, 1.90m, confidenceLevel: 0.95m);
 
         var readiness = new QuantitativeEvidenceAssessor().Assess(await BuildCorpusAsync(runId, [legacy, verified]));
 
@@ -238,7 +229,7 @@ public sealed class QuantitativeEvidenceAssessorTests
                 "PubMed",
                 DateTimeOffset.UtcNow.AddMinutes(index)))
             .ToArray();
-        var sourceByExtraction = evidence.ToDictionary(item => item.EvidenceExtractionId, item => Guid.NewGuid());
+        var sourceByExtraction = evidence.ToDictionary(item => item.EvidenceExtractionId, item => item.NumericGrounding?.FirstOrDefault()?.Anchor?.SourceMaterialId ?? Guid.NewGuid());
         var extractions = evidence
             .Select(item => new SynthesisExtractionSnapshot(
                 item.EvidenceExtractionId,
@@ -261,7 +252,8 @@ public sealed class QuantitativeEvidenceAssessorTests
                 SourceMaterial.ComputeContentHash(item.SupportingText),
                 1,
                 item.SupportingText.Contains("TRUNCATED", StringComparison.Ordinal),
-                true))
+                true,
+                item.SupportingText))
             .ToArray();
         var snapshot = new SynthesisCorpusSnapshot(
             runId,
@@ -294,7 +286,7 @@ public sealed class QuantitativeEvidenceAssessorTests
         string comparator = "placebo",
         string studyDesign = "randomized controlled trial")
     {
-        return new SynthesisEvidenceContext(
+        return GroundedEvidenceFixture.Create(new SynthesisEvidenceContext(
             Guid.NewGuid(),
             runId,
             studyId,
@@ -316,7 +308,7 @@ public sealed class QuantitativeEvidenceAssessorTests
             upper,
             pValue,
             confidenceLevel,
-            null);
+            null), Guid.NewGuid());
     }
 
     private sealed class StaticStore : ISynthesisCorpusStore

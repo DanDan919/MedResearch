@@ -14,7 +14,7 @@ public sealed class EvidenceExtractorTests
             new EvidenceFindingDraft(
                 "working memory",
                 "Sleep restriction reduced working memory accuracy.",
-                "Sleep restriction reduced working memory accuracy in 120 adults.",
+                "Overall, 120 adults were analyzed. Sleep restriction reduced working memory accuracy.",
                 "Negative",
                 "adults",
                 "sleep restriction",
@@ -29,7 +29,7 @@ public sealed class EvidenceExtractorTests
         ]));
         var extractor = CreateExtractor(llm);
 
-        var result = await extractor.ExtractAsync(CreateContext("Sleep restriction reduced working memory accuracy in 120 adults."), CancellationToken.None);
+        var result = await extractor.ExtractAsync(CreateContext("Overall, 120 adults were analyzed. Sleep restriction reduced working memory accuracy."), CancellationToken.None);
 
         Assert.Equal(EvidenceExtractionStatus.Completed, result.Status);
         Assert.True(result.GroundingValidated);
@@ -227,7 +227,7 @@ public sealed class EvidenceExtractorTests
             new EvidenceFindingDraft(
                 "depression severity",
                 "The odds ratio was 1.75.",
-                "The odds ratio was 1.75 with a 95% confidence interval and SE 0.12.",
+                "Depression severity: the odds ratio was 1.75 (95% CI 1.20 to 2.55, SE 0.12).",
                 "Positive",
                 "adults",
                 "intervention",
@@ -236,15 +236,15 @@ public sealed class EvidenceExtractorTests
                 120,
                 "odds ratio",
                 1.75m,
-                null,
-                null,
+                1.20m,
+                2.55m,
                 null,
                 0.95m,
                 0.12m)
         ]));
         var extractor = CreateExtractor(llm);
 
-        var result = await extractor.ExtractAsync(CreateContext("The odds ratio was 1.75 with a 95% confidence interval and SE 0.12."), CancellationToken.None);
+        var result = await extractor.ExtractAsync(CreateContext("Depression severity: the odds ratio was 1.75 (95% CI 1.20 to 2.55, SE 0.12)."), CancellationToken.None);
 
         var finding = Assert.Single(result.Findings);
         Assert.Equal(0.95m, finding.ConfidenceLevel);
@@ -258,7 +258,7 @@ public sealed class EvidenceExtractorTests
             new EvidenceFindingDraft(
                 "depression severity",
                 "The odds ratio was 1.75.",
-                "The odds ratio was 1.75 with a 95% confidence interval.",
+                "Depression severity: the odds ratio was 1.75 (95% CI 1.20 to 2.55).",
                 "Positive",
                 "adults",
                 "intervention",
@@ -267,15 +267,15 @@ public sealed class EvidenceExtractorTests
                 120,
                 "odds ratio",
                 1.75m,
-                null,
-                null,
+                1.20m,
+                2.55m,
                 null,
                 0.95m,
                 0.12m)
         ]));
         var extractor = CreateExtractor(llm);
 
-        var result = await extractor.ExtractAsync(CreateContext("The odds ratio was 1.75 with a 95% confidence interval."), CancellationToken.None);
+        var result = await extractor.ExtractAsync(CreateContext("Depression severity: the odds ratio was 1.75 (95% CI 1.20 to 2.55)."), CancellationToken.None);
 
         var finding = Assert.Single(result.Findings);
         Assert.Equal(0.95m, finding.ConfidenceLevel);

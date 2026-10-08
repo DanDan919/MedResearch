@@ -11,7 +11,8 @@ public sealed record SynthesisSourceMaterialSnapshot(
     string ContentHash,
     int ContentVersion,
     bool WasTruncated,
-    bool IsCurrent);
+    bool IsCurrent,
+    [property: System.Text.Json.Serialization.JsonIgnore] string? Content = null);
 
 public sealed record EvidenceCorpusCoverage(
     int StudiesDiscovered,

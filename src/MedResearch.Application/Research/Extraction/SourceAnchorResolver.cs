@@ -38,7 +38,7 @@ public sealed class SourceAnchorResolver
             return Unsupported("Candidate anchor does not occur in the exact SourceMaterial.");
         }
 
-        var second = normalizedSource.IndexOf(normalizedCandidate, first + normalizedCandidate.Length, StringComparison.Ordinal);
+        var second = normalizedSource.IndexOf(normalizedCandidate, first + 1, StringComparison.Ordinal);
         if (second >= 0)
         {
             return new SourceAnchorResolution(
@@ -53,7 +53,9 @@ public sealed class SourceAnchorResolver
             first,
             first + normalizedCandidate.Length,
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedCandidate))).ToLowerInvariant(),
-            normalizedCandidate);
+            normalizedCandidate,
+            EvidenceGroundingValidator.NormalizeForContainment(sourceText, preserveCase: true)
+                .Substring(first, normalizedCandidate.Length));
         return new SourceAnchorResolution(MedResearch.Domain.NumericGroundingStatus.Verified, anchor, null);
     }
 

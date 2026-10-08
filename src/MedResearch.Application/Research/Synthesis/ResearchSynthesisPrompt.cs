@@ -7,7 +7,7 @@ namespace MedResearch.Application.Research.Synthesis;
 
 public static class ResearchSynthesisPrompt
 {
-    public const string Version = "research-synthesizer-v1";
+    public const string Version = "research-synthesizer-v2-trusted-evidence";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "research_report",
@@ -66,6 +66,7 @@ public static class ResearchSynthesisPrompt
             """
             You are a structured evidence synthesis component for MedResearch.
             Use only the supplied SynthesisContext. Do not use outside scientific knowledge, remembered papers, invented studies, invented statistics, invented PMIDs, or invented DOIs.
+            Raw extraction ResultSummary is excluded. Only the explicitly grounded structured fields are numeric assertions for an Evidence finding. SupportingText is a source quotation, not permission to import another result or an unsupported statistic. Missing or unverified values remain unknown.
             Every substantive scientific claim must cite one or more supplied EvidenceId values. Do not cite StudyId, PMID, or DOI as model-generated authority.
             Preserve conflicting evidence. Do not force a single winning direction because one side has more studies.
             Do not vote-count studies into certainty. Direction counts are descriptive context only, not statistical weights.
@@ -363,9 +364,10 @@ public static class ResearchSynthesisPrompt
             return "[]";
         }
 
-        return string.Join("\n", evidence.Select(item =>
-            $"EvidenceId: {item.EvidenceId}; Outcome: {item.Outcome}; Direction: {item.Direction}; ResultSummary: {item.ResultSummary}; Population: {item.Population ?? "null"}; ExposureOrIntervention: {item.ExposureOrIntervention ?? "null"}; Comparator: {item.Comparator ?? "null"}; StudyDesign: {item.StudyDesign ?? "null"}; SampleSize: {item.SampleSize?.ToString(CultureInfo.InvariantCulture) ?? "null"}; EffectMeasure: {item.EffectMeasure ?? "null"}; EffectValue: {item.EffectValue?.ToString(CultureInfo.InvariantCulture) ?? "null"}; ConfidenceInterval: {item.ConfidenceIntervalLower?.ToString(CultureInfo.InvariantCulture) ?? "null"} to {item.ConfidenceIntervalUpper?.ToString(CultureInfo.InvariantCulture) ?? "null"}; PValue: {item.PValue?.ToString(CultureInfo.InvariantCulture) ?? "null"}; SupportingText: {item.SupportingText}"));
+        return string.Join("\n", evidence.Select(SynthesisEvidenceProjection.Create).Select(item =>
+            $"EvidenceId: {item.EvidenceId}; Outcome: {item.Outcome}; Direction: {item.Direction}; Population: {item.Population ?? "null"}; ExposureOrIntervention: {item.ExposureOrIntervention ?? "null"}; Comparator: {item.Comparator ?? "null"}; Timepoint: {item.Timepoint ?? "null"}; StudyDesign: {item.StudyDesign ?? "null"}; SampleSize: {item.SampleSize?.ToString(CultureInfo.InvariantCulture) ?? "null"}; EffectMeasure: {item.EffectMeasure ?? "null"}; EffectValue: {item.EffectValue?.ToString(CultureInfo.InvariantCulture) ?? "null"}; ConfidenceInterval: {item.ConfidenceIntervalLower?.ToString(CultureInfo.InvariantCulture) ?? "null"} to {item.ConfidenceIntervalUpper?.ToString(CultureInfo.InvariantCulture) ?? "null"}; ConfidenceLevel: {item.ConfidenceLevel?.ToString(CultureInfo.InvariantCulture) ?? "null"}; ReportedStandardError: {item.ReportedStandardError?.ToString(CultureInfo.InvariantCulture) ?? "null"}; PValue: {item.PValueOperator ?? "null"} {item.PValue?.ToString(CultureInfo.InvariantCulture) ?? "null"}; SupportingText (source quotation, not additional assertions): {item.SupportingText}"));
     }
+
 }
 
 public sealed record ResearchSynthesisPromptText(string SystemPrompt, string UserPrompt);

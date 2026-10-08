@@ -23,7 +23,8 @@ public enum NumericGroundingField
     Outcome = 7,
     Population = 8,
     Comparator = 9,
-    Timepoint = 10
+    Timepoint = 10,
+    ExposureOrIntervention = 11
 }
 
 public sealed record SourceAnchor(
@@ -32,7 +33,8 @@ public sealed record SourceAnchor(
     int StartOffset,
     int EndOffset,
     string SpanHash,
-    string Text);
+    string Text,
+    string? LexicalText = null);
 
 public sealed record NumericGroundingFact(
     NumericGroundingField Field,
@@ -50,7 +52,9 @@ public static class SourceAnchorIntegrity
             || anchor.EndOffset <= anchor.StartOffset
             || anchor.EndOffset - anchor.StartOffset != anchor.Text.Length
             || string.IsNullOrWhiteSpace(anchor.Text)
-            || string.IsNullOrWhiteSpace(anchor.SpanHash))
+            || string.IsNullOrWhiteSpace(anchor.SpanHash)
+            || (anchor.LexicalText is not null && !string.Equals(
+                new string(anchor.LexicalText.Select(char.ToLowerInvariant).ToArray()), anchor.Text, StringComparison.Ordinal)))
         {
             return false;
         }

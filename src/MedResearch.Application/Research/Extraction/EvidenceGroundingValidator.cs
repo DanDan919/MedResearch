@@ -53,7 +53,7 @@ public sealed class EvidenceGroundingValidator
         return true;
     }
 
-    public static string NormalizeForContainment(string value)
+    public static string NormalizeForContainment(string value, bool preserveCase = false)
     {
         var builder = new StringBuilder(value.Length);
         var previousWasWhitespace = false;
@@ -71,7 +71,7 @@ public sealed class EvidenceGroundingValidator
                 continue;
             }
 
-            builder.Append(char.ToLowerInvariant(character));
+            builder.Append(preserveCase ? character : char.ToLowerInvariant(character));
             previousWasWhitespace = false;
         }
 

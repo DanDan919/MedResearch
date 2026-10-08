@@ -6,7 +6,7 @@ namespace MedResearch.Application.Research.Extraction;
 
 public static class EvidenceExtractionPrompt
 {
-    public const string Version = "evidence-extractor-v2-source-anchors";
+    public const string Version = "evidence-extractor-v3-bound-tuples";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "evidence_extraction",
@@ -44,7 +44,8 @@ public static class EvidenceExtractionPrompt
                             "confidenceLevel",
                             "reportedStandardError",
                             "pValue",
-                            "pValueOperator"
+                            "pValueOperator",
+                            "timepoint"
                         },
                         properties = new
                         {
@@ -88,7 +89,8 @@ public static class EvidenceExtractionPrompt
                             confidenceLevel = new { description = "Explicit reported confidence level as a fraction, for example 0.95 for an explicitly reported 95% CI; otherwise null.", type = new[] { "number", "null" }, exclusiveMinimum = 0, exclusiveMaximum = 1 },
                             reportedStandardError = new { description = "Reported standard error only when directly stated in the supplied source; otherwise null.", type = new[] { "number", "null" }, exclusiveMinimum = 0 },
                             pValue = new { type = new[] { "number", "null" }, minimum = 0, maximum = 1 },
-                            pValueOperator = NullableString("Exact reported p-value operator such as =, <, or <=; otherwise null.", 2)
+                            pValueOperator = NullableString("Exact reported p-value operator such as =, <, or <=; otherwise null.", 2),
+                            timepoint = NullableString("Exact reported outcome follow-up/timepoint phrase, otherwise null. Do not infer from the plan.", 100)
                         }
                     }
                 }
@@ -108,6 +110,7 @@ public static class EvidenceExtractionPrompt
             The LLM is not a scientific source. Do not add background knowledge, causal interpretation, clinical advice, diagnoses, treatments, or conclusions beyond the supplied source text.
             Use null for absent data. Do not guess missing sample sizes, effect sizes, confidence intervals, confidence levels, standard errors, p-values, study designs, comparators, populations, or effect directions.
             supportingText must be a short verbatim excerpt from the supplied SourceMaterial. Do not paraphrase supportingText. For reported numeric findings, include the complete local statistical expression in supportingText, including the measure, estimate, confidence interval and p-value when they are reported together. Do not combine numbers from separate outcomes, populations, subgroups, timepoints, or sentences into one finding; use null when the local relationship is not explicit.
+            Include the exact outcome, population, intervention, comparator and timepoint context in the supporting excerpt where reported. Missing timepoint stays null. ResultSummary is an untrusted extraction description, not numeric authority for synthesis.
             Prefer reported findings only. If a confidence interval is reported with an explicit level, return the level as a fraction such as 0.95; otherwise keep confidenceLevel null. ReportedStandardError must be null unless the source directly reports SE/standard error. Preserve the exact p-value operator when one is reported. If a direction is not explicitly supported, use NotReported rather than inferring no effect.
             Return only the strict structured object requested by the schema.
             """,

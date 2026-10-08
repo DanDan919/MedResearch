@@ -89,7 +89,8 @@ public sealed record SynthesisEvidenceContext(
     decimal? ConfidenceLevel = null,
     decimal? ReportedStandardError = null,
     string? PValueOperator = null,
-    IReadOnlyCollection<NumericGroundingFact>? NumericGrounding = null);
+    IReadOnlyCollection<NumericGroundingFact>? NumericGrounding = null,
+    string? Timepoint = null);
 
 public sealed record SynthesisEvaluationContext(
     Guid EvaluationId,

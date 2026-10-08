@@ -6,7 +6,7 @@ namespace MedResearch.Application.Research.Evaluation;
 
 public static class EvidenceEvaluationPrompt
 {
-    public const string Version = "evidence-evaluator-v1";
+    public const string Version = "evidence-evaluator-v2-no-raw-summary";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "evidence_evaluation",
@@ -194,7 +194,7 @@ public static class EvidenceEvaluationPrompt
         }
 
         return string.Join("\n---\n", evidence.Select(item =>
-            $"EvidenceId: {item.EvidenceId}\nOutcome: {item.Outcome}\nResultSummary: {item.ResultSummary}\nDirection: {item.Direction}\nPopulation: {item.Population ?? "null"}\nExposureOrIntervention: {item.ExposureOrIntervention ?? "null"}\nComparator: {item.Comparator ?? "null"}\nStudyDesign: {item.StudyDesign ?? "null"}\nSampleSize: {item.SampleSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nEffectMeasure: {item.EffectMeasure ?? "null"}\nEffectValue: {item.EffectValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nConfidenceInterval: {item.ConfidenceIntervalLower?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"} to {item.ConfidenceIntervalUpper?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nPValue: {item.PValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nSupportingText: {item.SupportingText}"));
+            $"EvidenceId: {item.EvidenceId}\nOutcome: {item.Outcome}\nDirection: {item.Direction}\nPopulation: {item.Population ?? "null"}\nExposureOrIntervention: {item.ExposureOrIntervention ?? "null"}\nComparator: {item.Comparator ?? "null"}\nStudyDesign: {item.StudyDesign ?? "null"}\nSampleSize: {item.SampleSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nEffectMeasure: {item.EffectMeasure ?? "null"}\nEffectValue: {item.EffectValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nConfidenceInterval: {item.ConfidenceIntervalLower?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"} to {item.ConfidenceIntervalUpper?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nPValue: {item.PValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}\nSupportingText: {item.SupportingText}"));
     }
 }
 

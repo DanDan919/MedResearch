@@ -1,10 +1,31 @@
 # Technical Debt
 
+## F15.1 Remaining Scientific Limits
+
+- Tuple binding is an intentionally narrow deterministic grammar, not biomedical
+  semantic entailment. Unrecognized tables, covariate/analysis scopes, complex
+  subgroup context and clinical synonyms may remain ineligible; precision takes
+  priority over recall.
+- Explicit Evidence timepoint is now persisted and mandatory for quantitative
+  compatibility. No missing-timepoint wildcard, time-unit equivalence, or
+  follow-up harmonization is implemented.
+- Raw ResultSummary no longer enters evaluator/synthesis prompts and the corpus
+  rechecks source membership/proof. Final report free text can still introduce
+  numbers that its citation/direction validator does not semantically verify.
+  Source quotation may include numbers outside the accepted result tuple.
+- Bounded numeric proof remains accessible in typed domain/persistence tests,
+  not yet added to the public provenance DTO/UI; no SourceMaterial body is exposed.
+- Durable provider-attempt provenance, global acquisition attribution, Europe PMC
+  date semantics, mobile overflow, dependency advisories, native build, browser
+  token flow and live OpenAPI drift are unchanged from the independent audit.
+
 ## F8 audit follow-up
 
 - Report rows do not yet persist the quantitative artifact id/fingerprint used during synthesis; the relationship is currently implicit in the same synthesis execution.
 - Same-run report citation integrity and SourceMaterial current-version uniqueness are protected by application transactions/advisory locks rather than universal composite constraints or triggers.
-- F15 replaces the prior token-only numeric gate with source-anchored local statistical grounding. Remaining debt is intentionally narrower: outcome/population/comparator context is exact normalized text matching rather than ontology-based semantic equivalence, and timepoint-specific interpretation is not modeled as a separate persisted field.
+- F15's original sentence-level claim was disproved by the independent audit.
+  F15.1/ADR-029 implement bounded tuple binding and persist explicit timepoint;
+  exact context matching is still not ontology-based semantic equivalence.
 - F10 adds the first authentication/authorization boundary, but no external identity-provider tenant is configured in this repository. Production deployment must supply a trusted JWT issuer and audience; token issuance, user lifecycle, collaboration, and ownership transfer remain outside scope.
 
 ## Current

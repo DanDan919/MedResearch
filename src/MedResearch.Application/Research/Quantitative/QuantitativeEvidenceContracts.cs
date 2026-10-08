@@ -41,7 +41,9 @@ public enum QuantitativeIneligibilityReason
     SourceTruncated = 14,
     AmbiguousDirection = 15,
     DuplicateStudyContribution = 16,
-    NumericGroundingNotVerified = 17
+    NumericGroundingNotVerified = 17,
+    InterventionNotCompatible = 18,
+    TimepointNotCompatible = 19
 }
 
 public enum StatisticOrigin
@@ -80,7 +82,9 @@ public sealed record QuantitativeEvidenceAssessment(
     StatisticOrigin? NormalizedEffectOrigin,
     StatisticOrigin? StandardErrorOrigin,
     bool SourceWasTruncated,
-    IReadOnlyCollection<QuantitativeIneligibilityReason> ReasonCodes);
+    IReadOnlyCollection<QuantitativeIneligibilityReason> ReasonCodes,
+    string? InterventionCompatibilityKey = null,
+    string? TimepointCompatibilityKey = null);
 
 public sealed record CompatibleEvidenceGroup(
     string GroupKey,
@@ -94,4 +98,6 @@ public sealed record CompatibleEvidenceGroup(
     int EvidenceCount,
     int UniqueStudyCount,
     bool HasDependentEvidenceFromSameStudy,
-    bool ReadyForFutureMetaAnalysisInput);
+    bool ReadyForFutureMetaAnalysisInput,
+    string? InterventionCompatibilityKey = null,
+    string? TimepointCompatibilityKey = null);

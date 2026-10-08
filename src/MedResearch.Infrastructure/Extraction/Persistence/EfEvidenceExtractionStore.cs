@@ -236,7 +236,8 @@ public sealed class EfEvidenceExtractionStore : IEvidenceExtractionStore
                 finding.ConfidenceLevel,
                 finding.ReportedStandardError,
                 finding.PValueOperator,
-                finding.NumericGrounding));
+                finding.NumericGrounding,
+                finding.Timepoint));
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -1,5 +1,21 @@
 # Problems
 
+## 2026-10-08 F15.1: audited P1 predicates and raw snapshot bypass
+
+The 2026-10-07 audit's P1 failures were reproduced first as twelve red repository
+cases (zero production edits). F15.1 replaces token/sentence co-occurrence with
+bounded explicit tuple binding, adds intervention/timepoint compatibility and
+mandatory source/proof revalidation, and removes raw ResultSummary from provider
+inputs. Self-review additionally found SynthesisContextBuilder reading original
+snapshot Evidence instead of revalidated corpus Evidence; a dedicated regression
+now protects that path. A forward nullable timepoint migration is added.
+
+The original audit remains historical evidence, not rewritten success history.
+See `f15-1-scientific-trust-boundary-correction-ru.md` for actual verification,
+including honest local Docker skips and the final CI outcome. General free-text
+numeric entailment and the audit's unrelated provider/UI/dependency findings are
+not claimed fixed.
+
 ## 2026-10-07 independent audit: remaining scientific trust-boundary defects
 
 Status: observed, not fixed by this audit. See

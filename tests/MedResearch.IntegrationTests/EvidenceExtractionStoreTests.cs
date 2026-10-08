@@ -2,6 +2,9 @@ using MedResearch.Application.Research.Extraction;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Extraction.Persistence;
 using Microsoft.EntityFrameworkCore;
+using MedResearch.Application.Research.Synthesis;
+using MedResearch.Application.Research.Quantitative;
+using MedResearch.Infrastructure.Synthesis.Persistence;
 
 namespace MedResearch.IntegrationTests;
 
@@ -94,6 +97,41 @@ public sealed class EvidenceExtractionStoreTests
         Assert.Equal(seed.SourceMaterialId, effectFact.Anchor?.SourceMaterialId);
         Assert.Equal(anchor.SpanHash, effectFact.Anchor?.SpanHash);
         Assert.Equal(anchor.StartOffset, effectFact.Anchor?.StartOffset);
+        Assert.Equal(anchor.LexicalText, effectFact.Anchor?.LexicalText);
+    }
+
+    [SkippableFact]
+    public async Task PersistExtractionResultAsync_FreshReadRechecksTupleProofAndTimepoint()
+    {
+        SkipIfPostgreSqlUnavailable();
+        const string source = "In adults, drug A versus placebo at 12 weeks: Mortality OR 0.73 (95% CI 0.55 to 0.96).";
+        var seed = await SeedDiscoveredStudyAsync("Does drug A affect mortality?", source);
+        var studyContext = new EvidenceExtractionStudyContext(seed.RunId, Guid.NewGuid(), "Question", null, seed.StudyId, seed.SourceMaterialId,
+            EvidenceSourceScope.Abstract, "Fixture", source, SourceMaterial.ComputeContentHash(source), false, ["Abstract"], "Study", source,
+            null, null, null, null, null, [], [], "Fixture");
+        var draft = new EvidenceFindingDraft("Mortality", "Mortality OR 0.73.", source, "Positive", "adults", "drug A", "placebo",
+            "randomized controlled trial", null, "OR", 0.73m, 0.55m, 0.96m, null, 0.95m, Timepoint: "12 weeks");
+        var finding = Assert.Single(new EvidenceExtractionDraftValidator().Validate(studyContext, new([draft])));
+        // Simulate a corrupted accepted snapshot: status/hash alone must not be authority.
+        finding = finding with { ConfidenceIntervalLower = 0.1234m, ConfidenceIntervalUpper = 0.2345m, ResultSummary = "CI 0.1234 to 0.2345." };
+        await using (var db = _fixture.CreateDbContext())
+        {
+            await new EfEvidenceExtractionStore(db).PersistExtractionResultAsync(CreateCompletedResult(seed.RunId, seed.StudyId, seed.SourceMaterialId!.Value, [finding]), CancellationToken.None);
+        }
+        await using var fresh = _fixture.CreateDbContext();
+        var persisted = await fresh.Evidence.SingleAsync(item => item.ResearchRunId == seed.RunId);
+        Assert.Equal("12 weeks", persisted.Timepoint);
+        Assert.Equal(NumericGroundingStatus.Verified, Assert.Single(persisted.NumericGrounding, fact => fact.Field == NumericGroundingField.Timepoint).Status);
+        var corpus = await new EvidenceCorpusBuilder(new EfResearchSynthesisStore(fresh)).BuildAsync(seed.RunId, CancellationToken.None);
+        Assert.Equal(0, new QuantitativeEvidenceAssessor().Assess(corpus).EligibleEvidenceCount);
+        var read = Assert.Single(corpus.Evidence);
+        Assert.Equal(0.73m, read.EffectValue);
+        Assert.Equal(NumericGroundingStatus.Unsupported, Assert.Single(read.NumericGrounding!, fact => fact.Field == NumericGroundingField.ConfidenceInterval).Status);
+        Assert.DoesNotContain("0.1234", read.ResultSummary);
+        var synthesisContext = await new SynthesisContextBuilder(new EfResearchSynthesisStore(fresh), new SynthesisOptions(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(seed.RunId, CancellationToken.None);
+        Assert.Null(Assert.Single(Assert.Single(synthesisContext.Studies).Evidence).ConfidenceIntervalLower);
+        Assert.DoesNotContain("0.1234", ResearchSynthesisPrompt.Create(synthesisContext).UserPrompt);
     }
 
     [SkippableFact]

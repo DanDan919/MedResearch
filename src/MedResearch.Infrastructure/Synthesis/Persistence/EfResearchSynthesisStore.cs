@@ -135,7 +135,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 evidence.ConfidenceLevel,
                 evidence.ReportedStandardError,
                 evidence.PValueOperator,
-                evidence.NumericGrounding))
+                evidence.NumericGrounding,
+                evidence.Timepoint))
             .ToArray();
         var evaluations = await _dbContext.EvidenceEvaluations
             .AsNoTracking()
@@ -184,6 +185,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 extraction.EvidenceCount,
                 extraction.GroundingValidated))
             .ToArrayAsync(cancellationToken);
+        var extractionSourceIds = extractions.Where(extraction => extraction.SourceMaterialId.HasValue)
+            .Select(extraction => extraction.SourceMaterialId!.Value).Distinct().ToArray();
         var sourceMaterials = await _dbContext.SourceMaterials
             .AsNoTracking()
             .Where(material => studyIds.Contains(material.StudyId))
@@ -201,7 +204,8 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
                 material.ContentHash,
                 material.ContentVersion,
                 material.WasTruncated,
-                material.IsCurrent))
+                material.IsCurrent,
+                extractionSourceIds.Contains(material.Id) ? material.Content : null))
             .ToArrayAsync(cancellationToken);
 
         return new SynthesisCorpusSnapshot(

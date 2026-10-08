@@ -364,9 +364,9 @@ public sealed partial class FullFakePipelineTests
 
     private sealed class FakeScientificLiteratureSource : IScientificLiteratureSource
     {
-        public const string FullTextAbstract = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.";
-        public const string AbstractOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.40 with 95% CI 1.05 to 1.90.";
-        public const string ThirdOddsRatioText = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 4.00 with 95% CI 2.00 to 8.00.";
+        public const string FullTextAbstract = "In this randomized controlled trial, 120 participants were randomized. In adults with depressive symptoms, structured sleep compared with placebo at 12 weeks: depression severity improved, odds ratio 1.75 with 95% CI 1.20 to 2.55.";
+        public const string AbstractOddsRatioText = "In this randomized controlled trial, 120 participants were randomized. In adults with depressive symptoms, structured sleep compared with placebo at 12 weeks: depression severity improved, odds ratio 1.40 with 95% CI 1.05 to 1.90.";
+        public const string ThirdOddsRatioText = "In this randomized controlled trial, 120 participants were randomized. In adults with depressive symptoms, structured sleep compared with placebo at 12 weeks: depression severity improved, odds ratio 4.00 with 95% CI 2.00 to 8.00.";
 
         public string SourceName => "PubMed";
 
@@ -446,7 +446,7 @@ public sealed partial class FullFakePipelineTests
                 return Task.FromResult<SourceMaterialCandidate?>(null);
             }
 
-            const string content = "In this randomized controlled trial, depression severity improved in 120 adults compared with placebo; odds ratio 1.75 with 95% CI 1.20 to 2.55.";
+            const string content = FakeScientificLiteratureSource.FullTextAbstract;
             return Task.FromResult<SourceMaterialCandidate?>(new SourceMaterialCandidate(
                 SourceMaterialType.StructuredFullText,
                 ProviderName,
@@ -521,7 +521,8 @@ public sealed partial class FullFakePipelineTests
                         2.55m,
                         null,
                         0.95m,
-                        null)
+                        null,
+                        Timepoint: "12 weeks")
                 ]);
             }
 
@@ -544,7 +545,8 @@ public sealed partial class FullFakePipelineTests
                         1.90m,
                         null,
                         0.95m,
-                        null)
+                        null,
+                        Timepoint: "12 weeks")
                 ]);
             }
 
@@ -567,7 +569,8 @@ public sealed partial class FullFakePipelineTests
                         8.00m,
                         null,
                         0.95m,
-                        null)
+                        null,
+                        Timepoint: "12 weeks")
                 ]);
             }
 
