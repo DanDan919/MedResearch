@@ -41,6 +41,42 @@ public sealed class ScientificIdentifierNormalizerTests
 
 public sealed class EuropePmcScientificLiteratureSourceTests
 {
+    [Theory]
+    [InlineData("\"pubYear\":\"1998\",\"firstPublicationDate\":\"1998-05-06\",\"firstIndexDate\":\"2025-03-17\"", 1998, "1998-05-06")]
+    [InlineData("\"pubYear\":\"1998\"", 1998, null)]
+    [InlineData("\"firstIndexDate\":\"2025-03-17\"", null, null)]
+    [InlineData("\"pubYear\":null", null, null)]
+    [InlineData("\"pubYear\":\"1998\",\"firstPublicationDate\":\"1999-01-02\"", 1999, "1999-01-02")]
+    [InlineData("\"firstPublicationDate\":\"1998-05\"", 1998, null)]
+    [InlineData("\"journalInfo\":{\"electronicPublicationDate\":\"1998-05-06\"},\"firstIndexDate\":\"2025-03-17\"", 1998, "1998-05-06")]
+    public async Task SearchAsync_UsesOnlyPublicationFields(string fields, int? year, string? date)
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*", $$"""
+            { "pmid":"123", "title":"Historical article", {{fields}} }
+            """)));
+        var candidate = Assert.Single((await CreateSource(handler).SearchAsync(
+            new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), "history"), CancellationToken.None)).Candidates);
+        Assert.Equal(year, candidate.PublicationYear);
+        Assert.Equal(date is null ? null : (DateOnly?)DateOnly.Parse(date), candidate.PublicationDate);
+    }
+
+    [Fact]
+    public async Task SearchAsync_IndexDateDoesNotBecomePublicationDate()
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*", """
+            { "id": "123", "source": "MED", "pmid": "123", "title": "Historical article",
+              "pubYear": "1998", "firstIndexDate": "2025-03-17" }
+            """)));
+        var source = CreateSource(handler, new EuropePmcOptions { MaxRetryAttempts = 0 });
+        var candidate = Assert.Single((await source.SearchAsync(
+            new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), "history"), CancellationToken.None)).Candidates);
+
+        Assert.Equal(1998, candidate.PublicationYear);
+        Assert.Null(candidate.PublicationDate);
+        Assert.Null(candidate.PublicationMonth);
+        Assert.Null(candidate.PublicationDay);
+    }
+
     [Fact]
     public async Task SearchAsync_UsesOfficialSearchParametersAndMapsCoreMetadata()
     {

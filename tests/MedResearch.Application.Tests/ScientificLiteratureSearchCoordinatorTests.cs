@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Literature;
+using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MedResearch.Application.Tests;
@@ -43,18 +44,22 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
         var request = Assert.Single(store.Requests);
         Assert.Equal("EuropePmc", request.Source);
         Assert.Single(request.Candidates);
+        Assert.Equal(LiteratureProviderFailureCategory.UnexpectedFailure, Assert.Single(store.Failures).Category);
     }
 
     [Fact]
     public async Task SearchAsync_ThrowsWhenAllSourcesFail()
     {
+        var store = new RecordingSearchResultStore();
         var coordinator = CreateCoordinator([
             new RecordingScientificSource("PubMed", [], new ScientificLiteratureSourceException("pubmed failed")),
             new RecordingScientificSource("EuropePmc", [], new ScientificLiteratureSourceException("europe pmc failed"))],
-            new RecordingSearchResultStore());
+            store);
 
         await Assert.ThrowsAsync<ScientificLiteratureSourceException>(() =>
             coordinator.SearchAsync(Guid.NewGuid(), Guid.NewGuid(), ["sleep memory"], CancellationToken.None));
+        Assert.Equal(2, store.Failures.Count);
+        Assert.Empty(store.Requests);
     }
 
     [Fact]
@@ -85,6 +90,43 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
 
         Assert.Single(source.Requests);
         Assert.Single(store.Requests);
+        Assert.Single(store.Attempts);
+    }
+
+    [Theory]
+    [InlineData(LiteratureProviderFailureCategory.Timeout)]
+    [InlineData(LiteratureProviderFailureCategory.RateLimited)]
+    [InlineData(LiteratureProviderFailureCategory.InvalidResponse)]
+    [InlineData(LiteratureProviderFailureCategory.ResponseTooLarge)]
+    [InlineData(LiteratureProviderFailureCategory.NetworkFailure)]
+    public async Task SearchAsync_RecordsTypedFailureBesideSuccessfulZero(LiteratureProviderFailureCategory category)
+    {
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([
+            new RecordingScientificSource("PubMed", []),
+            new RecordingScientificSource("EuropePmc", [], new ScientificLiteratureSourceException("safe", category))], store);
+        await coordinator.SearchAsync(Guid.NewGuid(), Guid.NewGuid(), ["query"], CancellationToken.None);
+        Assert.Equal(category, Assert.Single(store.Failures).Category);
+        Assert.Equal(0, Assert.Single(store.Requests).ResultCount);
+        Assert.Equal(2, store.Attempts.Count);
+    }
+
+    [Fact]
+    public async Task SearchAsync_UnsignalledProviderCancellationIsTimeout()
+    {
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([new RecordingScientificSource("PubMed", [], new OperationCanceledException())], store);
+        await Assert.ThrowsAsync<ScientificLiteratureSourceException>(() => coordinator.SearchAsync(Guid.NewGuid(), Guid.NewGuid(), ["query"], CancellationToken.None));
+        Assert.Equal(LiteratureProviderFailureCategory.Timeout, Assert.Single(store.Failures).Category);
+    }
+
+    [Fact]
+    public async Task SearchAsync_PersistenceFailureDoesNotBecomeProviderFailure()
+    {
+        var store = new RecordingSearchResultStore { PersistenceFailure = new InvalidOperationException("database failure") };
+        var coordinator = CreateCoordinator([new RecordingScientificSource("PubMed", [])], store);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SearchAsync(Guid.NewGuid(), Guid.NewGuid(), ["query"], CancellationToken.None));
+        Assert.Empty(store.Failures);
     }
 
     private static ScientificLiteratureSearchCoordinator CreateCoordinator(
@@ -145,6 +187,19 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
 
     private sealed class RecordingSearchResultStore : IScientificSearchResultStore
     {
+        public List<Guid> Attempts { get; } = [];
+        public List<(Guid Id, LiteratureProviderFailureCategory Category)> Failures { get; } = [];
+        public Exception? PersistenceFailure { get; init; }
+        public Task BeginAttemptAsync(Guid attemptId, Guid researchRunId, Guid researchPlanId, string source, string query, DateTimeOffset startedAt, CancellationToken cancellationToken)
+        {
+            Attempts.Add(attemptId);
+            return Task.CompletedTask;
+        }
+        public Task FailAttemptAsync(Guid attemptId, LiteratureProviderFailureCategory category, DateTimeOffset completedAt, CancellationToken cancellationToken)
+        {
+            Failures.Add((attemptId, category));
+            return Task.CompletedTask;
+        }
         public List<ScientificSearchPersistenceRequest> Requests { get; } = [];
 
         public Task<bool> HasPersistedSearchAsync(
@@ -166,6 +221,7 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (PersistenceFailure is not null) throw PersistenceFailure;
             Requests.Add(request);
             return Task.FromResult(new ScientificSearchPersistenceResult(request.SearchExecutionId, request.Candidates.Count, 0));
         }

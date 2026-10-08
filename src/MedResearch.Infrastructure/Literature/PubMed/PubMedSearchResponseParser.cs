@@ -29,7 +29,7 @@ public sealed class PubMedSearchResponseParser
 
             return new PubMedSearchResult(pmids, count);
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
             throw new PubMedResponseException("PubMed ESearch response was not valid JSON.", exception);
         }

@@ -151,6 +151,9 @@ public sealed class Study
         string[]? publicationTypes,
         string[]? authors)
     {
+        publicationYear ??= publicationDate?.Year;
+        publicationMonth ??= publicationDate?.Month;
+        publicationDay ??= publicationDate?.Day;
         ValidatePublicationDateParts(publicationYear, publicationMonth, publicationDay);
 
         Abstract ??= NormalizeOptional(@abstract);
@@ -158,10 +161,17 @@ public sealed class Study
         Pmid ??= NormalizeOptional(pmid);
         Pmcid ??= NormalizeOptional(pmcid);
         Journal ??= NormalizeOptional(journal);
-        PublicationDate ??= publicationDate;
-        PublicationYear ??= publicationYear;
-        PublicationMonth ??= publicationMonth;
-        PublicationDay ??= publicationDay;
+        // Publication parts describe one date, not independently mergeable metadata.
+        if ((PublicationDate is null || publicationDate is null || PublicationDate == publicationDate) &&
+            (PublicationYear is null || publicationYear is null || PublicationYear == publicationYear) &&
+            (PublicationMonth is null || publicationMonth is null || PublicationMonth == publicationMonth) &&
+            (PublicationDay is null || publicationDay is null || PublicationDay == publicationDay))
+        {
+            PublicationDate ??= publicationDate;
+            PublicationYear ??= publicationYear;
+            PublicationMonth ??= publicationMonth;
+            PublicationDay ??= publicationDay;
+        }
         PublicationTypes = MergeCollection(PublicationTypes, publicationTypes);
         Authors = MergeCollection(Authors, authors);
     }

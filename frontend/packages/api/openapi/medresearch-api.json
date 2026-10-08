@@ -1042,8 +1042,25 @@
           "sourceMaterialId": { "type": "string", "format": "uuid" }
         }
       },
+      "LiteratureProviderAttemptResponse": {
+        "type": "object",
+        "required": ["attemptId", "researchPlanId", "source", "query", "status", "resultCount", "failureCategory", "startedAt", "completedAt", "literatureSearchId"],
+        "properties": {
+          "attemptId": { "type": "string", "format": "uuid" },
+          "researchPlanId": { "type": "string", "format": "uuid" },
+          "source": { "type": "string", "enum": ["PubMed", "EuropePmc"] },
+          "query": { "type": "string", "maxLength": 2000 },
+          "status": { "type": "string", "enum": ["Started", "SucceededWithResults", "SucceededZeroResults", "Failed", "TimedOut", "Cancelled"] },
+          "resultCount": { "type": ["integer", "null"], "minimum": 0 },
+          "failureCategory": { "type": ["string", "null"], "enum": ["NetworkFailure", "Timeout", "RateLimited", "InvalidResponse", "ProviderProtocolError", "ResponseTooLarge", "Cancelled", "UnexpectedFailure", null] },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "literatureSearchId": { "type": ["string", "null"], "format": "uuid" }
+        }
+      },
       "ResearchProvenanceResponse": {
         "type": "object",
+        "required": ["providerAttempts"],
         "properties": {
           "researchRunId": { "type": "string", "format": "uuid" },
           "question": { "type": "string" },
@@ -1080,7 +1097,8 @@
             }
           },
           "reportClaims": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchReportClaimProvenanceResponse" } },
-          "quantitativeContributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeContributionProvenanceResponse" } }
+          "quantitativeContributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeContributionProvenanceResponse" } },
+          "providerAttempts": { "type": "array", "items": { "$ref": "#/components/schemas/LiteratureProviderAttemptResponse" } }
         }
       },
       "ProblemDetails": {

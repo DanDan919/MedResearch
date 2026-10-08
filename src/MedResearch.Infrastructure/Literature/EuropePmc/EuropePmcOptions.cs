@@ -18,6 +18,9 @@ public sealed class EuropePmcOptions
 
     public int TimeoutSeconds { get; init; } = 15;
 
+    public int MaxResponseBytes { get; init; } = 2_000_000;
+    public int BodyReadTimeoutSeconds { get; init; } = 15;
+
     public int MaxRequestsPerSecond { get; init; } = 2;
 
     public int MaxRetryAttempts { get; init; } = 2;
@@ -36,6 +39,8 @@ public sealed class EuropePmcOptions
 
     public void Validate()
     {
+        if (MaxResponseBytes is < 1 or > 10_000_000 || BodyReadTimeoutSeconds is < 1 or > 120)
+            throw new InvalidOperationException("EuropePmc response byte limit must be 1..10000000 and body timeout 1..120 seconds.");
         if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var baseUri) ||
             (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp))
         {

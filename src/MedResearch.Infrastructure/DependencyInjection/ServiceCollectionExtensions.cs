@@ -118,7 +118,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(pubMedOptions.BaseUrl, UriKind.Absolute);
             client.Timeout = pubMedOptions.Timeout;
-        });
+        }).RemoveAllLoggers();
         if (pubMedOptions.Enabled)
         {
             services.AddScoped<IScientificLiteratureSource>(provider =>
@@ -133,7 +133,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(europePmcOptions.BaseUrl, UriKind.Absolute);
             client.Timeout = europePmcOptions.Timeout;
-        });
+        }).RemoveAllLoggers();
         if (europePmcOptions.Enabled)
         {
             services.AddScoped<IScientificLiteratureSource>(provider =>
@@ -150,7 +150,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(europePmcOptions.BaseUrl, UriKind.Absolute);
             client.Timeout = europePmcFullTextOptions.Timeout;
-        });
+        }).RemoveAllLoggers();
         if (europePmcFullTextOptions.Enabled)
         {
             services.AddScoped<ISourceMaterialProvider>(provider =>
@@ -406,6 +406,9 @@ public static class ServiceCollectionExtensions
                 : section["ApiKey"],
             MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"] ?? section["ResultLimit"], 10, "PubMed:MaxResultsPerQuery"),
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "PubMed:TimeoutSeconds"),
+            MaxSearchResponseBytes = ReadPositiveInt(section["MaxSearchResponseBytes"], 256_000, "PubMed:MaxSearchResponseBytes"),
+            MaxFetchResponseBytes = ReadPositiveInt(section["MaxFetchResponseBytes"], 2_000_000, "PubMed:MaxFetchResponseBytes"),
+            BodyReadTimeoutSeconds = ReadPositiveInt(section["BodyReadTimeoutSeconds"], 15, "PubMed:BodyReadTimeoutSeconds"),
             MaxRequestsPerSecond = ReadMaxRequestsPerSecond(section),
             FetchBatchSize = ReadPositiveInt(section["FetchBatchSize"], 25, "PubMed:FetchBatchSize"),
             MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "PubMed:MaxRetryAttempts"),
@@ -434,6 +437,8 @@ public static class ServiceCollectionExtensions
             MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"], 10, "EuropePmc:MaxResultsPerQuery"),
             PageSize = ReadPositiveInt(section["PageSize"], 25, "EuropePmc:PageSize"),
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "EuropePmc:TimeoutSeconds"),
+            MaxResponseBytes = ReadPositiveInt(section["MaxResponseBytes"], 2_000_000, "EuropePmc:MaxResponseBytes"),
+            BodyReadTimeoutSeconds = ReadPositiveInt(section["BodyReadTimeoutSeconds"], 15, "EuropePmc:BodyReadTimeoutSeconds"),
             MaxRequestsPerSecond = ReadPositiveInt(section["MaxRequestsPerSecond"], 2, "EuropePmc:MaxRequestsPerSecond"),
             MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "EuropePmc:MaxRetryAttempts"),
             RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "EuropePmc:RetryBaseDelayMilliseconds")

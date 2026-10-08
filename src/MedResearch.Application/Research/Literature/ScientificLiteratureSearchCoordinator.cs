@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
 namespace MedResearch.Application.Research.Literature;
@@ -78,6 +79,7 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
 
             var searchExecutionId = Guid.NewGuid();
             var stopwatch = Stopwatch.StartNew();
+            await _searchResultStore.BeginAttemptAsync(searchExecutionId, researchRunId, researchPlanId, source.SourceName, query, DateTimeOffset.UtcNow, cancellationToken);
 
             _logger.LogInformation(
                 "ScientificSearchStarted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}",
@@ -86,70 +88,83 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
                 source.SourceName,
                 searchExecutionId);
 
+            ScientificSearchResult searchResult;
             try
             {
-                var searchResult = await source.SearchAsync(
+                searchResult = await source.SearchAsync(
                     new ScientificSearchRequest(researchRunId, searchExecutionId, query),
                     cancellationToken);
-
-                foreach (var candidate in searchResult.Candidates)
-                {
-                    _logger.LogInformation(
-                        "ScientificStudyDiscovered. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; PMID: {Pmid}; PMCID: {Pmcid}; DOI: {Doi}; ProviderRecordId: {ProviderRecordId}",
-                        researchRunId,
-                        researchPlanId,
-                        candidate.Source,
-                        searchExecutionId,
-                        candidate.Pmid,
-                        candidate.Pmcid,
-                        candidate.Doi,
-                        candidate.ProviderRecordId);
-                }
-
-                var persistenceResult = await _searchResultStore.PersistSearchResultsAsync(
-                    new ScientificSearchPersistenceRequest(
-                        searchExecutionId,
-                        researchRunId,
-                        researchPlanId,
-                        searchResult.Source,
-                        query,
-                        searchResult.SearchedAt,
-                        searchResult.ReturnedResultCount,
-                        searchResult.Candidates),
-                    cancellationToken);
-
-                stopwatch.Stop();
-                successfulSources++;
-
-                _logger.LogInformation(
-                    "ScientificSearchCompleted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; ResultCount: {ResultCount}; PersistedCount: {PersistedCount}; DuplicateCount: {DuplicateCount}; DurationMs: {DurationMs}",
-                    researchRunId,
-                    researchPlanId,
-                    searchResult.Source,
-                    searchExecutionId,
-                    searchResult.ReturnedResultCount,
-                    persistenceResult.PersistedCount,
-                    persistenceResult.DuplicateCount,
-                    stopwatch.ElapsedMilliseconds);
+                if (searchResult.Source != source.SourceName || searchResult.ReturnedResultCount < 0)
+                    throw new ScientificLiteratureSourceException("Scientific source returned an inconsistent result.", LiteratureProviderFailureCategory.InvalidResponse);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                // Host cancellation must not become scientific failure. A bounded best-effort write is still fenced.
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                try
+                {
+                    await _searchResultStore.FailAttemptAsync(searchExecutionId, LiteratureProviderFailureCategory.Cancelled, DateTimeOffset.UtcNow, cleanup.Token);
+                }
+                catch (Exception cleanupFailure)
+                {
+                    _logger.LogWarning("ScientificSearchCancellationNotPersisted. SearchExecutionId: {SearchExecutionId}; FailureType: {FailureType}", searchExecutionId, cleanupFailure.GetType().Name);
+                }
                 throw;
             }
             catch (Exception exception)
             {
-                stopwatch.Stop();
+                var category = exception switch
+                {
+                    ScientificLiteratureSourceException providerFailure => providerFailure.FailureCategory,
+                    TimeoutException or OperationCanceledException => LiteratureProviderFailureCategory.Timeout,
+                    _ => LiteratureProviderFailureCategory.UnexpectedFailure
+                };
+                await _searchResultStore.FailAttemptAsync(searchExecutionId, category, DateTimeOffset.UtcNow, cancellationToken);
                 failures.Add(exception);
+                _logger.LogWarning("ScientificSearchFailed. ResearchRunId: {ResearchRunId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; FailureCategory: {FailureCategory}; DurationMs: {DurationMs}",
+                    researchRunId, source.SourceName, searchExecutionId, category, stopwatch.ElapsedMilliseconds);
+                continue;
+            }
 
-                _logger.LogError(
-                    exception,
-                    "ScientificSearchFailed. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; DurationMs: {DurationMs}",
+            foreach (var candidate in searchResult.Candidates)
+            {
+                _logger.LogInformation(
+                    "ScientificStudyDiscovered. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; PMID: {Pmid}; PMCID: {Pmcid}; DOI: {Doi}; ProviderRecordId: {ProviderRecordId}",
                     researchRunId,
                     researchPlanId,
-                    source.SourceName,
+                    candidate.Source,
                     searchExecutionId,
-                    stopwatch.ElapsedMilliseconds);
+                    candidate.Pmid,
+                    candidate.Pmcid,
+                    candidate.Doi,
+                    candidate.ProviderRecordId);
             }
+
+            var persistenceResult = await _searchResultStore.PersistSearchResultsAsync(
+                new ScientificSearchPersistenceRequest(
+                    searchExecutionId,
+                    researchRunId,
+                    researchPlanId,
+                    searchResult.Source,
+                    query,
+                    searchResult.SearchedAt,
+                    searchResult.ReturnedResultCount,
+                    searchResult.Candidates),
+                cancellationToken);
+
+            stopwatch.Stop();
+            successfulSources++;
+
+            _logger.LogInformation(
+                "ScientificSearchCompleted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; ResultCount: {ResultCount}; PersistedCount: {PersistedCount}; DuplicateCount: {DuplicateCount}; DurationMs: {DurationMs}",
+                researchRunId,
+                researchPlanId,
+                searchResult.Source,
+                searchExecutionId,
+                searchResult.ReturnedResultCount,
+                persistenceResult.PersistedCount,
+                persistenceResult.DuplicateCount,
+                stopwatch.ElapsedMilliseconds);
         }
 
         if (successfulSources == 0)

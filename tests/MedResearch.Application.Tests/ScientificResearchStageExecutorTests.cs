@@ -708,6 +708,8 @@ public sealed class ScientificResearchStageExecutorTests
 
     private sealed class RecordingSearchResultStore : IScientificSearchResultStore
     {
+        public Task BeginAttemptAsync(Guid attemptId, Guid researchRunId, Guid researchPlanId, string source, string query, DateTimeOffset startedAt, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task FailAttemptAsync(Guid attemptId, LiteratureProviderFailureCategory category, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.CompletedTask;
         public List<ScientificSearchPersistenceRequest> Requests { get; } = [];
 
         public Task<bool> HasPersistedSearchAsync(

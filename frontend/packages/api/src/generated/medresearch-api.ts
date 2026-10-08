@@ -646,6 +646,26 @@ export interface components {
             /** Format: uuid */
             sourceMaterialId?: string;
         };
+        LiteratureProviderAttemptResponse: {
+            /** Format: uuid */
+            attemptId: string;
+            /** Format: uuid */
+            researchPlanId: string;
+            /** @enum {string} */
+            source: "PubMed" | "EuropePmc";
+            query: string;
+            /** @enum {string} */
+            status: "Started" | "SucceededWithResults" | "SucceededZeroResults" | "Failed" | "TimedOut" | "Cancelled";
+            resultCount: number | null;
+            /** @enum {string|null} */
+            failureCategory: "NetworkFailure" | "Timeout" | "RateLimited" | "InvalidResponse" | "ProviderProtocolError" | "ResponseTooLarge" | "Cancelled" | "UnexpectedFailure" | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+            /** Format: uuid */
+            literatureSearchId: string | null;
+        };
         ResearchProvenanceResponse: {
             /** Format: uuid */
             researchRunId?: string;
@@ -682,6 +702,7 @@ export interface components {
             }[];
             reportClaims?: components["schemas"]["ResearchReportClaimProvenanceResponse"][];
             quantitativeContributions?: components["schemas"]["QuantitativeContributionProvenanceResponse"][];
+            providerAttempts: components["schemas"]["LiteratureProviderAttemptResponse"][];
         };
         ProblemDetails: {
             type?: string;

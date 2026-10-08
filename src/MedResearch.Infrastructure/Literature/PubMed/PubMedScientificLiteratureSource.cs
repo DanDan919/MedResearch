@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using MedResearch.Application.Research.Literature;
+using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +12,6 @@ namespace MedResearch.Infrastructure.Literature.PubMed;
 public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSource
 {
     public const string PubMedSourceName = ScientificLiteratureSourceNames.PubMed;
-    private const int MaximumErrorBodyBytes = 1024;
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly HttpClient _httpClient;
@@ -21,6 +21,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
     private readonly IPubMedRequestGate _requestGate;
     private readonly IPubMedRetryDelay _retryDelay;
     private readonly ILogger<PubMedScientificLiteratureSource> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public PubMedScientificLiteratureSource(
         HttpClient httpClient,
@@ -29,7 +30,8 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         PubMedArticleMapper articleMapper,
         IPubMedRequestGate requestGate,
         IPubMedRetryDelay retryDelay,
-        ILogger<PubMedScientificLiteratureSource> logger)
+        ILogger<PubMedScientificLiteratureSource> logger,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient;
         _options = options.Value;
@@ -38,6 +40,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         _requestGate = requestGate;
         _retryDelay = retryDelay;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public string SourceName => PubMedSourceName;
@@ -58,7 +61,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         {
             var searchedAt = DateTimeOffset.UtcNow;
             var searchResult = await SearchPmidsAsync(request.Query, cancellationToken);
-            var pmids = searchResult.Pmids.Distinct(StringComparer.Ordinal).ToArray();
+            var pmids = searchResult.Pmids.Distinct(StringComparer.Ordinal).Take(_options.BoundedMaxResultsPerQuery).ToArray();
 
             _logger.LogInformation(
                 "PubMedESearchCompleted. ResearchRunId: {ResearchRunId}; SearchExecutionId: {SearchExecutionId}; ReturnedPmidCount: {ReturnedPmidCount}; TotalAvailableCount: {TotalAvailableCount}",
@@ -78,7 +81,15 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ScientificLiteratureSourceException("PubMed request timed out.", exception);
+            throw new ScientificLiteratureSourceException("PubMed request timed out.", LiteratureProviderFailureCategory.Timeout, exception);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new ScientificLiteratureSourceException("PubMed body read timed out.", LiteratureProviderFailureCategory.Timeout, exception);
+        }
+        catch (ProviderResponseTooLargeException exception)
+        {
+            throw new ScientificLiteratureSourceException("PubMed response exceeded the byte limit.", LiteratureProviderFailureCategory.ResponseTooLarge, exception);
         }
         catch (OperationCanceledException)
         {
@@ -86,23 +97,23 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         }
         catch (PubMedResponseException exception)
         {
-            throw new ScientificLiteratureSourceException("PubMed returned an invalid response.", exception);
+            throw new ScientificLiteratureSourceException("PubMed returned an invalid response.", LiteratureProviderFailureCategory.InvalidResponse, exception);
         }
         catch (PubMedHttpException exception) when (exception.StatusCode == HttpStatusCode.TooManyRequests)
         {
-            throw new ScientificLiteratureSourceException("PubMed rate limit was reached.", exception);
+            throw new ScientificLiteratureSourceException("PubMed rate limit was reached.", LiteratureProviderFailureCategory.RateLimited, exception);
         }
         catch (PubMedHttpException exception)
         {
-            throw new ScientificLiteratureSourceException("PubMed request failed.", exception);
+            throw new ScientificLiteratureSourceException("PubMed request failed.", LiteratureProviderFailureCategory.ProviderProtocolError, exception);
         }
-        catch (HttpRequestException exception)
+        catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
-            throw new ScientificLiteratureSourceException("PubMed request failed.", exception);
+            throw new ScientificLiteratureSourceException("PubMed request failed.", LiteratureProviderFailureCategory.NetworkFailure);
         }
         catch (ScientificLiteratureRateLimitException exception)
         {
-            throw new ScientificLiteratureSourceException("PubMed local rate limiter rejected the request.", exception);
+            throw new ScientificLiteratureSourceException("PubMed local rate limiter rejected the request.", LiteratureProviderFailureCategory.RateLimited, exception);
         }
     }
 
@@ -117,8 +128,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
             ["sort"] = "relevance"
         });
 
-        using var response = await SendWithRetryAsync(uri, "ESearch", cancellationToken);
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var content = await SendWithRetryAsync(uri, "ESearch", _options.MaxSearchResponseBytes, cancellationToken);
 
         return _searchResponseParser.Parse(content);
     }
@@ -147,8 +157,7 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
             });
 
             var stopwatch = Stopwatch.StartNew();
-            using var response = await SendWithRetryAsync(uri, "EFetch", cancellationToken);
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var content = await SendWithRetryAsync(uri, "EFetch", _options.MaxFetchResponseBytes, cancellationToken);
             candidates.AddRange(_articleMapper.MapArticles(content));
             stopwatch.Stop();
 
@@ -165,9 +174,10 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         return DeduplicateCandidates(candidates);
     }
 
-    private async Task<HttpResponseMessage> SendWithRetryAsync(
+    private async Task<string> SendWithRetryAsync(
         Uri uri,
         string operation,
+        int maximumBytes,
         CancellationToken cancellationToken)
     {
         for (var retryCount = 0;; retryCount++)
@@ -178,7 +188,8 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
 
             try
             {
-                var response = await SendOnceAsync(uri, cancellationToken);
+                using var response = await SendOnceAsync(uri, cancellationToken);
+                var body = await BoundedProviderBody.ReadAsync(response.Content, maximumBytes, TimeSpan.FromSeconds(_options.BodyReadTimeoutSeconds), cancellationToken, _timeProvider);
                 stopwatch.Stop();
 
                 _logger.LogDebug(
@@ -187,23 +198,21 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
                     attempt,
                     stopwatch.ElapsedMilliseconds);
 
-                return response;
+                return body;
             }
-            catch (Exception exception) when (IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
             {
                 stopwatch.Stop();
                 var delay = ComputeRetryDelay(retryCount, exception);
 
                 _logger.LogWarning(
-                    exception,
-                    "PubMedTransientRequestFailed. Operation: {Operation}; Attempt: {Attempt}; RetryNumber: {RetryNumber}; DelayMs: {DelayMs}; DurationMs: {DurationMs}; HttpStatusCode: {HttpStatusCode}; DiagnosticBody: {DiagnosticBody}",
+                    "PubMedTransientRequestFailed. Operation: {Operation}; Attempt: {Attempt}; RetryNumber: {RetryNumber}; DelayMs: {DelayMs}; DurationMs: {DurationMs}; HttpStatusCode: {HttpStatusCode}",
                     operation,
                     attempt,
                     retryCount + 1,
                     delay.TotalMilliseconds,
                     stopwatch.ElapsedMilliseconds,
-                    exception is PubMedHttpException httpException ? (int?)httpException.StatusCode : null,
-                    exception is PubMedHttpException bodyException ? bodyException.DiagnosticBody : null);
+                    exception is PubMedHttpException httpException ? (int?)httpException.StatusCode : null);
 
                 await _retryDelay.DelayAsync(delay, cancellationToken);
             }
@@ -222,11 +231,10 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
             return response;
         }
 
-        var diagnosticBody = await ReadBoundedErrorBodyAsync(response.Content, cancellationToken);
-        var retryAfter = ReadRetryAfter(response.Headers.RetryAfter);
-        var exception = new PubMedHttpException(response.StatusCode, diagnosticBody, retryAfter);
-        response.Dispose();
-        throw exception;
+        using (response)
+        {
+            throw new PubMedHttpException(response.StatusCode, null, ReadRetryAfter(response.Headers.RetryAfter));
+        }
     }
 
     private Uri BuildUri(string endpoint, IReadOnlyDictionary<string, string?> parameters)
@@ -267,7 +275,8 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
             PubMedHttpException { StatusCode: HttpStatusCode.TooManyRequests } => true,
             PubMedHttpException { StatusCode: >= HttpStatusCode.InternalServerError } => true,
             HttpRequestException { StatusCode: null } => true,
-            TaskCanceledException => true,
+            IOException => true,
+            TaskCanceledException or TimeoutException => true,
             _ => false
         };
     }
@@ -305,20 +314,6 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         }
 
         return null;
-    }
-
-    private static async Task<string?> ReadBoundedErrorBodyAsync(HttpContent content, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        var buffer = new byte[MaximumErrorBodyBytes];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-
-        if (read == 0)
-        {
-            return null;
-        }
-
-        return System.Text.Encoding.UTF8.GetString(buffer, 0, read).Trim();
     }
 
     private static IReadOnlyCollection<ScientificStudyCandidate> DeduplicateCandidates(

@@ -31,6 +31,27 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
         _writeFence = writeFence;
     }
 
+    public async Task BeginAttemptAsync(Guid attemptId, Guid researchRunId, Guid researchPlanId, string source, string query, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (_writeFence is not null) await _writeFence.AssertOwnedAsync(researchRunId, cancellationToken);
+        if (!await _dbContext.ResearchPlans.AnyAsync(x => x.Id == researchPlanId && x.ResearchRunId == researchRunId, cancellationToken))
+            throw new InvalidOperationException("Search plan must belong to the attempt's run.");
+        _dbContext.LiteratureProviderAttempts.Add(new LiteratureProviderAttempt(attemptId, researchRunId, researchPlanId, source, query, startedAt));
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task FailAttemptAsync(Guid attemptId, LiteratureProviderFailureCategory category, DateTimeOffset completedAt, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var attempt = await _dbContext.LiteratureProviderAttempts.SingleAsync(x => x.Id == attemptId, cancellationToken);
+        if (_writeFence is not null) await _writeFence.AssertOwnedAsync(attempt.ResearchRunId, cancellationToken);
+        attempt.Fail(category, completedAt);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public Task<bool> HasPersistedSearchAsync(
         Guid researchRunId,
         Guid researchPlanId,
@@ -141,6 +162,14 @@ public sealed class EfScientificSearchResultStore : IScientificSearchResultStore
             persistedCount,
             duplicateCount,
             request.ResearchPlanId));
+
+        var attempt = await _dbContext.LiteratureProviderAttempts.SingleOrDefaultAsync(x => x.Id == request.SearchExecutionId, cancellationToken);
+        if (attempt is not null)
+        {
+            if (attempt.ResearchRunId != request.ResearchRunId || attempt.ResearchPlanId != request.ResearchPlanId || attempt.Source != request.Source || attempt.Query != request.Query.Trim())
+                throw new InvalidOperationException("Search outcome does not match its provider attempt.");
+            attempt.Succeed(request.SearchExecutionId, request.ResultCount, DateTimeOffset.UtcNow);
+        }
 
         try
         {

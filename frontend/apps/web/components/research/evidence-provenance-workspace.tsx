@@ -53,6 +53,7 @@ export function EvidenceProvenanceWorkspace({ researchRunId }: { researchRunId: 
       </header>
 
       <Coverage coverage={provenance.coverage} />
+      <ProviderAttempts attempts={provenance.providerAttempts} />
       <SearchExecutions provenance={provenance} />
 
       <Card>
@@ -71,11 +72,21 @@ export function EvidenceProvenanceWorkspace({ researchRunId }: { researchRunId: 
       </Card>
 
       <ClaimsSection claims={provenance.reportClaims} />
-      {!provenance.coverage.hasPersistedProviderFailureProvenance ? (
-        <p className="text-xs text-muted-foreground">Provider failure attempts are not persisted by the current LiteratureSearch model; zero-result executions are shown separately from successful searches with results.</p>
-      ) : null}
     </div>
   );
+}
+
+function ProviderAttempts({ attempts }: { attempts: ResearchProvenanceResponse["providerAttempts"] }) {
+  const labels = { Started: "Started / outcome not recorded", SucceededWithResults: "Succeeded", SucceededZeroResults: "No results", Failed: "Failed", TimedOut: "Timed out", Cancelled: "Cancelled" };
+  return <section className="space-y-3" aria-label="Provider coverage">
+    <h2 className="text-lg font-semibold">Provider coverage</h2>
+    {attempts.length === 0 ? <p className="text-sm text-muted-foreground">No provider attempts recorded. Historical searches may predate attempt tracking.</p> :
+      <div className="divide-y divide-border border-y border-border">{attempts.map(attempt => <div key={attempt.attemptId} className="grid gap-2 py-3 text-sm md:grid-cols-[100px_1fr_auto]">
+        <span className="font-medium">{attempt.source}</span>
+        <div className="min-w-0"><p className="break-words">{attempt.query}</p><p className="mt-1 text-xs text-muted-foreground">{formatTimestamp(attempt.startedAt)}{attempt.completedAt ? ` - ${formatTimestamp(attempt.completedAt)}` : ""}</p></div>
+        <div><Badge tone={attempt.failureCategory ? "neutral" : undefined}>{labels[attempt.status]}</Badge>{attempt.resultCount !== null ? <p className="mt-1 text-xs">{attempt.resultCount} provider result(s)</p> : null}{attempt.failureCategory ? <p className="mt-1 text-xs text-muted-foreground">Reason: {attempt.failureCategory}</p> : null}</div>
+      </div>)}</div>}
+  </section>;
 }
 
 function Coverage({ coverage }: { coverage: ResearchProvenanceResponse["coverage"] }) {

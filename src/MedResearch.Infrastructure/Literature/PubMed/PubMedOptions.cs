@@ -17,6 +17,10 @@ public sealed class PubMedOptions
 
     public int TimeoutSeconds { get; init; } = 15;
 
+    public int MaxSearchResponseBytes { get; init; } = 256_000;
+    public int MaxFetchResponseBytes { get; init; } = 2_000_000;
+    public int BodyReadTimeoutSeconds { get; init; } = 15;
+
     public string Tool { get; init; } = "MedResearch";
 
     public string? Email { get; init; }
@@ -55,6 +59,8 @@ public sealed class PubMedOptions
 
     public void Validate()
     {
+        if (MaxSearchResponseBytes is < 1 or > 1_000_000 || MaxFetchResponseBytes is < 1 or > 10_000_000 || BodyReadTimeoutSeconds is < 1 or > 120)
+            throw new InvalidOperationException("PubMed search byte limit must be 1..1000000, fetch limit 1..10000000 and body timeout 1..120 seconds.");
         if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var baseUri) ||
             (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp))
         {

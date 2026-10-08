@@ -5,6 +5,7 @@ using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.SourceMaterials;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Literature.EuropePmc;
+using MedResearch.Infrastructure.Literature;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,7 +13,6 @@ namespace MedResearch.Infrastructure.SourceMaterials.EuropePmc;
 
 public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialProvider
 {
-    private const int MaximumErrorBodyBytes = 1024;
     private const int MaximumXmlBytes = 2_000_000;
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(30);
 
@@ -57,21 +57,20 @@ public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialPro
         var uri = new Uri(_httpClient.BaseAddress ?? new Uri("https://www.ebi.ac.uk/europepmc/webservices/rest/"), $"{Uri.EscapeDataString(study.Pmcid)}/fullTextXML");
         var stopwatch = Stopwatch.StartNew();
 
-        using var response = await SendWithRetryAsync(uri, cancellationToken);
-        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden or HttpStatusCode.Gone)
+        var (statusCode, xml) = await SendWithRetryAsync(uri, cancellationToken);
+        if (statusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden or HttpStatusCode.Gone)
         {
             _logger.LogInformation(
                 "EuropePmcFullTextUnavailable. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; PMCID: {Pmcid}; HttpStatusCode: {HttpStatusCode}; DurationMs: {DurationMs}",
                 study.ResearchRunId,
                 study.StudyId,
                 study.Pmcid,
-                (int)response.StatusCode,
+                (int)statusCode,
                 stopwatch.ElapsedMilliseconds);
             return null;
         }
 
-        var xml = await ReadBoundedContentAsync(response.Content, cancellationToken);
-        var parsed = _parser.Parse(xml, boundedContentCharacters);
+        var parsed = _parser.Parse(xml!, boundedContentCharacters);
         stopwatch.Stop();
 
         _logger.LogInformation(
@@ -98,20 +97,29 @@ public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialPro
             parsed.SectionNames);
     }
 
-    private async Task<HttpResponseMessage> SendWithRetryAsync(Uri uri, CancellationToken cancellationToken)
+    private async Task<(HttpStatusCode StatusCode, string? Body)> SendWithRetryAsync(Uri uri, CancellationToken cancellationToken)
     {
         for (var retryCount = 0;; retryCount++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                return await SendOnceAsync(uri, cancellationToken);
+                using var response = await SendOnceAsync(uri, cancellationToken);
+                if (!response.IsSuccessStatusCode) return (response.StatusCode, null);
+                try
+                {
+                    var body = await BoundedProviderBody.ReadAsync(response.Content, MaximumXmlBytes, _options.Timeout, cancellationToken);
+                    return (response.StatusCode, body);
+                }
+                catch (ProviderResponseTooLargeException)
+                {
+                    throw new EuropePmcFullTextResponseException("Europe PMC full-text XML exceeded 2000000 bytes.");
+                }
             }
-            catch (Exception exception) when (IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
             {
                 var delay = ComputeRetryDelay(retryCount, exception);
                 _logger.LogWarning(
-                    exception,
                     "EuropePmcFullTextTransientRequestFailed. Attempt: {Attempt}; RetryNumber: {RetryNumber}; DelayMs: {DelayMs}",
                     retryCount + 1,
                     retryCount + 1,
@@ -133,11 +141,10 @@ public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialPro
             return response;
         }
 
-        var diagnosticBody = await ReadBoundedErrorBodyAsync(response.Content, cancellationToken);
-        var retryAfter = ReadRetryAfter(response.Headers.RetryAfter);
-        var exception = new EuropePmcFullTextHttpException(response.StatusCode, diagnosticBody, retryAfter);
-        response.Dispose();
-        throw exception;
+        using (response)
+        {
+            throw new EuropePmcFullTextHttpException(response.StatusCode, null, ReadRetryAfter(response.Headers.RetryAfter));
+        }
     }
 
     private static bool IsTransientFailure(Exception exception)
@@ -147,7 +154,8 @@ public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialPro
             EuropePmcFullTextHttpException { StatusCode: HttpStatusCode.TooManyRequests } => true,
             EuropePmcFullTextHttpException { StatusCode: >= HttpStatusCode.InternalServerError } => true,
             HttpRequestException { StatusCode: null } => true,
-            TaskCanceledException => true,
+            IOException => true,
+            TaskCanceledException or TimeoutException => true,
             _ => false
         };
     }
@@ -187,43 +195,6 @@ public sealed class EuropePmcFullTextSourceMaterialProvider : ISourceMaterialPro
         return null;
     }
 
-    private static async Task<string> ReadBoundedContentAsync(HttpContent content, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        using var memory = new MemoryStream();
-        var buffer = new byte[8192];
-        var total = 0;
-
-        while (true)
-        {
-            var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-            if (read == 0)
-            {
-                break;
-            }
-
-            total += read;
-            if (total > MaximumXmlBytes)
-            {
-                throw new EuropePmcFullTextResponseException($"Europe PMC full-text XML exceeded {MaximumXmlBytes} bytes.");
-            }
-
-            memory.Write(buffer, 0, read);
-        }
-
-        return System.Text.Encoding.UTF8.GetString(memory.ToArray());
-    }
-
-    private static async Task<string?> ReadBoundedErrorBodyAsync(HttpContent content, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        var buffer = new byte[MaximumErrorBodyBytes];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-
-        return read == 0
-            ? null
-            : System.Text.Encoding.UTF8.GetString(buffer, 0, read).Trim();
-    }
 }
 
 public sealed class EuropePmcFullTextHttpException : Exception

@@ -27,6 +27,7 @@ public sealed class MigrationRuntimeTests
         Assert.NotEmpty(configuredMigrations);
         Assert.Contains("20260901063528_AddResearchRunProcessingLeases", configuredMigrations);
         Assert.Contains("20261008041640_AddEvidenceTimepoint", configuredMigrations);
+        Assert.Contains("20261008053910_AddLiteratureProviderAttempts", configuredMigrations);
         Assert.Equal(configuredMigrations, appliedMigrations);
         Assert.Empty(pendingMigrations);
     }

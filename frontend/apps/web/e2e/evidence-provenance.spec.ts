@@ -10,7 +10,26 @@ test("evidence workspace shows multi-search provenance and honest zero-evidence 
   await expect(page.getByText("Discovery paths (2)")).toBeVisible();
   await expect(page.getByText("No validated Evidence is available for this extraction.")).toBeVisible();
   await expect(page.getByText("raw source body", { exact: false })).not.toBeVisible();
-  await expect(page.getByText("provider failure attempts are not persisted", { exact: false })).toBeVisible();
+  await expect(page.getByText("No provider attempts recorded.", { exact: false })).toBeVisible();
+});
+
+test("partial provider failure remains visible beside persisted studies", async ({ page }) => {
+  const response = provenanceResponse(false);
+  response.providerAttempts = [
+    { attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", researchPlanId: runId, source: "PubMed", query: "sleep recall", status: "SucceededWithResults", resultCount: 1, failureCategory: null, startedAt: response.createdAt, completedAt: response.completedAt, literatureSearchId: response.searches[0].literatureSearchId },
+    { attemptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", researchPlanId: runId, source: "EuropePmc", query: "sleep recall", status: "Failed", resultCount: null, failureCategory: "NetworkFailure", startedAt: response.createdAt, completedAt: response.completedAt, literatureSearchId: null }
+  ];
+  response.coverage.hasPersistedProviderFailureProvenance = true;
+  response.searches = response.searches.slice(0, 1);
+  response.studies[0].discoveryPaths = response.studies[0].discoveryPaths.slice(0, 1);
+  await mockProvenanceApi(page, response);
+  await page.goto(`/research/${runId}/evidence`);
+  const coverage = page.getByRole("region", { name: "Provider coverage" });
+  await expect(coverage.getByText("PubMed", { exact: true })).toBeVisible();
+  await expect(coverage.getByText("Succeeded", { exact: true })).toBeVisible();
+  await expect(coverage.getByText("EuropePmc", { exact: true })).toBeVisible();
+  await expect(coverage.getByText("Failed", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sleep and recall" })).toBeVisible();
 });
 
 test("evidence workspace links claims and quantitative contributions to persisted evidence", async ({ page }) => {
@@ -53,6 +72,7 @@ function provenanceResponse(withEvidence: boolean) {
     completedAt: now,
     coverage: { researchPlanCount: 1, literatureSearchCount: 2, discoveryPathCount: 2, distinctStudyCount: 1, sourceMaterialCount: 1, evidenceExtractionCount: 1, evidenceFindingCount: withEvidence ? 1 : 0, evidenceEvaluationCount: 0, researchReportClaimCount: withEvidence ? 1 : 0, hasPersistedProviderFailureProvenance: false },
     plans: [],
+    providerAttempts: [] as Array<{ attemptId: string; researchPlanId: string; source: string; query: string; status: string; resultCount: number | null; failureCategory: string | null; startedAt: string; completedAt: string | null; literatureSearchId: string | null }>,
     searches: [
       { literatureSearchId: "99999999-9999-4999-8999-999999999999", researchPlanId: null, source: "PubMed", query: "sleep recall", searchedAt: now, resultCount: 1, persistedStudyCount: 1, duplicateStudyCount: 0, resultStatus: "SucceededWithResults" },
       { literatureSearchId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", researchPlanId: null, source: "EuropePmc", query: "sleep recall", searchedAt: now, resultCount: 1, persistedStudyCount: 1, duplicateStudyCount: 0, resultStatus: "SucceededWithResults" }

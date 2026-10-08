@@ -579,7 +579,10 @@ static ResearchProvenanceResponse ToProvenanceResponse(ResearchProvenanceReadMod
             contribution.EvidenceId,
             contribution.StudyId,
             contribution.EvidenceExtractionId,
-            contribution.SourceMaterialId)).ToArray());
+            contribution.SourceMaterialId)).ToArray(),
+        provenance.ProviderAttempts.Select(attempt => new LiteratureProviderAttemptResponse(
+            attempt.AttemptId, attempt.ResearchPlanId, attempt.Source, attempt.Query, attempt.Status.ToString(), attempt.ResultCount,
+            attempt.FailureCategory?.ToString(), attempt.StartedAt, attempt.CompletedAt, attempt.LiteratureSearchId)).ToArray());
 }
 public partial class Program
 {

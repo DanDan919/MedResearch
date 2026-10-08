@@ -71,6 +71,13 @@ public sealed class EfResearchProvenanceStore : IResearchProvenanceStore
                 search.ResultCount == 0 ? "SucceededWithZeroResults" : "SucceededWithResults"))
             .ToArrayAsync(cancellationToken);
 
+        var attempts = await _dbContext.LiteratureProviderAttempts.AsNoTracking()
+            .Where(attempt => attempt.ResearchRunId == researchRunId)
+            .OrderBy(attempt => attempt.StartedAt).ThenBy(attempt => attempt.Id)
+            .Select(attempt => new LiteratureProviderAttemptProvenance(attempt.Id, attempt.ResearchPlanId, attempt.Source, attempt.Query,
+                attempt.Status, attempt.ResultCount, attempt.FailureCategory, attempt.StartedAt, attempt.CompletedAt, attempt.LiteratureSearchId))
+            .ToArrayAsync(cancellationToken);
+
         var discoveryRows = await (
             from discovery in _dbContext.ResearchStudyDiscoveries.AsNoTracking()
             join search in _dbContext.LiteratureSearches.AsNoTracking()
@@ -340,11 +347,12 @@ public sealed class EfResearchProvenanceStore : IResearchProvenanceStore
                 evidence.Length,
                 evaluations.Length,
                 claimReadModels.Length,
-                false),
+                attempts.Any(attempt => attempt.FailureCategory != null)),
             plans,
             searches,
             studyReadModels,
             claimReadModels,
-            quantitativeContributions);
+            quantitativeContributions,
+            attempts);
     }
 }

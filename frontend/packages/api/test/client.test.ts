@@ -138,6 +138,7 @@ function provenanceResponse() {
   return {
     researchRunId: "11111111-1111-4111-8111-111111111111",
     question: "Does sleep improve recall?",
+    providerAttempts: [],
     status: "Completed",
     createdAt: "2026-09-28T12:00:00Z",
     startedAt: "2026-09-28T12:01:00Z",

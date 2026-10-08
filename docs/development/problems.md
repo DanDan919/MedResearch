@@ -1,5 +1,14 @@
 # Problems
 
+## F15.2: provider metadata, outcomes and success-body boundaries (2026-10-08)
+
+- Reproduced Europe PMC date defect before production fix: fixture pubYear=1998 and firstIndexDate=2025-03-17 returned year 2025. Removed index-date fallback; date matrix is deterministic.
+- Failed provider calls previously disappeared from persisted search provenance. Added logical attempt history with atomic success, typed failures, cancellation and unchanged successful recovery key; stale-owner writes are rejected by the existing fence.
+- Result/page counts did not cap HTTP bytes and ResponseHeadersRead left body reads without an explicit deadline. Added bounded streaming/deadline tests with fake time and stalled streams; retained the full-text 2,000,000-byte guard.
+- Found incompatible publication-date parts could be merged into a global Study. Date enrichment now rejects the conflicting group; it does not overwrite existing publication parts.
+- Removed raw error-body/exception retry logs and default HTTP URI logs for scientific clients; PubMed query parameters can contain a configured secret.
+- Local Docker Linux pipe remains unavailable. PostgreSQL/Testcontainers runtime confidence must come from actual strict CI, not local skips. Details/results: `f15-2-provider-runtime-integrity-hardening-ru.md`.
+
 ## 2026-10-08: explicit n= hospital count survived the first F15.1 fix
 
 An additional adversarial test after the first green CI reproduced another

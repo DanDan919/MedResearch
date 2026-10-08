@@ -34,6 +34,8 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<LiteratureSearch> LiteratureSearches => Set<LiteratureSearch>();
 
+    public DbSet<LiteratureProviderAttempt> LiteratureProviderAttempts => Set<LiteratureProviderAttempt>();
+
     public DbSet<ResearchStudyDiscovery> ResearchStudyDiscoveries => Set<ResearchStudyDiscovery>();
 
     public DbSet<QuantitativeSynthesisArtifactEntity> QuantitativeSynthesisArtifacts => Set<QuantitativeSynthesisArtifactEntity>();

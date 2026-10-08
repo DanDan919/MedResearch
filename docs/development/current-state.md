@@ -1,5 +1,11 @@
 # Current State
 
+## F15.2 Provider/Runtime Integrity
+
+F15.2 removes Europe PMC indexing-date fallback from publication metadata and prevents incompatible Study date-part enrichment. It adds lease-fenced durable LiteratureProviderAttempt history (including zero results, failure, timeout, cancellation and unfinished Started). Successful attempt completion is atomic with scientific search output; existing successful search recovery keys remain authoritative. The owner/run-scoped provenance API and minimal Evidence workspace expose attempts. A forward migration, `20261008053910_AddLiteratureProviderAttempts`, adds metadata only.
+
+PubMed ESearch/EFetch, Europe PMC search and structured full text use inclusive streaming byte caps and explicit cancellable body deadlines. Error bodies/URI logging are disabled; typed bounded diagnostics replace raw transcripts. F15.1 source-proof protections and M17-M24 formulas are unchanged. Normal automated tests use fake providers/HTTP; PostgreSQL verification is CI-authoritative when local Docker is unavailable. Detailed final verification is recorded in `f15-2-provider-runtime-integrity-hardening-ru.md`.
+
 ## F15.1 Scientific Trust Boundary Correction
 
 Baseline after the separately authorized audit-document commit: `360e38a`.
@@ -427,7 +433,7 @@ F9 makes two recovery windows idempotent without changing the scientific pipelin
 
 F9 also corrects empty-evidence coverage semantics: no validated Evidence is not reported as abstract-only evidence. The frontend CI workflow now installs Chromium and runs the existing deterministic Playwright suite. Local Docker-backed integration tests may still skip when Docker Desktop is unavailable; CI remains authoritative for PostgreSQL execution.
 
-Known limitation retained intentionally: provider failures during a partial multi-source search are logged and do not yet have a first-class persisted failed LiteratureSearch attempt/status. This remains technical debt before automatic failed-attempt replay is expanded.
+Historical F9 limitation: provider failures originally had only logs. F15.2 closes that gap through separate durable LiteratureProviderAttempt history while keeping LiteratureSearch as successful scientific provenance. Acquisition-failure history remains separate debt.
 
 ## Frontend F3 Research Execution Observatory
 
@@ -446,7 +452,7 @@ F3 adds a backend-backed progress read model and upgrades `/research/[id]` from 
 
 F13 adds the owner-authorized `GET /api/research/{researchRunId}/provenance` endpoint and `/research/[id]/evidence` read-only workspace. The backend projects one ResearchRun's persisted search executions, per-search discovery paths, canonical Studies, SourceMaterial metadata, run-scoped extraction/Evidence/Evaluation records, report claim Evidence links, and quantitative contribution lineage. A study discovered by PubMed and Europe PMC appears once with multiple discovery paths.
 
-The endpoint intentionally excludes raw `SourceMaterial.Content`. The UI shows content hashes, versions, access status, character counts, and sections instead. It does not invent identifiers, citations, confidence, or study-level quantitative intervals. Search results with zero records are represented as successful zero-result executions. Provider failure attempts are not currently persisted by `LiteratureSearch`; that limitation is exposed and documented instead of being hidden.
+The endpoint intentionally excludes raw `SourceMaterial.Content`. The UI shows content hashes, versions, access status, character counts, and sections instead. It does not invent identifiers, citations, confidence, or study-level quantitative intervals. Search results with zero records are successful zero-result executions. Since F15.2, separate LiteratureProviderAttempt history also exposes failed/timeout/cancelled/unfinished calls; historical absence of attempt rows is not reconstructed.
 
 Cross-run isolation is enforced in the EF projection by owner-filtering the ResearchRun and filtering all run-scoped child records by the requested run. Report claim Evidence links are additionally joined to same-run Evidence. PostgreSQL integration coverage verifies the global Study/multiple discovery relationship and run-scoped Evidence graph; API and Playwright tests cover authorization, zero evidence, source-content exclusion, claim links, and quantitative lineage.
 ## Canonical HKSJ Summary-Effect Inference V1

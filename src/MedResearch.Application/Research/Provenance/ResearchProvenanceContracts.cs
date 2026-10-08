@@ -14,7 +14,13 @@ public sealed record ResearchProvenanceReadModel(
     IReadOnlyCollection<LiteratureSearchProvenance> Searches,
     IReadOnlyCollection<StudyProvenance> Studies,
     IReadOnlyCollection<ResearchReportClaimProvenance> ReportClaims,
-    IReadOnlyCollection<QuantitativeContributionProvenance> QuantitativeContributions);
+    IReadOnlyCollection<QuantitativeContributionProvenance> QuantitativeContributions,
+    IReadOnlyCollection<LiteratureProviderAttemptProvenance> ProviderAttempts);
+
+public sealed record LiteratureProviderAttemptProvenance(
+    Guid AttemptId, Guid ResearchPlanId, string Source, string Query,
+    LiteratureProviderAttemptStatus Status, int? ResultCount, LiteratureProviderFailureCategory? FailureCategory,
+    DateTimeOffset StartedAt, DateTimeOffset? CompletedAt, Guid? LiteratureSearchId);
 
 public sealed record ResearchProvenanceCoverage(
     int ResearchPlanCount,

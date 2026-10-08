@@ -12,7 +12,13 @@ public sealed record ResearchProvenanceResponse(
     IReadOnlyCollection<LiteratureSearchProvenanceResponse> Searches,
     IReadOnlyCollection<StudyProvenanceResponse> Studies,
     IReadOnlyCollection<ResearchReportClaimProvenanceResponse> ReportClaims,
-    IReadOnlyCollection<QuantitativeContributionProvenanceResponse> QuantitativeContributions);
+    IReadOnlyCollection<QuantitativeContributionProvenanceResponse> QuantitativeContributions,
+    IReadOnlyCollection<LiteratureProviderAttemptResponse> ProviderAttempts);
+
+public sealed record LiteratureProviderAttemptResponse(
+    Guid AttemptId, Guid ResearchPlanId, string Source, string Query,
+    string Status, int? ResultCount, string? FailureCategory,
+    DateTimeOffset StartedAt, DateTimeOffset? CompletedAt, Guid? LiteratureSearchId);
 
 public sealed record ResearchProvenanceCoverageResponse(
     int ResearchPlanCount,

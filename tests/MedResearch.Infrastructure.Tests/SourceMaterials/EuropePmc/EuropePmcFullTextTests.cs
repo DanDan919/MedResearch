@@ -152,6 +152,17 @@ public sealed class EuropePmcFullTextSourceMaterialProviderTests
         Assert.Single(handler.Requests);
     }
 
+    [Fact]
+    public async Task TryAcquireAsync_PreservesTwoMillionByteCapWithoutRetryingOversize()
+    {
+        var handler = new RecordingHandler(Response(HttpStatusCode.OK, new string('x', 2_000_001)));
+        var delay = new RecordingRetryDelay();
+        var provider = CreateProvider(handler, options: new EuropePmcFullTextOptions { MaxRetryAttempts = 3 }, retryDelay: delay);
+        await Assert.ThrowsAsync<EuropePmcFullTextResponseException>(() => provider.TryAcquireAsync(CreateStudy(), 10_000, CancellationToken.None));
+        Assert.Empty(delay.Delays);
+        Assert.Single(handler.Requests);
+    }
+
     private static EuropePmcFullTextSourceMaterialProvider CreateProvider(
         RecordingHandler handler,
         EuropePmcFullTextOptions? options = null,

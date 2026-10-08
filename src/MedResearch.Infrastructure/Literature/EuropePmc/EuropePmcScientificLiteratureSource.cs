@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text;
+using MedResearch.Domain;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Infrastructure.Literature;
 using MedResearch.Infrastructure.Literature.Identity;
@@ -14,7 +16,6 @@ namespace MedResearch.Infrastructure.Literature.EuropePmc;
 public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureSource
 {
     public const string EuropePmcSourceName = ScientificLiteratureSourceNames.EuropePmc;
-    private const int MaximumErrorBodyBytes = 1024;
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly HttpClient _httpClient;
@@ -22,19 +23,22 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
     private readonly IEuropePmcRequestGate _requestGate;
     private readonly IEuropePmcRetryDelay _retryDelay;
     private readonly ILogger<EuropePmcScientificLiteratureSource> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public EuropePmcScientificLiteratureSource(
         HttpClient httpClient,
         IOptions<EuropePmcOptions> options,
         IEuropePmcRequestGate requestGate,
         IEuropePmcRetryDelay retryDelay,
-        ILogger<EuropePmcScientificLiteratureSource> logger)
+        ILogger<EuropePmcScientificLiteratureSource> logger,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient;
         _options = options.Value;
         _requestGate = requestGate;
         _retryDelay = retryDelay;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public string SourceName => EuropePmcSourceName;
@@ -74,8 +78,8 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
                 });
 
                 var stopwatch = Stopwatch.StartNew();
-                using var response = await SendWithRetryAsync(uri, "Search", cancellationToken);
-                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var body = await SendWithRetryAsync(uri, "Search", cancellationToken);
+                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(body));
                 var page = await ParseSearchPageAsync(stream, cancellationToken);
                 stopwatch.Stop();
 
@@ -107,7 +111,15 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC request timed out.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC request timed out.", LiteratureProviderFailureCategory.Timeout, exception);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new ScientificLiteratureSourceException("Europe PMC body read timed out.", LiteratureProviderFailureCategory.Timeout, exception);
+        }
+        catch (ProviderResponseTooLargeException exception)
+        {
+            throw new ScientificLiteratureSourceException("Europe PMC response exceeded the byte limit.", LiteratureProviderFailureCategory.ResponseTooLarge, exception);
         }
         catch (OperationCanceledException)
         {
@@ -115,27 +127,27 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         }
         catch (EuropePmcResponseException exception)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC returned an invalid response.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC returned an invalid response.", LiteratureProviderFailureCategory.InvalidResponse, exception);
         }
         catch (EuropePmcHttpException exception) when (exception.StatusCode == HttpStatusCode.TooManyRequests)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC rate limit was reached.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC rate limit was reached.", LiteratureProviderFailureCategory.RateLimited, exception);
         }
         catch (EuropePmcHttpException exception)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC request failed.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC request failed.", LiteratureProviderFailureCategory.ProviderProtocolError, exception);
         }
-        catch (HttpRequestException exception)
+        catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC request failed.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC request failed.", LiteratureProviderFailureCategory.NetworkFailure);
         }
         catch (ScientificLiteratureRateLimitException exception)
         {
-            throw new ScientificLiteratureSourceException("Europe PMC local rate limiter rejected the request.", exception);
+            throw new ScientificLiteratureSourceException("Europe PMC local rate limiter rejected the request.", LiteratureProviderFailureCategory.RateLimited, exception);
         }
     }
 
-    private async Task<HttpResponseMessage> SendWithRetryAsync(
+    private async Task<string> SendWithRetryAsync(
         Uri uri,
         string operation,
         CancellationToken cancellationToken)
@@ -148,7 +160,8 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
 
             try
             {
-                var response = await SendOnceAsync(uri, cancellationToken);
+                using var response = await SendOnceAsync(uri, cancellationToken);
+                var body = await BoundedProviderBody.ReadAsync(response.Content, _options.MaxResponseBytes, TimeSpan.FromSeconds(_options.BodyReadTimeoutSeconds), cancellationToken, _timeProvider);
                 stopwatch.Stop();
 
                 _logger.LogDebug(
@@ -157,23 +170,21 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
                     attempt,
                     stopwatch.ElapsedMilliseconds);
 
-                return response;
+                return body;
             }
-            catch (Exception exception) when (IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && IsTransientFailure(exception) && retryCount < _options.BoundedMaxRetryAttempts)
             {
                 stopwatch.Stop();
                 var delay = ComputeRetryDelay(retryCount, exception);
 
                 _logger.LogWarning(
-                    exception,
-                    "EuropePmcTransientRequestFailed. Operation: {Operation}; Attempt: {Attempt}; RetryNumber: {RetryNumber}; DelayMs: {DelayMs}; DurationMs: {DurationMs}; HttpStatusCode: {HttpStatusCode}; DiagnosticBody: {DiagnosticBody}",
+                    "EuropePmcTransientRequestFailed. Operation: {Operation}; Attempt: {Attempt}; RetryNumber: {RetryNumber}; DelayMs: {DelayMs}; DurationMs: {DurationMs}; HttpStatusCode: {HttpStatusCode}",
                     operation,
                     attempt,
                     retryCount + 1,
                     delay.TotalMilliseconds,
                     stopwatch.ElapsedMilliseconds,
-                    exception is EuropePmcHttpException httpException ? (int?)httpException.StatusCode : null,
-                    exception is EuropePmcHttpException bodyException ? bodyException.DiagnosticBody : null);
+                    exception is EuropePmcHttpException httpException ? (int?)httpException.StatusCode : null);
 
                 await _retryDelay.DelayAsync(delay, cancellationToken);
             }
@@ -192,11 +203,10 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
             return response;
         }
 
-        var diagnosticBody = await ReadBoundedErrorBodyAsync(response.Content, cancellationToken);
-        var retryAfter = ReadRetryAfter(response.Headers.RetryAfter);
-        var exception = new EuropePmcHttpException(response.StatusCode, diagnosticBody, retryAfter);
-        response.Dispose();
-        throw exception;
+        using (response)
+        {
+            throw new EuropePmcHttpException(response.StatusCode, null, ReadRetryAfter(response.Headers.RetryAfter));
+        }
     }
 
     private Uri BuildUri(string endpoint, IReadOnlyDictionary<string, string?> parameters)
@@ -218,7 +228,10 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         {
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var root = document.RootElement;
-            var hitCount = ReadInt(root, "hitCount") ?? 0;
+            var hitCount = ReadInt(root, "hitCount");
+            if (hitCount is null or < 0 || !root.TryGetProperty("resultList", out var requiredList) || requiredList.ValueKind != JsonValueKind.Object ||
+                !requiredList.TryGetProperty("result", out var requiredResults) || requiredResults.ValueKind != JsonValueKind.Array)
+                throw new EuropePmcResponseException("Europe PMC search response is missing required result fields.");
             var nextCursorMark = ReadString(root, "nextCursorMark");
             var candidates = new List<ScientificStudyCandidate>();
 
@@ -236,7 +249,7 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
                 }
             }
 
-            return new EuropePmcSearchPage(hitCount, nextCursorMark, candidates);
+            return new EuropePmcSearchPage(hitCount.Value, nextCursorMark, candidates);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
@@ -284,7 +297,7 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
 
     private static PublicationParts ReadPublicationParts(JsonElement result)
     {
-        foreach (var propertyName in new[] { "firstPublicationDate", "firstIndexDate" })
+        foreach (var propertyName in new[] { "firstPublicationDate" })
         {
             var parts = ParseDate(ReadString(result, propertyName));
             if (parts.HasAnyPart)
@@ -325,11 +338,20 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
 
     private static PublicationParts BuildPublicationParts(int? year, int? month, int? day)
     {
+        if (year is < 1 or > 9999) year = null;
+        if (month is < 1 or > 12) month = null;
+        if (day is < 1 or > 31) day = null;
+        if (year is null) { month = null; day = null; }
+        if (month is null) day = null;
         DateOnly? publicationDate = null;
         if (year.HasValue && month.HasValue && day.HasValue &&
-            DateOnly.TryParse($"{year.Value:0000}-{month.Value:00}-{day.Value:00}", out var parsedDate))
+            DateOnly.TryParseExact($"{year.Value:0000}-{month.Value:00}-{day.Value:00}", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
         {
             publicationDate = parsedDate;
+        }
+        else if (year.HasValue && month.HasValue && day.HasValue)
+        {
+            day = null;
         }
 
         return new PublicationParts(publicationDate, year, month, day);
@@ -463,7 +485,8 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
             EuropePmcHttpException { StatusCode: HttpStatusCode.TooManyRequests } => true,
             EuropePmcHttpException { StatusCode: >= HttpStatusCode.InternalServerError } => true,
             HttpRequestException { StatusCode: null } => true,
-            TaskCanceledException => true,
+            IOException => true,
+            TaskCanceledException or TimeoutException => true,
             _ => false
         };
     }
@@ -501,20 +524,6 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         }
 
         return null;
-    }
-
-    private static async Task<string?> ReadBoundedErrorBodyAsync(HttpContent content, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        var buffer = new byte[MaximumErrorBodyBytes];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-
-        if (read == 0)
-        {
-            return null;
-        }
-
-        return System.Text.Encoding.UTF8.GetString(buffer, 0, read).Trim();
     }
 
     private static IReadOnlyCollection<ScientificStudyCandidate> DeduplicateCandidates(IEnumerable<ScientificStudyCandidate> candidates)

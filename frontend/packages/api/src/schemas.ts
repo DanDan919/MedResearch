@@ -479,6 +479,31 @@ const quantitativeContributionProvenanceSchema = z.object({
   sourceMaterialId: z.string().uuid()
 });
 
+export const literatureProviderAttemptSchema = z.object({
+  attemptId: z.string().uuid(),
+  researchPlanId: z.string().uuid(),
+  source: z.enum(["PubMed", "EuropePmc"]),
+  query: z.string().min(1).max(2000),
+  status: z.enum(["Started", "SucceededWithResults", "SucceededZeroResults", "Failed", "TimedOut", "Cancelled"]),
+  resultCount: z.number().int().nonnegative().nullable(),
+  failureCategory: z.enum(["NetworkFailure", "Timeout", "RateLimited", "InvalidResponse", "ProviderProtocolError", "ResponseTooLarge", "Cancelled", "UnexpectedFailure"]).nullable(),
+  startedAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+  literatureSearchId: z.string().uuid().nullable()
+}).superRefine((attempt, context) => {
+  const success = attempt.status === "SucceededWithResults" || attempt.status === "SucceededZeroResults";
+  const valid = attempt.status === "Started"
+    ? attempt.completedAt === null && attempt.resultCount === null && attempt.failureCategory === null && attempt.literatureSearchId === null
+    : success
+      ? attempt.completedAt !== null && attempt.failureCategory === null && attempt.literatureSearchId !== null &&
+        (attempt.status === "SucceededZeroResults" ? attempt.resultCount === 0 : attempt.resultCount !== null && attempt.resultCount > 0)
+      : attempt.completedAt !== null && attempt.resultCount === null && attempt.literatureSearchId === null && attempt.failureCategory !== null &&
+        (attempt.status === "TimedOut" ? attempt.failureCategory === "Timeout" : attempt.status === "Cancelled" ? attempt.failureCategory === "Cancelled" : !["Timeout", "Cancelled"].includes(attempt.failureCategory));
+  if (!valid || (attempt.completedAt !== null && Date.parse(attempt.completedAt) < Date.parse(attempt.startedAt))) {
+    context.addIssue({ code: "custom", message: "Inconsistent provider attempt outcome" });
+  }
+});
+
 export const researchProvenanceResponseSchema = z.object({
   researchRunId: z.string().uuid(),
   question: z.string(),
@@ -489,6 +514,7 @@ export const researchProvenanceResponseSchema = z.object({
   coverage: researchProvenanceCoverageSchema,
   plans: z.array(researchPlanProvenanceSchema),
   searches: z.array(literatureSearchProvenanceSchema),
+  providerAttempts: z.array(literatureProviderAttemptSchema),
   studies: z.array(z.object({
     studyId: z.string().uuid(),
     title: z.string(),

@@ -77,3 +77,6 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 50. Validation-guided LLM repair may only retry a typed repairable issue within its bounded budget; never weaken the validator or persist the rejected candidate.
 51. The Evidence & Provenance read model must project persisted run-scoped lineage; the frontend must not reconstruct citations or expose SourceMaterial.Content.
 52. Provenance queries must preserve global Study identity while filtering Evidence, extraction, evaluation, report claims, and quantitative lineage to the requested ResearchRun.
+53. Provider index/ingestion dates are not publication dates; incomplete publication metadata must remain incomplete.
+54. Successful zero results and provider failure are distinct. Logical provider attempt outcomes must be durable, run-scoped and lease-fenced, without secrets or raw response transcripts.
+55. External success bodies must have explicit byte caps and cancellation-aware read deadlines; HTTP 200 is not permission to buffer an unlimited response.

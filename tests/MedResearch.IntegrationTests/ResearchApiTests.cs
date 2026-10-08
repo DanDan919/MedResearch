@@ -181,7 +181,9 @@ public sealed class ResearchApiTests
                 [new EvidenceEvaluationProvenance(Guid.NewGuid(), studyId, EvidenceEvaluationStatus.Completed, null, EvidenceSourceScope.Abstract, [evidenceId], "FakeLLM", "fake-model", "eval-v1", DateTimeOffset.UtcNow, StudyDesignClassification.Unknown, MethodologicalAssessmentState.Unknown, ComparatorPresence.Unclear, null, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, MethodologicalAssessmentState.Unknown, DirectnessRating.Unclear, MethodologicalConfidence.InsufficientInformation, "Rationale", [], [], false, false, false, false, false, 0, 0)]
             )],
             [new ResearchReportClaimProvenance(Guid.NewGuid(), Guid.NewGuid(), ResearchReportClaimType.Conclusion, ResearchReportClaimDirection.Positive, "Recall improved.", 0, [evidenceId])],
-            [new QuantitativeContributionProvenance(Guid.NewGuid(), "recall", "Fixed", 0, evidenceId, studyId, extractionId, sourceMaterialId)]);
+            [new QuantitativeContributionProvenance(Guid.NewGuid(), "recall", "Fixed", 0, evidenceId, studyId, extractionId, sourceMaterialId)],
+            [new LiteratureProviderAttemptProvenance(Guid.NewGuid(), Guid.NewGuid(), "EuropePmc", "sleep recall", LiteratureProviderAttemptStatus.Failed, null,
+                LiteratureProviderFailureCategory.NetworkFailure, DateTimeOffset.UtcNow.AddSeconds(-1), DateTimeOffset.UtcNow, null)]);
         factory.ProvenanceStore.Seed(model, "UserA");
 
         using var client = factory.CreateClientFor("UserA");
@@ -191,6 +193,8 @@ public sealed class ResearchApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("discoveryPathCount", body);
         Assert.Contains("SucceededWithResults", body);
+        Assert.Contains("providerAttempts", body);
+        Assert.Contains("NetworkFailure", body);
         Assert.Contains("Persisted supporting excerpt.", body);
         Assert.DoesNotContain("raw source body", body, StringComparison.OrdinalIgnoreCase);
 
