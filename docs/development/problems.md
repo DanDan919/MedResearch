@@ -1,5 +1,30 @@
 # Problems
 
+## 2026-10-07 independent audit: remaining scientific trust-boundary defects
+
+Status: observed, not fixed by this audit. See
+`project-audit-2026-10-07-ru.md` for reproductions, severity, code references,
+test results, and explicit limits of verification.
+
+Independent deterministic probes found that sentence-level numeric grounding can
+still mark a wrong effect sign, another outcome's CI/SE/confidence level, or a
+hospital count as `Verified`. Different interventions can enter one compatible
+quantitative group and produce a pooled result. Rejected numeric fields can
+remain asserted in `ResultSummary`, which is forwarded to the synthesis prompt.
+These qualify the earlier F15 claim: anchor existence and token co-occurrence
+do not prove the claimed statistical relationship.
+
+Additional observed defects: Europe PMC maps first-index date as publication
+date when the latter is absent; the production web shell has horizontal overflow
+at a 390px viewport. Dependency audit reported two high advisories. Native Tauri
+verification is blocked by missing Cargo, with a separate library-target/source
+manifest inconsistency identified statically.
+
+Normal Debug/Release regressions passed (311 local passes, 80 honest Docker
+skips). Existing CI on the audited HEAD passed all 391 backend tests, with zero
+skips. The new adversarial probes are outside the normal suite and reveal missing
+guarantees despite that green baseline. No live scientific service was called.
+
 ## 2026-10-05 F15: numeric tokens could be detached from their statistical context
 
 Before F15, extraction validated that `supportingText` occurred in the selected
