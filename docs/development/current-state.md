@@ -28,6 +28,13 @@ sentence-level protection in ADR-028.
   ownership and M17-M24 formulas are unchanged.
 - Detailed red baseline, tests, CI outcome and residual limits:
   `f15-1-scientific-trust-boundary-correction-ru.md`.
+- Corrected production HEAD `2aeebe1` verified by CI `37730308819`: Domain 32,
+  Application 245, Infrastructure 73, Integration 107; all 457 passed with zero
+  failures/skips. Docker-required PostgreSQL tests actually executed. Fresh
+  migrations, EF model, Compose and frontend/browser jobs succeeded. Local Debug
+  and Release each passed 376 tests with 81 unavailable-Docker skips. Live
+  scientific workflow was NOT RUN; general final free-text entailment remains
+  a documented limitation, not a guarantee inferred from green CI.
 
 ## F8 adversarial verification
 

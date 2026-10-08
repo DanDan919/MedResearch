@@ -250,7 +250,7 @@ LiveEuropePmcFullText 1 skipped, LiveEuropePmc 1 skipped, LivePubMed 1 skipped.
 
 ## Live scientific workflow
 
-**NOT RUN**: локальный PostgreSQL/Docker недоступен. ResearchRunId отсутствует;
+**NOT RUN**: требуемый изолированный PostgreSQL не поднят, Docker недоступен. ResearchRunId отсутствует;
 live Verified/Ambiguous/Unsupported counts, groups и ручная выборка пяти фактов
 не получены. Никаких результатов не фабриковали. Никакой OpenAI key или paid API
 не использовался. Live Codex/OpenAI/PubMed/Europe PMC вызовов не было.
@@ -282,9 +282,69 @@ explicit hospital n= контрпример. Final corrected commit/run и ег�
 `37729643468`. Но после него расширенные отрицательные тесты нашли co-occurrence
 контрпримеры для n= и outcome. Поэтому и этот green run не является final proof.
 
+### Верифицированное итоговое production состояние
+
+Последний production commit:
+`2aeebe1be9f7e94b5deb63f4235766e9e0c8d785`
+(`fix: bind outcome and sample labels to explicit roles`). Push успешен.
+Независимый workflow-level результат:
+[37730308819](https://github.com/DanDan919/MedResearch/actions/runs/37730308819),
+**completed / success**. Оба jobs (`Build and test`, `Frontend`) success.
+Проверены GitHub jobs/steps и публичные TRX annotations, не только YAML.
+
+| CI suite | Total / Executed / Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Domain | 32 / 32 / 32 | 0 | 0 |
+| Application | 245 / 245 / 245 | 0 | 0 |
+| Infrastructure | 73 / 73 / 73 | 0 | 0 |
+| Integration | 107 / 107 / 107 | 0 | 0 |
+| Итого | 457 / 457 / 457 | 0 | 0 |
+
+61 focused adversarial/control case находится в новом Application test class;
+его количество проверено по TRX definitions, не оценено по строкам кода.
+4 новых Domain cases и 1 новый PostgreSQL readback case дополняют существующие
+regressions. CI strict Docker gate выполнен: 81 locally skipped Docker-required
+case действительно исполнен внутри 107 Integration cases. Fresh empty PostgreSQL
+получил все chronological migrations, включая новую timepoint migration.
+Roundtrip проверил и lexical case, и сохранение valid effect рядом с rejected CI.
+
+Docker info, restore/build, TRX test step, pending-model check, Compose,
+frontend install/generation/diff gate/lint/typecheck/tests/Playwright/Next build
+и desktop React-shell Vite build: success. Native Tauri не проверен.
+Runner config ubuntu-latest; .NET 10.0.x; Node 24.x; pnpm 11.19.0.
+Новых CI secrets/live scientific dependencies нет. Live projects не входят в
+normal solution workflow. Non-blocking Node20 action warning не исправлялся как
+unrelated dependency work.
+
+После этого сохраняется только verification documentation. Production файлы
+последующего documentation-only commit идентичны `2aeebe1`. Финальный chat
+дополнительно фиксирует hash и реально завершённый CI на documentation HEAD;
+не нужно создавать бесконечный self-referential commit ради собственного hash.
+
 Перед feature commit reviewed staged scope/diff, whitespace check и search по
 api_key/ApiKey/OPENAI_API_KEY/Authorization/Bearer/secret/password; credentials
 не добавлены. Нет provider, auth, frontend или M17-M24 calculator changes.
+
+### Ответы на финальные scientific integrity вопросы
+
+| Вопрос | Доказанный ответ в реализованной границе |
+| --- | --- |
+| Чужой CI / SE / confidence level / p | Не Verified в promoted counterexamples; local tuple grammar обязателен |
+| Sign flip | Не Verified; signed value сравнивается точно |
+| Обычный or | Не OR proof; source-case и outcome-role проверены |
+| Hospital count, в том числе n= | Не participant N; непосредственная role и scope обязательны |
+| Чужой outcome/effect | Не Verified в tested prefix/joint-label/cross-result cases |
+| Unsupported confidence level | Не может приводить к CI-derived variance |
+| Разные interventions / comparators / timepoints | Не один compatible pooled group |
+| Missing intervention/timepoint | Ineligible, не wildcard |
+| Rejected structured number в raw summary | Не проходит в authoritative SynthesisContext/provider request через этот bypass |
+| Ambiguous/Unsupported proof | Не quantitative contribution |
+| M17-M24 formulas | Не изменены, reference regressions passed |
+| Все конкретные известные P1 | Закрыты regression tests на final production HEAD; универсальная semantic entailment не заявлена |
+
+F15.1 production correction и обязательная real PostgreSQL verification
+завершены на указанном green production CI. История сохранена. Final working-tree,
+upstream/remote hash и documentation HEAD CI проверяются перед финальным ответом.
 
 ## Остаточные риски и следующий milestone
 
