@@ -13,6 +13,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
     public string? ConnectionString { get; private set; }
 
+    public string ContainerId => _postgres?.Id ?? throw new InvalidOperationException("PostgreSQL test container is not initialized.");
+
     public string? UnavailableReason { get; private set; }
 
     public bool IsAvailable => UnavailableReason is null;

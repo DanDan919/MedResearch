@@ -252,22 +252,27 @@ public sealed partial class FullFakePipelineTests
         private readonly string _connectionString;
         private readonly FakeStructuredLlmClient _fakeLlm;
         private readonly FakeScientificLiteratureSource _fakeLiterature;
+        private readonly string _subject;
 
         public CapturingLoggerProvider LogProvider { get; } = new();
 
         public FakePipelineApiFactory(
             string connectionString,
             FakeStructuredLlmClient fakeLlm,
-            FakeScientificLiteratureSource fakeLiterature)
+            FakeScientificLiteratureSource fakeLiterature,
+            string subject = "local-development-user")
         {
             _connectionString = connectionString;
             _fakeLlm = fakeLlm;
             _fakeLiterature = fakeLiterature;
+            _subject = subject;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            builder.UseSetting("Authentication:Mode", "DevelopmentLocal");
+            builder.UseSetting("Authentication:DevelopmentSubject", _subject);
             builder.ConfigureLogging(logging => logging.AddProvider(LogProvider));
             builder.ConfigureAppConfiguration(configuration =>
             {

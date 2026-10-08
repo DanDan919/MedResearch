@@ -1,5 +1,22 @@
 # Technical Debt
 
+## F18 Release Limits (Supersedes F17 Release Follow-Ups Below)
+
+Next/source-map-js production advisories, backend-origin OpenAPI drift and
+page-wide mobile shell overflow are addressed in F18. Historic F17 findings
+below describe their discovery, not the current dependency state.
+One full-audit HIGH remains: dev-only braces 3.0.3, GHSA-vfj7-8cjw-p6xm,
+with no published patched version. It is reached by Next ESLint/fast-glob
+over repository-controlled patterns, absent from the traced standalone
+runtime. Keep CI isolated, do not accept user-supplied lint glob patterns,
+retain the unfiltered advisory and revisit a real upstream patch. No audit
+suppression or fake resolution is used.
+
+External IdP/deployed proxy/TLS, session revocation/key rotation, image digest
+pinning/scanning, native Tauri and live scientific workflow remain separate
+verification work. Synthetic trusted HTTPS is not deployed HTTPS. Existing
+source-acquisition provenance and scientific limitations are unchanged.
+
 ## F17 Authentication Limits
 
 Observed 2026-10-08: pnpm audit --prod reports 7 existing advisories: 2 high,

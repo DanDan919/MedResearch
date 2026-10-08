@@ -49,6 +49,11 @@ public static class AuthenticationConfiguration
                 throw new InvalidOperationException(
                     "Authentication:Authority and Authentication:Audience are required when Authentication:Mode=JwtBearer.");
             }
+            if (!Uri.TryCreate(authority, UriKind.Absolute, out var authorityUri)
+                || !string.IsNullOrEmpty(authorityUri.UserInfo) || !string.IsNullOrEmpty(authorityUri.Query)
+                || !string.IsNullOrEmpty(authorityUri.Fragment)
+                || (authorityUri.Scheme != Uri.UriSchemeHttps && !(environment.IsDevelopment() && authorityUri.Scheme == Uri.UriSchemeHttp)))
+                throw new InvalidOperationException("Authentication:Authority must be an absolute HTTPS URL without credentials, query or fragment (HTTP is development-only).");
 
             services.AddAuthentication(options =>
                 {

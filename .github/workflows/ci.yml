@@ -29,6 +29,20 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Dependency security gate (unfiltered production and full audits)
+        working-directory: frontend
+        run: |
+          pnpm security:test
+          pnpm security:audit
+
+      - name: Upload dependency audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audits
+          path: TestResults/F18/audit-*.json
+          if-no-files-found: error
+
       - name: Generate API types
         working-directory: frontend
         run: pnpm api:generate
@@ -75,6 +89,56 @@ jobs:
       - name: Build desktop React shell
         working-directory: frontend
         run: pnpm --filter @medresearch/desktop vite:build
+
+  web-release:
+    name: Actual API PostgreSQL HTTPS web RC
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      MEDRESEARCH_REQUIRE_DOCKER_TESTS: true
+      TESTCONTAINERS_RYUK_DISABLED: true
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/medresearch-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Docker and trusted CA tooling
+        run: |
+          docker info
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.19.0 --activate
+      - name: Frozen frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install browser
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Production Next build
+        working-directory: frontend
+        run: pnpm build
+      - name: Actual API and migrated PostgreSQL browser smoke (trusted HTTPS, no TLS bypass)
+        run: dotnet run --project tests/MedResearch.WebReleaseTests --configuration Release
+      - name: Reproducible web and API container builds (no runtime secrets)
+        run: |
+          docker build -f frontend/apps/web/Dockerfile -t medresearch-web:ci .
+          docker build -f src/MedResearch.Api/Dockerfile -t medresearch-api:ci .
+      - name: Upload full-stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release-results
+          path: frontend/apps/web/test-results
+          if-no-files-found: ignore
 
   build-test:
     name: Build and test

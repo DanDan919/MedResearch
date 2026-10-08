@@ -11,6 +11,8 @@
     "test:e2e": "pnpm --filter @medresearch/web test:e2e",
     "test:auth-e2e": "pnpm --filter @medresearch/web test:auth-e2e",
     "api:generate": "pnpm --filter @medresearch/api generate",
+    "security:audit": "node scripts/security-audit.mjs",
+    "security:test": "node --test scripts/security-audit-policy.test.mjs",
     "desktop:dev": "pnpm --filter @medresearch/desktop tauri dev",
     "desktop:build": "pnpm --filter @medresearch/desktop tauri build",
     "desktop:check": "pnpm --filter @medresearch/desktop tauri info"

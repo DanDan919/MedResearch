@@ -17,7 +17,7 @@ export default tseslint.config(
     ]
   },
   js.configs.recommended,
-  { files: ["apps/web/e2e-auth/*.mjs"], languageOptions: { globals: globals.node } },
+  { files: ["apps/web/e2e-auth/*.mjs", "apps/web/e2e-fullstack/*.mjs", "scripts/*.mjs"], languageOptions: { globals: globals.node } },
   ...tseslint.configs.recommended,
   {
     files: ["**/*.{ts,tsx}"],

@@ -31,7 +31,7 @@ export function EmptyState({
 
 export function ErrorPanel({ title, message }: { title: string; message: string }) {
   return (
-    <Card className="border-destructive">
+    <Card role="alert" className="border-destructive">
       <CardContent className="flex items-start gap-3 py-6">
         <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
         <div>

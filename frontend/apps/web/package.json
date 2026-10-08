@@ -20,7 +20,7 @@
     "lucide-react": "latest",
     "iron-session": "9.0.1",
     "jose": "6.2.12",
-    "next": "latest",
+    "next": "16.3.8",
     "openid-client": "6.8.8",
     "react": "latest",
     "react-dom": "latest",

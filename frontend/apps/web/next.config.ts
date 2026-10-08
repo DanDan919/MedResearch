@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
+import { resolve } from "node:path";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
   allowedDevOrigins: ["127.0.0.1"],
   transpilePackages: ["@medresearch/api", "@medresearch/ui"],
   async headers() {

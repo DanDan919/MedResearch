@@ -1,5 +1,27 @@
 # Problems
 
+## F18: Independently Observed Release Gaps (2026-10-08)
+
+- Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped
+  published patches 16.3.8/1.2.2 clear production findings. Full audit still
+  reports dev-only braces; no published patch, no suppression.
+- A naive lockfile-only install re-resolved unrelated `latest` importers.
+  Corrected using the baseline structured lockfile and only patch closures;
+  frozen install and regression validate the bounded update.
+- The curated OpenAPI snapshot was not an actual-backend drift check. Actual
+  ASP.NET document exposed string-enum/security/required/numeric schema gaps.
+  F18 captures and compares the backend document and tests four mutations.
+- Two Zod report fields allowed null despite required backend string DTOs;
+  fixtures gave false confidence. Contracts/fixtures now reflect real DTOs,
+  with explicit negative null controls; missing bibliographic fields stay null.
+- At 320/375/390 the production shell expanded to 575px: implicit grid tracks
+  retained nav min-content width. Explicit minmax(0,1fr), min-width zero and
+  wrapping fix page width without global overflow hiding.
+- `networkidle` hung responsive checks because dashboard polling is perpetual.
+  Checks now wait for visible content and fonts, not an impossible idle signal.
+- Local Docker Linux pipe is still unavailable. Full-stack runner fails rather
+  than substituting a database or silently skipping; CI is authoritative.
+
 ## F17: production auth browser verification (2026-10-08)
 
 - First production browser run rejected ordinary login POST forms: trace showed

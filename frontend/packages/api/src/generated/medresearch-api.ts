@@ -4,38 +4,6 @@
  */
 
 export interface paths {
-    "/health/live": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getHealthLive"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/health/ready": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getHealthReady"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/research": {
         parameters: {
             query?: never;
@@ -43,9 +11,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listResearchRuns"];
+        get: operations["ListResearchRuns"];
         put?: never;
-        post: operations["createResearch"];
+        post: operations["CreateResearch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -59,7 +27,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getResearch"];
+        get: operations["GetResearch"];
         put?: never;
         post?: never;
         delete?: never;
@@ -75,39 +43,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getResearchProgress"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/research/{researchRunId}/report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getResearchReport"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/research/{researchRunId}/quantitative": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getQuantitativeSynthesisArtifacts"];
+        get: operations["GetResearchProgress"];
         put?: never;
         post?: never;
         delete?: never;
@@ -123,7 +59,39 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getResearchProvenance"];
+        get: operations["GetResearchProvenance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/{researchRunId}/quantitative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetQuantitativeSynthesisArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/{researchRunId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetResearchReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -136,645 +104,780 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BetweenStudyVarianceEstimate: {
+            algorithmVersion: string;
+            converged: boolean;
+            estimator: components["schemas"]["BetweenStudyVarianceEstimator"];
+            failureReason: null | components["schemas"]["BetweenStudyVarianceFailureReason"];
+            /** Format: int32 */
+            iterationCount: number;
+            status: components["schemas"]["BetweenStudyVarianceEstimateStatus"];
+            /** Format: int32 */
+            studyCount: number;
+            /** Format: double */
+            tauSquared: null | number;
+        };
+        BetweenStudyVarianceEstimateStatus: number;
+        BetweenStudyVarianceEstimator: number;
+        BetweenStudyVarianceFailureReason: number;
         CreateResearchRequest: {
-            question?: string | null;
+            question: null | string;
         };
         CreateResearchResponse: {
             /** Format: uuid */
             researchRunId: string;
-            status: components["schemas"]["ResearchRunStatus"];
-        };
-        ResearchRunResponse: {
-            /** Format: uuid */
-            researchRunId: string;
-            question: string;
-            status: components["schemas"]["ResearchRunStatus"];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            startedAt: string | null;
-            /** Format: date-time */
-            completedAt: string | null;
-            failureReason: string | null;
-        };
-        ResearchRunSummaryResponse: {
-            /** Format: uuid */
-            researchRunId: string;
-            /** Format: uuid */
-            researchQuestionId: string;
-            question: string;
-            status: components["schemas"]["ResearchRunStatus"];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            startedAt: string | null;
-            /** Format: date-time */
-            completedAt: string | null;
-            failureReason: string | null;
-        };
-        ResearchRunListResponse: {
-            items: components["schemas"]["ResearchRunSummaryResponse"][];
-            page: number;
-            pageSize: number;
-            totalCount: number;
-            totalPages: number;
-        };
-        /** @enum {string} */
-        ResearchRunStatus: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
-        ResearchRunProgressResponse: {
-            /** Format: uuid */
-            researchRunId: string;
-            question: string;
-            status: components["schemas"]["ResearchRunStatus"];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            startedAt: string | null;
-            /** Format: date-time */
-            completedAt: string | null;
-            failureReason: string | null;
-            /** Format: date-time */
-            refreshedAt: string;
-            processing: components["schemas"]["ResearchRunProcessingProgressResponse"];
-            metrics: components["schemas"]["ResearchRunProgressMetricsResponse"];
-            stages: components["schemas"]["ResearchRunStageProgressResponse"][];
-        };
-        ResearchRunProcessingProgressResponse: {
             /** @enum {string} */
-            leaseState: "None" | "Active" | "Expired" | "Terminal";
+            status: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+        };
+        EffectMeasureType: number;
+        EvidenceEvaluationProvenanceResponse: {
+            allocationConcealment: string;
+            attritionMissingData: string;
+            authorReportedLimitations: string[];
+            blinding: string;
+            comparatorDescription: null | string;
+            comparatorPresence: string;
+            directness: string;
             /** Format: date-time */
-            leaseExpiresAt: string | null;
-            /** Format: date-time */
-            lastHeartbeatAt: string | null;
-            /** Format: int64 */
-            leaseVersion: number;
-        };
-        ResearchRunProgressMetricsResponse: {
-            researchPlanCount: number;
-            plannedSearchQueryCount: number;
-            literatureSearchCount: number;
-            literatureSearchSourceCount: number;
-            literatureSearchResultCount: number;
-            discoveryPathCount: number;
-            distinctDiscoveredStudyCount: number;
-            currentSourceMaterialCount: number;
-            structuredFullTextMaterialCount: number;
-            abstractMaterialCount: number;
-            evidenceExtractionCount: number;
-            completedEvidenceExtractionCount: number;
-            skippedEvidenceExtractionCount: number;
-            evidenceFindingCount: number;
-            evidenceEvaluationCount: number;
-            completedEvidenceEvaluationCount: number;
-            skippedEvidenceEvaluationCount: number;
-            researchReportCount: number;
-            researchReportClaimCount: number;
-        };
-        ResearchRunStageProgressResponse: {
-            stage: components["schemas"]["ResearchRunStatus"];
-            /** @enum {string} */
-            state: "Pending" | "Current" | "Completed";
-            metrics: components["schemas"]["ResearchRunProgressMetricResponse"][];
-        };
-        ResearchRunProgressMetricResponse: {
-            label: string;
-            value: number;
-        };
-        ResearchReportResponse: {
+            evaluatedAt: string;
+            evaluatorModel: null | string;
+            evaluatorProvider: null | string;
             /** Format: uuid */
-            researchRunId: string;
-            /** Format: uuid */
-            researchReportId: string;
-            status: string;
-            insufficientEvidenceReason: null | string;
-            question: string;
-            executiveSummary: string;
-            evidenceSummary: string;
-            conflictSummary: string;
-            limitationsSummary: string;
-            conclusion: string;
-            synthesisConfidence: string;
-            promptVersion: string;
-            /** Format: date-time */
-            generatedAt: string;
-            coverage: components["schemas"]["ResearchReportCoverageResponse"];
-            deterministicLimitations: string[];
-            claims: components["schemas"]["ResearchReportClaimResponse"][];
-            narrativeAuthority?: null | string;
-        };
-        ResearchReportCoverageResponse: {
-            discoveredStudyCount: number;
-            extractedStudyCount: number;
-            evaluatedStudyCount: number;
-            evidenceFindingCount: number;
-            includedStudyCount: number;
-            includedEvidenceFindingCount: number;
-            searchQueryCount: number;
-            studiesWithNoExtractableEvidence: number;
-            studiesWithInsufficientEvaluationSource: number;
-            potentialConflictDetected: boolean;
-            evidenceTruncated: boolean;
-            usesAbstractLevelEvidenceOnly: boolean;
-            searchedSources: string[];
-        };
-        ResearchReportClaimResponse: {
-            /** Format: uuid */
-            claimId: string;
-            claimType: string;
-            direction: string;
-            text: string;
+            evidenceEvaluationId: string;
+            evidenceIds: string[];
+            hasComparator: boolean;
+            hasConfidenceInterval: boolean;
+            hasEffectEstimate: boolean;
+            hasPValue: boolean;
+            hasSampleSize: boolean;
             /** Format: int32 */
-            ordinal: number | string;
-            citations: components["schemas"]["ResearchReportCitationResponse"][];
-            /** @default LegacyUnverified */
-            groundingStatus: string;
-            semantics?: null | components["schemas"]["ResearchClaimSemanticsResponse"];
-        };
-        ResearchReportCitationResponse: {
-            /** Format: uuid */
-            evidenceId: string;
+            insufficientSourceDomainCount: number;
+            overallConfidence: string;
+            precision: string;
+            promptVersion: string;
+            randomization: string;
+            rationale: string;
+            reportingLimitations: string[];
+            sampleInformation: string;
+            skipReason: null | string;
+            sourceScope: string;
+            status: string;
+            studyDesign: string;
             /** Format: uuid */
             studyId: string;
-            pmid: string | null;
-            pmcid: string | null;
-            doi: string | null;
-            title: string;
-            journal: string | null;
-            publicationYear: number | null;
-            publicationMonth: number | null;
-            publicationDay: number | null;
-            publicationTypes: string[];
-            authors: string[];
-            studySource: string | null;
-            outcome: string;
-            resultSummary: string | null;
-            supportingText: string;
-            evidenceDirection: string;
-            sourceScope: string;
-            groundingValidated: boolean;
-            population: string | null;
-            exposureOrIntervention: string | null;
-            comparator: string | null;
-            studyDesign: string | null;
-            sampleSize: number | null;
-            effectMeasure: string | null;
-            effectValue: number | null;
-            confidenceIntervalLower: number | null;
-            confidenceIntervalUpper: number | null;
-            confidenceLevel: number | null;
-            reportedStandardError: number | null;
-            pValue: number | null;
+            /** Format: int32 */
+            unknownDomainCount: number;
+        };
+        EvidenceExtractionProvenanceResponse: {
+            /** Format: int32 */
+            evidenceCount: number;
+            /** Format: uuid */
+            evidenceExtractionId: string;
             /** Format: date-time */
             extractedAt: string;
-            sourceMaterial: components["schemas"]["ResearchReportSourceMaterialResponse"] | null;
-            ordinal: number;
+            groundingValidated: boolean;
+            model: null | string;
+            promptVersion: string;
+            provider: null | string;
+            skipReason: null | string;
+            /** Format: uuid */
+            sourceMaterialId: null | string;
+            sourceScope: string;
+            status: string;
+            /** Format: uuid */
+            studyId: string;
         };
-        ResearchReportSourceMaterialResponse: {
+        EvidenceProvenanceResponse: {
+            comparator: null | string;
+            /** Format: double */
+            confidenceIntervalLower: null | number;
+            /** Format: double */
+            confidenceIntervalUpper: null | number;
+            /** Format: double */
+            confidenceLevel: null | number;
+            direction: string;
+            effectMeasure: null | string;
+            /** Format: double */
+            effectValue: null | number;
+            /** Format: uuid */
+            evidenceExtractionId: string;
+            /** Format: uuid */
+            evidenceId: string;
+            exposureOrIntervention: null | string;
+            /** Format: date-time */
+            extractedAt: string;
+            groundingValidated: boolean;
+            outcome: string;
+            /** Format: double */
+            pValue: null | number;
+            population: null | string;
+            /** Format: double */
+            reportedStandardError: null | number;
+            resultSummary: string;
+            /** Format: int32 */
+            sampleSize: null | number;
+            sourceScope: string;
+            studyDesign: null | string;
+            supportingText: string;
+        };
+        LiteratureProviderAttemptResponse: {
+            /** Format: uuid */
+            attemptId: string;
+            /** Format: date-time */
+            completedAt: null | string;
+            failureCategory: null | string;
+            /** Format: uuid */
+            literatureSearchId: null | string;
+            query: string;
+            /** Format: uuid */
+            researchPlanId: string;
+            /** Format: int32 */
+            resultCount: null | number;
+            source: string;
+            /** Format: date-time */
+            startedAt: string;
+            status: string;
+        };
+        LiteratureSearchProvenanceResponse: {
+            /** Format: int32 */
+            duplicateStudyCount: number;
+            /** Format: uuid */
+            literatureSearchId: string;
+            /** Format: int32 */
+            persistedStudyCount: number;
+            query: string;
+            /** Format: uuid */
+            researchPlanId: null | string;
+            /** Format: int32 */
+            resultCount: number;
+            resultStatus: string;
+            /** Format: date-time */
+            searchedAt: string;
+            source: string;
+        };
+        ProblemDetails: {
+            detail?: null | string;
+            instance?: null | string;
+            /** Format: int32 */
+            status?: null | number;
+            title?: null | string;
+            type?: null | string;
+        };
+        QuantitativeConfidenceIntervalMethod: number;
+        QuantitativeContributionProvenanceResponse: {
+            analysisMethod: string;
+            /** Format: uuid */
+            artifactId: string;
+            /** Format: uuid */
+            evidenceExtractionId: string;
+            /** Format: uuid */
+            evidenceId: string;
+            groupKey: string;
+            /** Format: int32 */
+            ordinal: number;
             /** Format: uuid */
             sourceMaterialId: string;
-            type: string;
-            provider: string;
-            retrievalMethod: string;
-            contentVersion: number;
-            /** Format: date-time */
-            retrievedAt: string;
-            accessStatus: string;
-            wasTruncated: boolean;
-            sectionNames: string[];
+            /** Format: uuid */
+            studyId: string;
+        };
+        QuantitativeHeterogeneityDiagnostics: {
+            algorithmVersion: string;
+            /** Format: double */
+            cochransQ: number;
+            /** Format: int32 */
+            degreesOfFreedom: number;
+            /** Format: double */
+            iSquared: number;
+            /** Format: int32 */
+            studyCount: number;
+        };
+        QuantitativeHksjFailureReason: number;
+        QuantitativeHksjInferenceResult: {
+            algorithmVersion: string;
+            /** Format: double */
+            analysisScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            analysisScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            analysisScaleEffect: null | number;
+            /** Format: double */
+            analysisScaleStandardError: null | number;
+            /** Format: double */
+            analysisScaleVariance: null | number;
+            confidenceIntervalMethod: components["schemas"]["QuantitativeConfidenceIntervalMethod"];
+            /** Format: double */
+            criticalValue: null | number;
+            /** Format: int32 */
+            degreesOfFreedom: null | number;
+            failureReasons: components["schemas"]["QuantitativeHksjFailureReason"][];
+            /** Format: double */
+            outputConfidenceLevel: number;
+            /** Format: double */
+            reportedScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            reportedScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            reportedScaleEffect: null | number;
+            status: components["schemas"]["QuantitativeSynthesisStatus"];
+            /** Format: int32 */
+            studyCount: number;
+            /** Format: double */
+            varianceAdjustment: null | number;
+        };
+        QuantitativePredictionIntervalFailureReason: number;
+        QuantitativePredictionIntervalMethod: number;
+        QuantitativePredictionIntervalResult: {
+            algorithmVersion: string;
+            /** Format: double */
+            analysisScaleEffect: null | number;
+            /** Format: double */
+            analysisScaleLower: null | number;
+            /** Format: double */
+            analysisScaleUpper: null | number;
+            /** Format: double */
+            criticalValue: null | number;
+            /** Format: int32 */
+            degreesOfFreedom: null | number;
+            failureReasons: components["schemas"]["QuantitativePredictionIntervalFailureReason"][];
+            method: components["schemas"]["QuantitativePredictionIntervalMethod"];
+            /** Format: double */
+            outputConfidenceLevel: number;
+            /** Format: double */
+            predictionStandardError: null | number;
+            /** Format: double */
+            predictionVariance: null | number;
+            /** Format: double */
+            reportedScaleEffect: null | number;
+            /** Format: double */
+            reportedScaleLower: null | number;
+            /** Format: double */
+            reportedScaleUpper: null | number;
+            status: components["schemas"]["QuantitativeSynthesisStatus"];
+            /** Format: int32 */
+            studyCount: number;
+            /** Format: double */
+            summaryEffectStandardError: null | number;
+            /** Format: double */
+            summaryEffectVariance: null | number;
+            /** Format: double */
+            tauSquared: null | number;
+        };
+        QuantitativeRandomEffectsFailureReason: number;
+        QuantitativeRandomEffectsSynthesisResult: {
+            algorithmVersion: string;
+            /** Format: double */
+            analysisScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            analysisScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            analysisScaleEffect: null | number;
+            /** Format: double */
+            analysisScaleStandardError: null | number;
+            /** Format: double */
+            analysisScaleVariance: null | number;
+            confidenceIntervalMethod: components["schemas"]["QuantitativeConfidenceIntervalMethod"];
+            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
+            failureReasons: components["schemas"]["QuantitativeRandomEffectsFailureReason"][];
+            hksjInference: null | components["schemas"]["QuantitativeHksjInferenceResult"];
+            method: components["schemas"]["QuantitativeSynthesisMethod"];
+            /** Format: double */
+            outputConfidenceLevel: number;
+            predictionInterval: null | components["schemas"]["QuantitativePredictionIntervalResult"];
+            /** Format: double */
+            reportedScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            reportedScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            reportedScaleEffect: null | number;
+            status: components["schemas"]["QuantitativeSynthesisStatus"];
+            /** Format: int32 */
+            studyCount: number;
+            /** Format: double */
+            tauSquared: null | number;
+            tauSquaredAlgorithmVersion: string;
+            tauSquaredEstimator: components["schemas"]["BetweenStudyVarianceEstimator"];
         };
         QuantitativeSynthesisArtifactResponse: {
             /** Format: uuid */
             artifactId: string;
             /** Format: date-time */
             persistedAt: string;
-            snapshotFingerprint: string;
             result: components["schemas"]["QuantitativeSynthesisResult"];
-        };
-        QuantitativeSynthesisResult: {
-            /** Format: uuid */
-            researchRunId: string;
-            groupKey: string;
-            outcomeGroupKey: string;
-            populationCompatibilityKey: string;
-            comparatorCompatibilityKey: string;
-            studyDesignCompatibilityKey: string;
-            effectMeasureType: number;
-            status: number;
-            method: number;
-            algorithmVersion: string;
-            outputConfidenceLevel: number;
-            evidenceCount: number;
-            uniqueStudyCount: number;
-            analysisScaleEffect: number | null;
-            analysisScaleVariance: number | null;
-            analysisScaleStandardError: number | null;
-            analysisScaleConfidenceIntervalLower: number | null;
-            analysisScaleConfidenceIntervalUpper: number | null;
-            reportedScaleEffect: number | null;
-            reportedScaleConfidenceIntervalLower: number | null;
-            reportedScaleConfidenceIntervalUpper: number | null;
-            heterogeneityDiagnostics: components["schemas"]["QuantitativeHeterogeneityDiagnostics"] | null;
-            betweenStudyVariance: components["schemas"]["BetweenStudyVarianceEstimate"] | null;
-            randomEffects: components["schemas"]["QuantitativeRandomEffectsSynthesisResult"] | null;
-            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
-            rejectionReasons: number[];
-        };
-        QuantitativeHeterogeneityDiagnostics: {
-            cochransQ: number;
-            degreesOfFreedom: number;
-            iSquared: number;
-            studyCount: number;
-            algorithmVersion: string;
-        };
-        BetweenStudyVarianceEstimate: {
-            tauSquared: number | null;
-            estimator: number;
-            status: number;
-            algorithmVersion: string;
-            studyCount: number;
-            converged: boolean;
-            iterationCount: number;
-            failureReason: number | null;
-        };
-        QuantitativeRandomEffectsSynthesisResult: {
-            status: number;
-            method: number;
-            algorithmVersion: string;
-            confidenceIntervalMethod: number;
-            outputConfidenceLevel: number;
-            tauSquared: number | null;
-            tauSquaredEstimator: number;
-            tauSquaredAlgorithmVersion: string;
-            studyCount: number;
-            analysisScaleEffect: number | null;
-            analysisScaleVariance: number | null;
-            analysisScaleStandardError: number | null;
-            analysisScaleConfidenceIntervalLower: number | null;
-            analysisScaleConfidenceIntervalUpper: number | null;
-            reportedScaleEffect: number | null;
-            reportedScaleConfidenceIntervalLower: number | null;
-            reportedScaleConfidenceIntervalUpper: number | null;
-            hksjInference: components["schemas"]["QuantitativeHksjInferenceResult"] | null;
-            predictionInterval: components["schemas"]["QuantitativePredictionIntervalResult"] | null;
-            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
-            failureReasons: number[];
-        };
-        QuantitativeHksjInferenceResult: {
-            status: number;
-            confidenceIntervalMethod: number;
-            algorithmVersion: string;
-            outputConfidenceLevel: number;
-            studyCount: number;
-            degreesOfFreedom: number | null;
-            varianceAdjustment: number | null;
-            criticalValue: number | null;
-            analysisScaleEffect: number | null;
-            analysisScaleVariance: number | null;
-            analysisScaleStandardError: number | null;
-            analysisScaleConfidenceIntervalLower: number | null;
-            analysisScaleConfidenceIntervalUpper: number | null;
-            reportedScaleEffect: number | null;
-            reportedScaleConfidenceIntervalLower: number | null;
-            reportedScaleConfidenceIntervalUpper: number | null;
-            failureReasons: number[];
-        };
-        QuantitativePredictionIntervalResult: {
-            status: number;
-            method: number;
-            algorithmVersion: string;
-            outputConfidenceLevel: number;
-            studyCount: number;
-            degreesOfFreedom: number | null;
-            tauSquared: number | null;
-            summaryEffectVariance: number | null;
-            summaryEffectStandardError: number | null;
-            predictionVariance: number | null;
-            predictionStandardError: number | null;
-            criticalValue: number | null;
-            analysisScaleEffect: number | null;
-            analysisScaleLower: number | null;
-            analysisScaleUpper: number | null;
-            reportedScaleEffect: number | null;
-            reportedScaleLower: number | null;
-            reportedScaleUpper: number | null;
-            failureReasons: number[];
+            snapshotFingerprint: string;
         };
         QuantitativeSynthesisContribution: {
-            /** Format: uuid */
-            evidenceId: string;
-            /** Format: uuid */
-            studyId: string;
+            /** Format: double */
+            analysisScaleEffect: number;
+            /** Format: double */
+            analysisScaleStandardError: number;
+            /** Format: double */
+            analysisScaleVariance: number;
             /** Format: uuid */
             evidenceExtractionId: string;
             /** Format: uuid */
-            sourceMaterialId: string;
-            analysisScaleEffect: number;
-            analysisScaleVariance: number;
-            analysisScaleStandardError: number;
-            weight: number;
+            evidenceId: string;
+            /** Format: double */
             normalizedWeight: number;
+            /** Format: uuid */
+            sourceMaterialId: string;
+            /** Format: uuid */
+            studyId: string;
+            /** Format: double */
+            weight: number;
         };
-        ResearchProvenanceCoverageResponse: {
-            researchPlanCount: number;
-            literatureSearchCount: number;
-            discoveryPathCount: number;
-            distinctStudyCount: number;
-            sourceMaterialCount: number;
-            evidenceExtractionCount: number;
-            evidenceFindingCount: number;
-            evidenceEvaluationCount: number;
-            researchReportClaimCount: number;
-            hasPersistedProviderFailureProvenance: boolean;
+        QuantitativeSynthesisMethod: number;
+        QuantitativeSynthesisRejectionReason: number;
+        QuantitativeSynthesisResult: {
+            algorithmVersion: string;
+            /** Format: double */
+            analysisScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            analysisScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            analysisScaleEffect: null | number;
+            /** Format: double */
+            analysisScaleStandardError: null | number;
+            /** Format: double */
+            analysisScaleVariance: null | number;
+            betweenStudyVariance: null | components["schemas"]["BetweenStudyVarianceEstimate"];
+            comparatorCompatibilityKey: string;
+            contributions: components["schemas"]["QuantitativeSynthesisContribution"][];
+            effectMeasureType: components["schemas"]["EffectMeasureType"];
+            /** Format: int32 */
+            evidenceCount: number;
+            groupKey: string;
+            heterogeneityDiagnostics: null | components["schemas"]["QuantitativeHeterogeneityDiagnostics"];
+            method: components["schemas"]["QuantitativeSynthesisMethod"];
+            outcomeGroupKey: string;
+            /** Format: double */
+            outputConfidenceLevel: number;
+            populationCompatibilityKey: string;
+            randomEffects: null | components["schemas"]["QuantitativeRandomEffectsSynthesisResult"];
+            rejectionReasons: components["schemas"]["QuantitativeSynthesisRejectionReason"][];
+            /** Format: double */
+            reportedScaleConfidenceIntervalLower: null | number;
+            /** Format: double */
+            reportedScaleConfidenceIntervalUpper: null | number;
+            /** Format: double */
+            reportedScaleEffect: null | number;
+            /** Format: uuid */
+            researchRunId: string;
+            status: components["schemas"]["QuantitativeSynthesisStatus"];
+            studyDesignCompatibilityKey: string;
+            /** Format: int32 */
+            uniqueStudyCount: number;
+        };
+        QuantitativeSynthesisStatus: number;
+        ResearchClaimNumericSnapshot: {
+            algorithmVersion: null | string;
+            /** Format: double */
+            artifactLower: null | number;
+            /** Format: double */
+            artifactUpper: null | number;
+            /** Format: double */
+            artifactValue: null | number;
+            /** Format: double */
+            confidenceLevel: null | number;
+            /** Format: int32 */
+            degreesOfFreedom: null | number;
+            label: string;
+            operator: null | string;
+            /** Format: double */
+            studyLower: null | number;
+            /** Format: double */
+            studyUpper: null | number;
+            /** Format: double */
+            studyValue: null | number;
+        };
+        ResearchClaimSemanticsResponse: {
+            comparator: null | string;
+            direction: string;
+            evidenceIds: string[];
+            exposureOrIntervention: null | string;
+            groupKey: null | string;
+            kind: string;
+            numeric: null | components["schemas"]["ResearchClaimNumericSnapshot"];
+            /** Format: uuid */
+            numericEvidenceId: null | string;
+            outcome: null | string;
+            population: null | string;
+            protocolVersion: string;
+            /** Format: uuid */
+            quantitativeArtifactId: null | string;
+            snapshotFingerprint: null | string;
+            statistic: null | string;
+            timepoint: null | string;
         };
         ResearchPlanProvenanceResponse: {
-            /** Format: uuid */
-            researchPlanId?: string;
-            originalQuestion?: string;
-            searchQueries?: string[];
-            provider?: string;
-            model?: string;
-            promptVersion?: string;
             /** Format: date-time */
-            generatedAt?: string;
+            generatedAt: string;
+            model: string;
+            originalQuestion: string;
+            promptVersion: string;
+            provider: string;
+            /** Format: uuid */
+            researchPlanId: string;
+            searchQueries: string[];
         };
-        LiteratureSearchProvenanceResponse: {
-            /** Format: uuid */
-            literatureSearchId?: string;
-            /** Format: uuid */
-            researchPlanId?: string | null;
-            source?: string;
-            query?: string;
-            /** Format: date-time */
-            searchedAt?: string;
-            resultCount?: number;
-            persistedStudyCount?: number;
-            duplicateStudyCount?: number;
-            resultStatus?: string;
+        ResearchProvenanceCoverageResponse: {
+            /** Format: int32 */
+            discoveryPathCount: number;
+            /** Format: int32 */
+            distinctStudyCount: number;
+            /** Format: int32 */
+            evidenceEvaluationCount: number;
+            /** Format: int32 */
+            evidenceExtractionCount: number;
+            /** Format: int32 */
+            evidenceFindingCount: number;
+            hasPersistedProviderFailureProvenance: boolean;
+            /** Format: int32 */
+            literatureSearchCount: number;
+            /** Format: int32 */
+            researchPlanCount: number;
+            /** Format: int32 */
+            researchReportClaimCount: number;
+            /** Format: int32 */
+            sourceMaterialCount: number;
         };
-        StudyDiscoveryProvenanceResponse: {
-            /** Format: uuid */
-            researchStudyDiscoveryId?: string;
-            /** Format: uuid */
-            literatureSearchId?: string;
-            source?: string;
-            sourceStudyIdentifier?: string | null;
-            query?: string;
+        ResearchProvenanceResponse: {
             /** Format: date-time */
-            searchedAt?: string;
+            completedAt: null | string;
+            coverage: components["schemas"]["ResearchProvenanceCoverageResponse"];
             /** Format: date-time */
-            discoveredAt?: string;
+            createdAt: string;
+            plans: components["schemas"]["ResearchPlanProvenanceResponse"][];
+            providerAttempts: components["schemas"]["LiteratureProviderAttemptResponse"][];
+            quantitativeContributions: components["schemas"]["QuantitativeContributionProvenanceResponse"][];
+            question: string;
+            reportClaims: components["schemas"]["ResearchReportClaimProvenanceResponse"][];
+            /** Format: uuid */
+            researchRunId: string;
+            searches: components["schemas"]["LiteratureSearchProvenanceResponse"][];
+            /** Format: date-time */
+            startedAt: null | string;
+            /** @enum {string} */
+            status: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+            studies: components["schemas"]["StudyProvenanceResponse"][];
         };
-        SourceMaterialProvenanceResponse: {
+        ResearchReportCitationResponse: {
+            authors: string[];
+            comparator: null | string;
+            /** Format: double */
+            confidenceIntervalLower: null | number;
+            /** Format: double */
+            confidenceIntervalUpper: null | number;
+            /** Format: double */
+            confidenceLevel: null | number;
+            doi: null | string;
+            effectMeasure: null | string;
+            /** Format: double */
+            effectValue: null | number;
+            evidenceDirection: string;
             /** Format: uuid */
-            sourceMaterialId?: string;
-            /** Format: uuid */
-            studyId?: string;
-            type?: string;
-            provider?: string;
-            providerSourceId?: string | null;
-            retrievalMethod?: string;
-            contentHash?: string;
-            contentVersion?: number;
+            evidenceId: string;
+            exposureOrIntervention: null | string;
             /** Format: date-time */
-            retrievedAt?: string;
-            /** Format: date-time */
-            sourceUpdatedAt?: string | null;
-            accessStatus?: string;
-            characterCount?: number;
-            wasTruncated?: boolean;
-            isCurrent?: boolean;
-            sectionNames?: string[];
-        };
-        EvidenceExtractionProvenanceResponse: {
+            extractedAt: string;
+            groundingValidated: boolean;
+            journal: null | string;
+            /** Format: int32 */
+            ordinal: number;
+            outcome: string;
+            /** Format: double */
+            pValue: null | number;
+            pmcid: null | string;
+            pmid: null | string;
+            population: null | string;
+            /** Format: int32 */
+            publicationDay: null | number;
+            /** Format: int32 */
+            publicationMonth: null | number;
+            publicationTypes: string[];
+            /** Format: int32 */
+            publicationYear: null | number;
+            /** Format: double */
+            reportedStandardError: null | number;
+            resultSummary: string;
+            /** Format: int32 */
+            sampleSize: null | number;
+            sourceMaterial: null | components["schemas"]["ResearchReportSourceMaterialResponse"];
+            sourceScope: string;
+            studyDesign: null | string;
             /** Format: uuid */
-            evidenceExtractionId?: string;
-            /** Format: uuid */
-            studyId?: string;
-            /** Format: uuid */
-            sourceMaterialId?: string | null;
-            status?: string;
-            skipReason?: string | null;
-            sourceScope?: string;
-            provider?: string | null;
-            model?: string | null;
-            promptVersion?: string;
-            /** Format: date-time */
-            extractedAt?: string;
-            evidenceCount?: number;
-            groundingValidated?: boolean;
-        };
-        EvidenceProvenanceResponse: {
-            /** Format: uuid */
-            evidenceId?: string;
-            /** Format: uuid */
-            evidenceExtractionId?: string;
-            outcome?: string;
-            resultSummary?: string;
-            supportingText?: string;
-            direction?: string;
-            sourceScope?: string;
-            /** Format: date-time */
-            extractedAt?: string;
-            groundingValidated?: boolean;
-            population?: string | null;
-            exposureOrIntervention?: string | null;
-            comparator?: string | null;
-            studyDesign?: string | null;
-            sampleSize?: number | null;
-            effectMeasure?: string | null;
-            effectValue?: number | null;
-            confidenceIntervalLower?: number | null;
-            confidenceIntervalUpper?: number | null;
-            confidenceLevel?: number | null;
-            reportedStandardError?: number | null;
-            pValue?: number | null;
-        };
-        EvidenceEvaluationProvenanceResponse: {
-            /** Format: uuid */
-            evidenceEvaluationId?: string;
-            /** Format: uuid */
-            studyId?: string;
-            status?: string;
-            skipReason?: string | null;
-            sourceScope?: string;
-            evidenceIds?: string[];
-            evaluatorProvider?: string | null;
-            evaluatorModel?: string | null;
-            promptVersion?: string;
-            /** Format: date-time */
-            evaluatedAt?: string;
-            studyDesign?: string;
-            sampleInformation?: string;
-            comparatorPresence?: string;
-            comparatorDescription?: string | null;
-            randomization?: string;
-            blinding?: string;
-            allocationConcealment?: string;
-            attritionMissingData?: string;
-            precision?: string;
-            directness?: string;
-            overallConfidence?: string;
-            rationale?: string;
-            reportingLimitations?: string[];
-            authorReportedLimitations?: string[];
-            hasSampleSize?: boolean;
-            hasEffectEstimate?: boolean;
-            hasConfidenceInterval?: boolean;
-            hasPValue?: boolean;
-            hasComparator?: boolean;
-            unknownDomainCount?: number;
-            insufficientSourceDomainCount?: number;
+            studyId: string;
+            studySource: string;
+            supportingText: string;
+            title: string;
         };
         ResearchReportClaimProvenanceResponse: {
-            /** Format: uuid */
-            researchReportId: string;
-            /** Format: uuid */
-            researchReportClaimId: string;
             claimType: string;
             direction: string;
-            text: string;
-            /** Format: int32 */
-            ordinal: number | string;
             evidenceIds: string[];
             /** @default LegacyUnverified */
             groundingStatus: string;
-            semantics?: null | components["schemas"]["ResearchClaimSemanticsResponse"];
-        };
-        QuantitativeContributionProvenanceResponse: {
-            /** Format: uuid */
-            artifactId?: string;
-            groupKey?: string;
-            analysisMethod?: string;
-            ordinal?: number;
-            /** Format: uuid */
-            evidenceId?: string;
-            /** Format: uuid */
-            studyId?: string;
-            /** Format: uuid */
-            evidenceExtractionId?: string;
-            /** Format: uuid */
-            sourceMaterialId?: string;
-        };
-        LiteratureProviderAttemptResponse: {
-            /** Format: uuid */
-            attemptId: string;
-            /** Format: uuid */
-            researchPlanId: string;
-            /** @enum {string} */
-            source: "PubMed" | "EuropePmc";
-            query: string;
-            /** @enum {string} */
-            status: "Started" | "SucceededWithResults" | "SucceededZeroResults" | "Failed" | "TimedOut" | "Cancelled";
-            resultCount: number | null;
-            /** @enum {string|null} */
-            failureCategory: "NetworkFailure" | "Timeout" | "RateLimited" | "InvalidResponse" | "ProviderProtocolError" | "ResponseTooLarge" | "Cancelled" | "UnexpectedFailure" | null;
-            /** Format: date-time */
-            startedAt: string;
-            /** Format: date-time */
-            completedAt: string | null;
-            /** Format: uuid */
-            literatureSearchId: string | null;
-        };
-        ResearchProvenanceResponse: {
-            /** Format: uuid */
-            researchRunId?: string;
-            question?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            startedAt?: string | null;
-            /** Format: date-time */
-            completedAt?: string | null;
-            coverage?: components["schemas"]["ResearchProvenanceCoverageResponse"];
-            plans?: components["schemas"]["ResearchPlanProvenanceResponse"][];
-            searches?: components["schemas"]["LiteratureSearchProvenanceResponse"][];
-            studies?: {
-                /** Format: uuid */
-                studyId?: string;
-                title?: string;
-                pmid?: string | null;
-                pmcid?: string | null;
-                doi?: string | null;
-                journal?: string | null;
-                publicationYear?: number | null;
-                publicationMonth?: number | null;
-                publicationDay?: number | null;
-                publicationTypes?: string[];
-                authors?: string[];
-                source?: string;
-                discoveryPaths?: components["schemas"]["StudyDiscoveryProvenanceResponse"][];
-                sourceMaterials?: components["schemas"]["SourceMaterialProvenanceResponse"][];
-                extractions?: components["schemas"]["EvidenceExtractionProvenanceResponse"][];
-                evidence?: components["schemas"]["EvidenceProvenanceResponse"][];
-                evaluations?: components["schemas"]["EvidenceEvaluationProvenanceResponse"][];
-            }[];
-            reportClaims?: components["schemas"]["ResearchReportClaimProvenanceResponse"][];
-            quantitativeContributions?: components["schemas"]["QuantitativeContributionProvenanceResponse"][];
-            providerAttempts: components["schemas"]["LiteratureProviderAttemptResponse"][];
-        };
-        ProblemDetails: {
-            type?: string;
-            title?: string;
-            status?: number;
-            detail?: string;
-            instance?: string;
-        } & {
-            [key: string]: unknown;
-        };
-        ResearchClaimSemanticsResponse: {
-            protocolVersion: string;
-            kind: string;
-            outcome: null | string;
-            population: null | string;
-            exposureOrIntervention: null | string;
-            comparator: null | string;
-            timepoint: null | string;
-            direction: string;
-            evidenceIds: string[];
-            /** Format: uuid */
-            numericEvidenceId: null | string;
-            /** Format: uuid */
-            quantitativeArtifactId: null | string;
-            groupKey: null | string;
-            snapshotFingerprint: null | string;
-            statistic: null | string;
-            numeric: null | components["schemas"]["ResearchClaimNumericSnapshot"];
-        };
-        ResearchClaimNumericSnapshot: {
-            label: string;
-            /** Format: double */
-            studyValue: null | number | string;
-            /** Format: double */
-            artifactValue: null | number | string;
-            /** Format: double */
-            studyLower: null | number | string;
-            /** Format: double */
-            studyUpper: null | number | string;
-            /** Format: double */
-            artifactLower: null | number | string;
-            /** Format: double */
-            artifactUpper: null | number | string;
-            /** Format: double */
-            confidenceLevel: null | number | string;
-            operator: null | string;
             /** Format: int32 */
-            degreesOfFreedom: null | number | string;
-            algorithmVersion: null | string;
+            ordinal: number;
+            /** Format: uuid */
+            researchReportClaimId: string;
+            /** Format: uuid */
+            researchReportId: string;
+            semantics: null | components["schemas"]["ResearchClaimSemanticsResponse"];
+            text: string;
+        };
+        ResearchReportClaimResponse: {
+            citations: components["schemas"]["ResearchReportCitationResponse"][];
+            /** Format: uuid */
+            claimId: string;
+            claimType: string;
+            direction: string;
+            /** @default LegacyUnverified */
+            groundingStatus: string;
+            /** Format: int32 */
+            ordinal: number;
+            semantics: null | components["schemas"]["ResearchClaimSemanticsResponse"];
+            text: string;
+        };
+        ResearchReportCoverageResponse: {
+            /** Format: int32 */
+            discoveredStudyCount: number;
+            /** Format: int32 */
+            evaluatedStudyCount: number;
+            /** Format: int32 */
+            evidenceFindingCount: number;
+            evidenceTruncated: boolean;
+            /** Format: int32 */
+            extractedStudyCount: number;
+            /** Format: int32 */
+            includedEvidenceFindingCount: number;
+            /** Format: int32 */
+            includedStudyCount: number;
+            potentialConflictDetected: boolean;
+            /** Format: int32 */
+            searchQueryCount: number;
+            searchedSources: string[];
+            /** Format: int32 */
+            studiesWithInsufficientEvaluationSource: number;
+            /** Format: int32 */
+            studiesWithNoExtractableEvidence: number;
+            usesAbstractLevelEvidenceOnly: boolean;
+        };
+        ResearchReportResponse: {
+            claims: components["schemas"]["ResearchReportClaimResponse"][];
+            conclusion: string;
+            conflictSummary: string;
+            coverage: components["schemas"]["ResearchReportCoverageResponse"];
+            deterministicLimitations: string[];
+            evidenceSummary: string;
+            executiveSummary: string;
+            /** Format: date-time */
+            generatedAt: string;
+            insufficientEvidenceReason: null | string;
+            limitationsSummary: string;
+            narrativeAuthority: null | string;
+            promptVersion: string;
+            question: string;
+            /** Format: uuid */
+            researchReportId: string;
+            /** Format: uuid */
+            researchRunId: string;
+            status: string;
+            synthesisConfidence: string;
+        };
+        ResearchReportSourceMaterialResponse: {
+            accessStatus: string;
+            /** Format: int32 */
+            contentVersion: number;
+            provider: string;
+            retrievalMethod: string;
+            /** Format: date-time */
+            retrievedAt: string;
+            sectionNames: string[];
+            /** Format: uuid */
+            sourceMaterialId: string;
+            type: string;
+            wasTruncated: boolean;
+        };
+        ResearchRunListResponse: {
+            items: components["schemas"]["ResearchRunSummaryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        ResearchRunProcessingProgressResponse: {
+            /** Format: date-time */
+            lastHeartbeatAt: null | string;
+            /** Format: date-time */
+            leaseExpiresAt: null | string;
+            leaseState: string;
+            /** Format: int64 */
+            leaseVersion: number;
+        };
+        ResearchRunProgressMetricResponse: {
+            label: string;
+            /** Format: int32 */
+            value: number;
+        };
+        ResearchRunProgressMetricsResponse: {
+            /** Format: int32 */
+            abstractMaterialCount: number;
+            /** Format: int32 */
+            completedEvidenceEvaluationCount: number;
+            /** Format: int32 */
+            completedEvidenceExtractionCount: number;
+            /** Format: int32 */
+            currentSourceMaterialCount: number;
+            /** Format: int32 */
+            discoveryPathCount: number;
+            /** Format: int32 */
+            distinctDiscoveredStudyCount: number;
+            /** Format: int32 */
+            evidenceEvaluationCount: number;
+            /** Format: int32 */
+            evidenceExtractionCount: number;
+            /** Format: int32 */
+            evidenceFindingCount: number;
+            /** Format: int32 */
+            literatureSearchCount: number;
+            /** Format: int32 */
+            literatureSearchResultCount: number;
+            /** Format: int32 */
+            literatureSearchSourceCount: number;
+            /** Format: int32 */
+            plannedSearchQueryCount: number;
+            /** Format: int32 */
+            researchPlanCount: number;
+            /** Format: int32 */
+            researchReportClaimCount: number;
+            /** Format: int32 */
+            researchReportCount: number;
+            /** Format: int32 */
+            skippedEvidenceEvaluationCount: number;
+            /** Format: int32 */
+            skippedEvidenceExtractionCount: number;
+            /** Format: int32 */
+            structuredFullTextMaterialCount: number;
+        };
+        ResearchRunProgressResponse: {
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            failureReason: null | string;
+            metrics: components["schemas"]["ResearchRunProgressMetricsResponse"];
+            processing: components["schemas"]["ResearchRunProcessingProgressResponse"];
+            question: string;
+            /** Format: date-time */
+            refreshedAt: string;
+            /** Format: uuid */
+            researchRunId: string;
+            stages: components["schemas"]["ResearchRunStageProgressResponse"][];
+            /** Format: date-time */
+            startedAt: null | string;
+            /** @enum {string} */
+            status: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+        };
+        ResearchRunResponse: {
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            failureReason: null | string;
+            question: string;
+            /** Format: uuid */
+            researchRunId: string;
+            /** Format: date-time */
+            startedAt: null | string;
+            /** @enum {string} */
+            status: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+        };
+        ResearchRunStageProgressResponse: {
+            metrics: components["schemas"]["ResearchRunProgressMetricResponse"][];
+            stage: string;
+            state: string;
+        };
+        ResearchRunSummaryResponse: {
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            failureReason: null | string;
+            question: string;
+            /** Format: uuid */
+            researchQuestionId: string;
+            /** Format: uuid */
+            researchRunId: string;
+            /** Format: date-time */
+            startedAt: null | string;
+            /** @enum {string} */
+            status: "Queued" | "Planning" | "Searching" | "Extracting" | "Evaluating" | "Synthesizing" | "Completed" | "Failed" | "Cancelled";
+        };
+        SourceMaterialProvenanceResponse: {
+            accessStatus: string;
+            /** Format: int32 */
+            characterCount: number;
+            contentHash: string;
+            /** Format: int32 */
+            contentVersion: number;
+            isCurrent: boolean;
+            provider: string;
+            providerSourceId: null | string;
+            retrievalMethod: string;
+            /** Format: date-time */
+            retrievedAt: string;
+            sectionNames: string[];
+            /** Format: uuid */
+            sourceMaterialId: string;
+            /** Format: date-time */
+            sourceUpdatedAt: null | string;
+            /** Format: uuid */
+            studyId: string;
+            type: string;
+            wasTruncated: boolean;
+        };
+        StudyDiscoveryProvenanceResponse: {
+            /** Format: date-time */
+            discoveredAt: string;
+            /** Format: uuid */
+            literatureSearchId: string;
+            query: string;
+            /** Format: uuid */
+            researchStudyDiscoveryId: string;
+            /** Format: date-time */
+            searchedAt: string;
+            source: string;
+            sourceStudyIdentifier: null | string;
+        };
+        StudyProvenanceResponse: {
+            authors: string[];
+            discoveryPaths: components["schemas"]["StudyDiscoveryProvenanceResponse"][];
+            doi: null | string;
+            evaluations: components["schemas"]["EvidenceEvaluationProvenanceResponse"][];
+            evidence: components["schemas"]["EvidenceProvenanceResponse"][];
+            extractions: components["schemas"]["EvidenceExtractionProvenanceResponse"][];
+            journal: null | string;
+            pmcid: null | string;
+            pmid: null | string;
+            /** Format: int32 */
+            publicationDay: null | number;
+            /** Format: int32 */
+            publicationMonth: null | number;
+            publicationTypes: string[];
+            /** Format: int32 */
+            publicationYear: null | number;
+            source: string;
+            sourceMaterials: components["schemas"]["SourceMaterialProvenanceResponse"][];
+            /** Format: uuid */
+            studyId: string;
+            title: string;
         };
     };
-    responses: {
-        /** @description Problem Details */
-        Problem: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-                "application/json": components["schemas"]["ProblemDetails"];
-            };
-        };
-    };
+    responses: never;
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -782,55 +885,12 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getHealthLive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Application process is alive */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getHealthReady: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Application is ready and can reach PostgreSQL */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Application is not ready */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listResearchRuns: {
+    ListResearchRuns: {
         parameters: {
             query?: {
                 page?: number;
                 pageSize?: number;
-                status?: components["schemas"]["ResearchRunStatus"];
+                status?: string;
             };
             header?: never;
             path?: never;
@@ -838,7 +898,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paged research run history */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -847,11 +907,41 @@ export interface operations {
                     "application/json": components["schemas"]["ResearchRunListResponse"];
                 };
             };
-            400: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
-    createResearch: {
+    CreateResearch: {
         parameters: {
             query?: never;
             header?: never;
@@ -864,7 +954,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Research run queued */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -873,11 +963,41 @@ export interface operations {
                     "application/json": components["schemas"]["CreateResearchResponse"];
                 };
             };
-            400: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
-    getResearch: {
+    GetResearch: {
         parameters: {
             query?: never;
             header?: never;
@@ -888,7 +1008,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Research run state */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -897,11 +1017,41 @@ export interface operations {
                     "application/json": components["schemas"]["ResearchRunResponse"];
                 };
             };
-            404: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
-    getResearchProgress: {
+    GetResearchProgress: {
         parameters: {
             query?: never;
             header?: never;
@@ -912,7 +1062,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Persisted research run progress */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -921,60 +1071,41 @@ export interface operations {
                     "application/json": components["schemas"]["ResearchRunProgressResponse"];
                 };
             };
-            404: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
-        };
-    };
-    getResearchReport: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                researchRunId: string;
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Persisted research report */
-            200: {
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResearchReportResponse"];
+                    "application/json": components["schemas"]["ProblemDetails"];
                 };
             };
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
-        };
-    };
-    getQuantitativeSynthesisArtifacts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                researchRunId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Persisted deterministic quantitative synthesis artifacts */
-            200: {
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuantitativeSynthesisArtifactResponse"][];
+                    "application/json": components["schemas"]["ProblemDetails"];
                 };
             };
-            404: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
         };
     };
-    getResearchProvenance: {
+    GetResearchProvenance: {
         parameters: {
             query?: never;
             header?: never;
@@ -985,7 +1116,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Persisted evidence and provenance lineage for the authorized research run */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -994,8 +1125,155 @@ export interface operations {
                     "application/json": components["schemas"]["ResearchProvenanceResponse"];
                 };
             };
-            404: components["responses"]["Problem"];
-            500: components["responses"]["Problem"];
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetQuantitativeSynthesisArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantitativeSynthesisArtifactResponse"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetResearchReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchReportResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
 }

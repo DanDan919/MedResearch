@@ -14,12 +14,12 @@ export function ApiStatusIndicator() {
   });
 
   if (query.isLoading) {
-    return <StatusIndicator tone="neutral" label="API Checking" aria-live="polite" />;
+    return <StatusIndicator compact tone="neutral" label="API Checking" />;
   }
 
   if (query.data === "connected") {
-    return <StatusIndicator tone="success" label="API Connected" aria-live="polite" />;
+    return <StatusIndicator compact tone="success" label="API Connected" />;
   }
 
-  return <StatusIndicator tone="danger" label="API Unavailable" aria-live="polite" />;
+  return <StatusIndicator compact tone="danger" label="API Unavailable" />;
 }

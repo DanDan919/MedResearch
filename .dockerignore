@@ -5,5 +5,12 @@
 **/obj
 **/TestResults
 **/.env
+**/.env.*
+**/node_modules
+**/.next
+**/dist
+**/test-results
+**/playwright-report
+**/src-tauri/target
 **/*.user
 **/*.suo

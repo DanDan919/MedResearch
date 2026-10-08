@@ -2,10 +2,10 @@
 import http from "node:http";
 import https from "node:https";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, cp, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import selfsigned from "selfsigned";
 import { generateKeyPair, exportJWK, SignJWT, jwtVerify } from "jose";
 
@@ -15,6 +15,7 @@ const clientId = "synthetic-web-client";
 const audience = "synthetic-research-api";
 const clientSecret = randomBytes(32).toString("hex");
 const sessionSecret = randomBytes(48).toString("hex");
+const fullStack = process.env.MEDRESEARCH_FULL_STACK === "true";
 const { privateKey, publicKey } = await generateKeyPair("RS256");
 const wrong = await generateKeyPair("RS256");
 const jwk = { ...await exportJWK(publicKey), kid: "ephemeral-test-key", use: "sig", alg: "RS256" };
@@ -24,9 +25,38 @@ const certificates = await selfsigned.generate([{ name: "commonName", value: "lo
   ] }] });
 const temporary = await mkdtemp(join(tmpdir(), "medresearch-auth-"));
 const ca = join(temporary, "ca.pem"); await writeFile(ca, certificates.cert);
+export { ca, temporary };
 const pending = new Map(); const codes = new Map(); const runs = new Map();
 const metrics = { exchanges: 0, pkceVerified: 0, apiRequests: 0, identityHeaderSeen: false, cookieSeenAtIssuer: false };
 const servers = [];
+let actualApi;
+let issuerAvailable = true;
+async function stopApi() {
+  if (!actualApi || actualApi.exitCode !== null) return;
+  const processToStop = actualApi;
+  await new Promise(resolve => {
+    const timer = setTimeout(() => processToStop.kill("SIGKILL"), 10_000);
+    processToStop.once("exit", () => { clearTimeout(timer); resolve(); });
+    processToStop.kill();
+  });
+}
+async function startApi() {
+  if (!fullStack) throw new Error("Actual API is available only in the full-stack fixture");
+  actualApi = spawn("dotnet", [process.env.MEDRESEARCH_API_DLL], { cwd: resolve("../../../src/MedResearch.Api"),
+    env: { ...process.env, SSL_CERT_FILE: ca, ASPNETCORE_ENVIRONMENT: "Production", ASPNETCORE_URLS: "http://127.0.0.1:3442",
+      Authentication__Mode: "JwtBearer", Authentication__Authority: issuer, Authentication__Audience: audience,
+      ResearchProcessing__Enabled: "false", Database__ApplyMigrationsOnStartup: "true", EuropePmc__Enabled: "false", EuropePmcFullText__Enabled: "false" },
+    windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  actualApi.stdout.on("data", chunk => process.stdout.write(chunk));
+  actualApi.stderr.on("data", chunk => process.stderr.write(chunk));
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (actualApi.exitCode !== null) throw new Error("Actual API exited before readiness");
+    try { if ((await fetch("http://127.0.0.1:3442/health/ready", { signal: AbortSignal.timeout(2000) })).ok) return; } catch { /* bounded startup polling */ }
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+  throw new Error("Actual API readiness timeout");
+}
 const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); response.end(JSON.stringify(body)); };
 const redirect = (response, destination) => { response.writeHead(302, { Location: destination, "Cache-Control": "no-store" }); response.end(); };
 async function body(request) {
@@ -40,6 +70,7 @@ async function sign(subject, aud, nonce, lifetime = 300, signingKey = privateKey
 }
 
 const identityServer = https.createServer({ key: certificates.private, cert: certificates.cert }, safe(async (request, response) => {
+  if (!issuerAvailable) return json(response, 503, { error: "temporarily_unavailable" });
   const url = new URL(request.url, issuer);
   if (request.headers.cookie?.includes("medresearch")) metrics.cookieSeenAtIssuer = true;
   if (url.pathname === "/.well-known/openid-configuration") return json(response, 200, {
@@ -123,16 +154,38 @@ const apiServer = http.createServer(safe(async (request, response) => {
 let ready = false;
 const webServer = https.createServer({ key: certificates.private, cert: certificates.cert }, (request, response) => {
   if (request.url === "/_fixture/ready") { response.writeHead(ready ? 200 : 503); response.end(); return; }
+  if (fullStack && request.url === "/_fixture/control" && request.method === "POST") {
+    void safe(async (request, response) => {
+      const { action } = JSON.parse(await body(request));
+      if (action === "api-stop") await stopApi();
+      else if (action === "api-restart") { await stopApi(); await startApi(); }
+      else if (action === "issuer-stop") issuerAvailable = false;
+      else if (action === "issuer-start") issuerAvailable = true;
+      else if (action === "postgres-stop" || action === "postgres-start") {
+        if (!/^[a-f0-9]{64}$/.test(process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID ?? "")) throw new Error("Invalid fixture container");
+        execFileSync("docker", [action === "postgres-stop" ? "stop" : "start", process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID], { stdio: "ignore" });
+      }
+      else return json(response, 400, { title: "Unknown fixture action" });
+      json(response, 200, { ok: true });
+    })(request, response);
+    return;
+  }
   const upstream = http.request({ hostname: "127.0.0.1", port: 3440, method: request.method, path: request.url, headers: request.headers }, incoming => {
     response.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(response);
   });
   upstream.on("error", () => { response.writeHead(503); response.end(); }); request.pipe(upstream);
 });
-for (const [server, port] of [[identityServer, 3443], [apiServer, 3442], [webServer, 3441]]) {
-  await new Promise(resolve => server.listen(port, resolve)); servers.push(server);
+for (const [server, port] of [[identityServer, 3443], ...fullStack ? [] : [[apiServer, 3442]], [webServer, 3441]]) {
+  await new Promise(resolve => server.listen(port, "127.0.0.1", resolve)); servers.push(server);
 }
-const child = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", "3440"], {
+if (fullStack) await startApi();
+const standalone = resolve(".next/standalone/apps/web/server.js");
+const standaloneAvailable = await access(standalone).then(() => true, () => false);
+if (fullStack && !standaloneAvailable) throw new Error("Full-stack release verification requires the standalone production build");
+if (standaloneAvailable) await cp(resolve(".next/static"), resolve(".next/standalone/apps/web/.next/static"), { recursive: true });
+const child = spawn(process.execPath, standaloneAvailable ? [standalone] : [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", "3440"], {
   env: { ...process.env, NODE_ENV: "production", NODE_EXTRA_CA_CERTS: ca, WEB_AUTH_MODE: "Oidc", WEB_AUTH_ORIGIN: web,
+    HOSTNAME: "127.0.0.1", PORT: "3440",
     MEDRESEARCH_API_INTERNAL_URL: "http://127.0.0.1:3442", OIDC_ISSUER: issuer, OIDC_CLIENT_ID: clientId, OIDC_CLIENT_SECRET: clientSecret,
     OIDC_API_AUDIENCE: audience, OIDC_SCOPE: "openid profile research", WEB_SESSION_SECRET: sessionSecret }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"]
 });
@@ -140,8 +193,17 @@ child.stdout.on("data", chunk => { const text = chunk.toString(); if (/Ready in/
 child.stderr.on("data", chunk => process.stderr.write(chunk));
 child.on("exit", code => { ready = false; if (!stopping) { console.error("Synthetic Next server exited", code); void stop(1); } });
 let stopping = false;
-async function stop(code = 0) {
+export async function waitUntilReady() {
+  const deadline = Date.now() + 60_000;
+  while (!ready && Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error("Production Next server exited before readiness");
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  if (!ready) throw new Error("Production Next readiness timeout");
+}
+export async function stop(code = 0) {
   if (stopping) return; stopping = true; child.kill();
+  if (fullStack) await stopApi();
   for (const server of servers) server.closeAllConnections();
   await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));
   if (dirname(resolve(temporary)) !== resolve(tmpdir()) || !temporary.includes("medresearch-auth-")) throw new Error("Unsafe temporary cleanup path");

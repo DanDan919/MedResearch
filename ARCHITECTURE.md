@@ -1,5 +1,29 @@
 # Architecture
 
+## F18 Web Release Verification Boundary
+
+The web release harness runs the production Next standalone server/BFF, a
+separate Production ASP.NET JWT API process, and a fresh migrated PostgreSQL.
+Synthetic OIDC/JWKS and scientific providers are test-only. Browser, Node and
+API trust a temporary CA; the new full-stack suite does not disable TLS checks.
+Owner authorization stays in the API/database, not in browser identity headers.
+The test seed adds read-model scale discoveries without fabricating scientific
+claims. The worker remains disabled in the production browser API process.
+
+ASP.NET Development OpenAPI is the canonical client contract. The test compares
+all paths, security and schemas to the checked-in snapshot, excluding only
+runtime servers and sorting object keys. Numeric response schemas reflect the
+actual numeric serialization; nullable emitted properties remain required.
+Generated TS and separately refined Zod contracts have alignment controls.
+Production does not expose OpenAPI. See `docs/frontend/deployment.md`.
+
+Deployment uses a public HTTPS proxy, private Next/BFF and API listeners, and
+private PostgreSQL. Standalone packaging and image builds are reproducibility
+checks, not deployed image scanning or real IdP compatibility certification.
+Production HIGH/CRITICAL dependency advisories block CI; full audit artifacts
+retain development advisories without exclusions. Statistical algorithms and
+scientific trust boundaries are unchanged by F18.
+
 For a short Russian onboarding guide, read `docs/architecture-overview.md`. For the exact request lifecycle through code, read `docs/request-lifecycle.md`. For a staged learning roadmap, read `docs/learning-path.md`.
 
 MedResearch is a modular, layered monolith. The system should remain simple until concrete needs justify more infrastructure.
@@ -577,7 +601,7 @@ The compose API service enables config-gated startup migrations with `Database__
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
 - Europe PMC live availability is verified only through an optional smoke test, not normal CI.
 - Production migration strategy is not decided yet.
-- OpenAPI document generation is intentionally not enabled until a non-vulnerable package set and concrete documentation need are chosen.
+- OpenAPI document generation is enabled in Development using the current package set; F18 verifies its complete backend-origin contract. It is not exposed in Production.
 
 ## Source Material and External Boundaries
 

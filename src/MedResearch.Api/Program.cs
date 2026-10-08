@@ -1,4 +1,5 @@
 using MedResearch.Api.Research;
+using MedResearch.Api;
 using MedResearch.Domain;
 using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
@@ -15,7 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(ApiOpenApiConfiguration.Configure);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentActor, HttpCurrentActor>();
 builder.Services.AddMedResearchAuthentication(builder.Configuration, builder.Environment);

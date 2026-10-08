@@ -1,5 +1,16 @@
 # MedResearch
 
+## Web Release Candidate (F18)
+
+The web app has standalone Node/Docker packaging, an actual-backend OpenAPI
+drift gate, production dependency HIGH/CRITICAL blocking audits, and a separate
+Linux full-stack browser job with a trusted temporary CA, real JWT API and
+migrated Testcontainers PostgreSQL. Scientific providers in that job are fakes.
+See [deployment operations](docs/frontend/deployment.md) and the
+[Russian F18 verification report](docs/development/f18-web-release-candidate-ru.md).
+These checks are not certification of an external IdP, deployed HTTPS, live
+scientific providers or a native Tauri release.
+
 MedResearch is a portfolio and learning project for AI-assisted scientific evidence synthesis, focused primarily on medical and neuroscience research.
 
 The purpose is not to diagnose patients or recommend treatments. The long-term goal is to help transform scientific questions into structured research workflows, retrieve study metadata, extract structured evidence, evaluate study quality where deterministic rules are possible, detect conflicting evidence, and produce traceable evidence syntheses.

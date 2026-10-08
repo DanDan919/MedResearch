@@ -48,6 +48,28 @@ public sealed class AuthenticationConfigurationTests
         Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(Microsoft.AspNetCore.Authorization.IAuthorizationHandler));
     }
 
+    [Theory]
+    [InlineData("http://issuer.example.org")]
+    [InlineData("https://user:password@issuer.example.org")]
+    [InlineData("https://issuer.example.org?token=not-a-secret")]
+    [InlineData("https://issuer.example.org#fragment")]
+    [InlineData("not-a-url")]
+    public void ProductionJwtAuthority_RejectsUnsafeUrls(string authority)
+    {
+        var configuration = Configuration(new Dictionary<string, string?>
+        { ["Authentication:Mode"] = "JwtBearer", ["Authentication:Authority"] = authority, ["Authentication:Audience"] = "research-api" });
+        var error = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddMedResearchAuthentication(configuration, Environment("Production")));
+        Assert.DoesNotContain(authority, error.Message);
+    }
+
+    [Fact]
+    public void ProductionJwtAuthority_AcceptsHttpsIssuer()
+    {
+        var configuration = Configuration(new Dictionary<string, string?>
+        { ["Authentication:Mode"] = "JwtBearer", ["Authentication:Authority"] = "https://issuer.example.org/tenant", ["Authentication:Audience"] = "research-api" });
+        new ServiceCollection().AddMedResearchAuthentication(configuration, Environment("Production"));
+    }
+
     private static IConfiguration Configuration(IReadOnlyDictionary<string, string?> values)
     {
         return new ConfigurationBuilder()

@@ -1,432 +1,1866 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "MedResearch API",
-    "version": "f1"
-  },
-  "paths": {
-    "/health/live": {
-      "get": {
-        "operationId": "getHealthLive",
-        "responses": {
-          "200": {
-            "description": "Application process is alive"
-          }
-        }
-      }
-    },
-    "/health/ready": {
-      "get": {
-        "operationId": "getHealthReady",
-        "responses": {
-          "200": {
-            "description": "Application is ready and can reach PostgreSQL"
+  "components": {
+    "schemas": {
+      "BetweenStudyVarianceEstimate": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
           },
-          "503": {
-            "description": "Application is not ready"
-          }
-        }
-      }
-    },
-    "/api/research": {
-      "get": {
-        "operationId": "listResearchRuns",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
+          "converged": {
+            "type": "boolean"
           },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
+          "estimator": {
+            "$ref": "#/components/schemas/BetweenStudyVarianceEstimator"
           },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/ResearchRunStatus"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paged research run history",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResearchRunListResponse"
-                }
+          "failureReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BetweenStudyVarianceFailureReason"
               }
-            }
+            ]
           },
-          "400": {
-            "$ref": "#/components/responses/Problem"
+          "iterationCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
           },
-          "500": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createResearch",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateResearchRequest"
-              }
-            }
+          "status": {
+            "$ref": "#/components/schemas/BetweenStudyVarianceEstimateStatus"
+          },
+          "studyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "tauSquared": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
           }
         },
-        "responses": {
-          "201": {
-            "description": "Research run queued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateResearchResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "500": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/api/research/{researchRunId}": {
-      "get": {
-        "operationId": "getResearch",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "researchRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
+        "required": [
+          "tauSquared",
+          "estimator",
+          "status",
+          "algorithmVersion",
+          "studyCount",
+          "converged",
+          "iterationCount",
+          "failureReason"
         ],
-        "responses": {
-          "200": {
-            "description": "Research run state",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResearchRunResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "500": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/api/research/{researchRunId}/progress": {
-      "get": {
-        "operationId": "getResearchProgress",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "researchRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Persisted research run progress",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResearchRunProgressResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "500": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/api/research/{researchRunId}/report": {
-      "get": {
-        "operationId": "getResearchReport",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "researchRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Persisted research report",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResearchReportResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "409": {
-            "$ref": "#/components/responses/Problem"
-          },
-          "500": {
-            "$ref": "#/components/responses/Problem"
-          }
-        }
-      }
-    },
-    "/api/research/{researchRunId}/quantitative": {
-      "get": {
-        "operationId": "getQuantitativeSynthesisArtifacts",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "researchRunId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Persisted deterministic quantitative synthesis artifacts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/QuantitativeSynthesisArtifactResponse" }
-                }
-              }
-            }
-          },
-          "404": { "$ref": "#/components/responses/Problem" },
-          "500": { "$ref": "#/components/responses/Problem" }
-        }
-      }
-    },
-    "/api/research/{researchRunId}/provenance": {
-      "get": {
-        "operationId": "getResearchProvenance",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "name": "researchRunId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Persisted evidence and provenance lineage for the authorized research run",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ResearchProvenanceResponse" }
-              }
-            }
-          },
-          "404": { "$ref": "#/components/responses/Problem" },
-          "500": { "$ref": "#/components/responses/Problem" }
-        }
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      }
-    },
-    "responses": {
-      "Problem": {
-        "description": "Problem Details",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
-            }
-          },
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
-            }
-          }
-        }
-      }
-    },
-    "schemas": {
+        "type": "object"
+      },
+      "BetweenStudyVarianceEstimateStatus": {
+        "type": "integer"
+      },
+      "BetweenStudyVarianceEstimator": {
+        "type": "integer"
+      },
+      "BetweenStudyVarianceFailureReason": {
+        "type": "integer"
+      },
       "CreateResearchRequest": {
-        "type": "object",
-        "additionalProperties": false,
         "properties": {
           "question": {
-            "type": ["string", "null"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
       },
       "CreateResearchResponse": {
-        "type": "object",
-        "required": ["researchRunId", "status"],
-        "additionalProperties": false,
         "properties": {
           "researchRunId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "$ref": "#/components/schemas/ResearchRunStatus"
-          }
-        }
-      },
-      "ResearchRunResponse": {
-        "type": "object",
-        "required": ["researchRunId", "question", "status", "createdAt", "startedAt", "completedAt", "failureReason"],
-        "additionalProperties": false,
-        "properties": {
-          "researchRunId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "question": {
+            "format": "uuid",
             "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/ResearchRunStatus"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "startedAt": {
-            "type": ["string", "null"],
-            "format": "date-time"
-          },
-          "completedAt": {
-            "type": ["string", "null"],
-            "format": "date-time"
-          },
-          "failureReason": {
-            "type": ["string", "null"]
+            "enum": [
+              "Queued",
+              "Planning",
+              "Searching",
+              "Extracting",
+              "Evaluating",
+              "Synthesizing",
+              "Completed",
+              "Failed",
+              "Cancelled"
+            ],
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "researchRunId",
+          "status"
+        ],
+        "type": "object"
       },
-      "ResearchRunSummaryResponse": {
-        "type": "object",
-        "required": ["researchRunId", "researchQuestionId", "question", "status", "createdAt", "startedAt", "completedAt", "failureReason"],
-        "additionalProperties": false,
+      "EffectMeasureType": {
+        "type": "integer"
+      },
+      "EvidenceEvaluationProvenanceResponse": {
         "properties": {
-          "researchRunId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "researchQuestionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "question": {
+          "allocationConcealment": {
             "type": "string"
           },
-          "status": {
-            "$ref": "#/components/schemas/ResearchRunStatus"
+          "attritionMissingData": {
+            "type": "string"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "startedAt": {
-            "type": ["string", "null"],
-            "format": "date-time"
-          },
-          "completedAt": {
-            "type": ["string", "null"],
-            "format": "date-time"
-          },
-          "failureReason": {
-            "type": ["string", "null"]
-          }
-        }
-      },
-      "ResearchRunListResponse": {
-        "type": "object",
-        "required": ["items", "page", "pageSize", "totalCount", "totalPages"],
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "type": "array",
+          "authorReportedLimitations": {
             "items": {
-              "$ref": "#/components/schemas/ResearchRunSummaryResponse"
-            }
+              "type": "string"
+            },
+            "type": "array"
           },
-          "page": {
+          "blinding": {
+            "type": "string"
+          },
+          "comparatorDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comparatorPresence": {
+            "type": "string"
+          },
+          "directness": {
+            "type": "string"
+          },
+          "evaluatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evaluatorModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evaluatorProvider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidenceEvaluationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "evidenceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hasComparator": {
+            "type": "boolean"
+          },
+          "hasConfidenceInterval": {
+            "type": "boolean"
+          },
+          "hasEffectEstimate": {
+            "type": "boolean"
+          },
+          "hasPValue": {
+            "type": "boolean"
+          },
+          "hasSampleSize": {
+            "type": "boolean"
+          },
+          "insufficientSourceDomainCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": "integer"
           },
-          "pageSize": {
-            "type": "integer"
+          "overallConfidence": {
+            "type": "string"
           },
-          "totalCount": {
-            "type": "integer"
+          "precision": {
+            "type": "string"
           },
-          "totalPages": {
+          "promptVersion": {
+            "type": "string"
+          },
+          "randomization": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "reportingLimitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sampleInformation": {
+            "type": "string"
+          },
+          "skipReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceScope": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "studyDesign": {
+            "type": "string"
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "unknownDomainCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": "integer"
           }
-        }
+        },
+        "required": [
+          "evidenceEvaluationId",
+          "studyId",
+          "status",
+          "skipReason",
+          "sourceScope",
+          "evidenceIds",
+          "evaluatorProvider",
+          "evaluatorModel",
+          "promptVersion",
+          "evaluatedAt",
+          "studyDesign",
+          "sampleInformation",
+          "comparatorPresence",
+          "comparatorDescription",
+          "randomization",
+          "blinding",
+          "allocationConcealment",
+          "attritionMissingData",
+          "precision",
+          "directness",
+          "overallConfidence",
+          "rationale",
+          "reportingLimitations",
+          "authorReportedLimitations",
+          "hasSampleSize",
+          "hasEffectEstimate",
+          "hasConfidenceInterval",
+          "hasPValue",
+          "hasComparator",
+          "unknownDomainCount",
+          "insufficientSourceDomainCount"
+        ],
+        "type": "object"
       },
-      "ResearchRunStatus": {
-        "type": "string",
-        "enum": ["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]
+      "EvidenceExtractionProvenanceResponse": {
+        "properties": {
+          "evidenceCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceExtractionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "extractedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "groundingValidated": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "skipReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceMaterialId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceScope": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidenceExtractionId",
+          "studyId",
+          "sourceMaterialId",
+          "status",
+          "skipReason",
+          "sourceScope",
+          "provider",
+          "model",
+          "promptVersion",
+          "extractedAt",
+          "evidenceCount",
+          "groundingValidated"
+        ],
+        "type": "object"
       },
-      "ResearchRunProgressResponse": {
-        "type": "object",
+      "EvidenceProvenanceResponse": {
+        "properties": {
+          "comparator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "confidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "direction": {
+            "type": "string"
+          },
+          "effectMeasure": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "evidenceExtractionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "evidenceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "exposureOrIntervention": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "extractedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "groundingValidated": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "pValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "population": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reportedStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "resultSummary": {
+            "type": "string"
+          },
+          "sampleSize": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "sourceScope": {
+            "type": "string"
+          },
+          "studyDesign": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "supportingText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidenceId",
+          "evidenceExtractionId",
+          "outcome",
+          "resultSummary",
+          "supportingText",
+          "direction",
+          "sourceScope",
+          "extractedAt",
+          "groundingValidated",
+          "population",
+          "exposureOrIntervention",
+          "comparator",
+          "studyDesign",
+          "sampleSize",
+          "effectMeasure",
+          "effectValue",
+          "confidenceIntervalLower",
+          "confidenceIntervalUpper",
+          "confidenceLevel",
+          "reportedStandardError",
+          "pValue"
+        ],
+        "type": "object"
+      },
+      "LiteratureProviderAttemptResponse": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "failureCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "literatureSearchId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "query": {
+            "type": "string"
+          },
+          "researchPlanId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resultCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attemptId",
+          "researchPlanId",
+          "source",
+          "query",
+          "status",
+          "resultCount",
+          "failureCategory",
+          "startedAt",
+          "completedAt",
+          "literatureSearchId"
+        ],
+        "type": "object"
+      },
+      "LiteratureSearchProvenanceResponse": {
+        "properties": {
+          "duplicateStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "literatureSearchId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "persistedStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "query": {
+            "type": "string"
+          },
+          "researchPlanId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resultCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "resultStatus": {
+            "type": "string"
+          },
+          "searchedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "literatureSearchId",
+          "researchPlanId",
+          "source",
+          "query",
+          "searchedAt",
+          "resultCount",
+          "persistedStudyCount",
+          "duplicateStudyCount",
+          "resultStatus"
+        ],
+        "type": "object"
+      },
+      "ProblemDetails": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "QuantitativeConfidenceIntervalMethod": {
+        "type": "integer"
+      },
+      "QuantitativeContributionProvenanceResponse": {
+        "properties": {
+          "analysisMethod": {
+            "type": "string"
+          },
+          "artifactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "evidenceExtractionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "evidenceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "groupKey": {
+            "type": "string"
+          },
+          "ordinal": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "sourceMaterialId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "groupKey",
+          "analysisMethod",
+          "ordinal",
+          "evidenceId",
+          "studyId",
+          "evidenceExtractionId",
+          "sourceMaterialId"
+        ],
+        "type": "object"
+      },
+      "QuantitativeHeterogeneityDiagnostics": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "cochransQ": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "degreesOfFreedom": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "iSquared": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "studyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cochransQ",
+          "degreesOfFreedom",
+          "iSquared",
+          "studyCount",
+          "algorithmVersion"
+        ],
+        "type": "object"
+      },
+      "QuantitativeHksjFailureReason": {
+        "type": "integer"
+      },
+      "QuantitativeHksjInferenceResult": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "analysisScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceIntervalMethod": {
+            "$ref": "#/components/schemas/QuantitativeConfidenceIntervalMethod"
+          },
+          "criticalValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "degreesOfFreedom": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "failureReasons": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeHksjFailureReason"
+            },
+            "type": "array"
+          },
+          "outputConfidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": "number"
+          },
+          "reportedScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisStatus"
+          },
+          "studyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "varianceAdjustment": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "confidenceIntervalMethod",
+          "algorithmVersion",
+          "outputConfidenceLevel",
+          "studyCount",
+          "degreesOfFreedom",
+          "varianceAdjustment",
+          "criticalValue",
+          "analysisScaleEffect",
+          "analysisScaleVariance",
+          "analysisScaleStandardError",
+          "analysisScaleConfidenceIntervalLower",
+          "analysisScaleConfidenceIntervalUpper",
+          "reportedScaleEffect",
+          "reportedScaleConfidenceIntervalLower",
+          "reportedScaleConfidenceIntervalUpper",
+          "failureReasons"
+        ],
+        "type": "object"
+      },
+      "QuantitativePredictionIntervalFailureReason": {
+        "type": "integer"
+      },
+      "QuantitativePredictionIntervalMethod": {
+        "type": "integer"
+      },
+      "QuantitativePredictionIntervalResult": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "analysisScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "criticalValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "degreesOfFreedom": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "failureReasons": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativePredictionIntervalFailureReason"
+            },
+            "type": "array"
+          },
+          "method": {
+            "$ref": "#/components/schemas/QuantitativePredictionIntervalMethod"
+          },
+          "outputConfidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": "number"
+          },
+          "predictionStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "predictionVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisStatus"
+          },
+          "studyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "summaryEffectStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "summaryEffectVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "tauSquared": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "method",
+          "algorithmVersion",
+          "outputConfidenceLevel",
+          "studyCount",
+          "degreesOfFreedom",
+          "tauSquared",
+          "summaryEffectVariance",
+          "summaryEffectStandardError",
+          "predictionVariance",
+          "predictionStandardError",
+          "criticalValue",
+          "analysisScaleEffect",
+          "analysisScaleLower",
+          "analysisScaleUpper",
+          "reportedScaleEffect",
+          "reportedScaleLower",
+          "reportedScaleUpper",
+          "failureReasons"
+        ],
+        "type": "object"
+      },
+      "QuantitativeRandomEffectsFailureReason": {
+        "type": "integer"
+      },
+      "QuantitativeRandomEffectsSynthesisResult": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "analysisScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceIntervalMethod": {
+            "$ref": "#/components/schemas/QuantitativeConfidenceIntervalMethod"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeSynthesisContribution"
+            },
+            "type": "array"
+          },
+          "failureReasons": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeRandomEffectsFailureReason"
+            },
+            "type": "array"
+          },
+          "hksjInference": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuantitativeHksjInferenceResult"
+              }
+            ]
+          },
+          "method": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisMethod"
+          },
+          "outputConfidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": "number"
+          },
+          "predictionInterval": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuantitativePredictionIntervalResult"
+              }
+            ]
+          },
+          "reportedScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisStatus"
+          },
+          "studyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "tauSquared": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "tauSquaredAlgorithmVersion": {
+            "type": "string"
+          },
+          "tauSquaredEstimator": {
+            "$ref": "#/components/schemas/BetweenStudyVarianceEstimator"
+          }
+        },
+        "required": [
+          "status",
+          "method",
+          "algorithmVersion",
+          "confidenceIntervalMethod",
+          "outputConfidenceLevel",
+          "tauSquared",
+          "tauSquaredEstimator",
+          "tauSquaredAlgorithmVersion",
+          "studyCount",
+          "analysisScaleEffect",
+          "analysisScaleVariance",
+          "analysisScaleStandardError",
+          "analysisScaleConfidenceIntervalLower",
+          "analysisScaleConfidenceIntervalUpper",
+          "reportedScaleEffect",
+          "reportedScaleConfidenceIntervalLower",
+          "reportedScaleConfidenceIntervalUpper",
+          "hksjInference",
+          "predictionInterval",
+          "contributions",
+          "failureReasons"
+        ],
+        "type": "object"
+      },
+      "QuantitativeSynthesisArtifactResponse": {
+        "properties": {
+          "artifactId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "persistedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisResult"
+          },
+          "snapshotFingerprint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "persistedAt",
+          "snapshotFingerprint",
+          "result"
+        ],
+        "type": "object"
+      },
+      "QuantitativeSynthesisContribution": {
+        "properties": {
+          "analysisScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "analysisScaleStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "analysisScaleVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "evidenceExtractionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "evidenceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "normalizedWeight": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          },
+          "sourceMaterialId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "weight": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": "number"
+          }
+        },
+        "required": [
+          "evidenceId",
+          "studyId",
+          "evidenceExtractionId",
+          "sourceMaterialId",
+          "analysisScaleEffect",
+          "analysisScaleVariance",
+          "analysisScaleStandardError",
+          "weight",
+          "normalizedWeight"
+        ],
+        "type": "object"
+      },
+      "QuantitativeSynthesisMethod": {
+        "type": "integer"
+      },
+      "QuantitativeSynthesisRejectionReason": {
+        "type": "integer"
+      },
+      "QuantitativeSynthesisResult": {
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "analysisScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "analysisScaleVariance": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "betweenStudyVariance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BetweenStudyVarianceEstimate"
+              }
+            ]
+          },
+          "comparatorCompatibilityKey": {
+            "type": "string"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeSynthesisContribution"
+            },
+            "type": "array"
+          },
+          "effectMeasureType": {
+            "$ref": "#/components/schemas/EffectMeasureType"
+          },
+          "evidenceCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "groupKey": {
+            "type": "string"
+          },
+          "heterogeneityDiagnostics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuantitativeHeterogeneityDiagnostics"
+              }
+            ]
+          },
+          "method": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisMethod"
+          },
+          "outcomeGroupKey": {
+            "type": "string"
+          },
+          "outputConfidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": "number"
+          },
+          "populationCompatibilityKey": {
+            "type": "string"
+          },
+          "randomEffects": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuantitativeRandomEffectsSynthesisResult"
+              }
+            ]
+          },
+          "rejectionReasons": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeSynthesisRejectionReason"
+            },
+            "type": "array"
+          },
+          "reportedScaleConfidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleConfidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "reportedScaleEffect": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuantitativeSynthesisStatus"
+          },
+          "studyDesignCompatibilityKey": {
+            "type": "string"
+          },
+          "uniqueStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "researchRunId",
+          "groupKey",
+          "outcomeGroupKey",
+          "populationCompatibilityKey",
+          "comparatorCompatibilityKey",
+          "studyDesignCompatibilityKey",
+          "effectMeasureType",
+          "status",
+          "method",
+          "algorithmVersion",
+          "outputConfidenceLevel",
+          "evidenceCount",
+          "uniqueStudyCount",
+          "analysisScaleEffect",
+          "analysisScaleVariance",
+          "analysisScaleStandardError",
+          "analysisScaleConfidenceIntervalLower",
+          "analysisScaleConfidenceIntervalUpper",
+          "reportedScaleEffect",
+          "reportedScaleConfidenceIntervalLower",
+          "reportedScaleConfidenceIntervalUpper",
+          "heterogeneityDiagnostics",
+          "betweenStudyVariance",
+          "randomEffects",
+          "contributions",
+          "rejectionReasons"
+        ],
+        "type": "object"
+      },
+      "QuantitativeSynthesisStatus": {
+        "type": "integer"
+      },
+      "ResearchClaimNumericSnapshot": {
+        "properties": {
+          "algorithmVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "artifactLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "artifactUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "artifactValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "degreesOfFreedom": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "operator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "studyLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "studyUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "studyValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "label",
+          "studyValue",
+          "artifactValue",
+          "studyLower",
+          "studyUpper",
+          "artifactLower",
+          "artifactUpper",
+          "confidenceLevel",
+          "operator",
+          "degreesOfFreedom",
+          "algorithmVersion"
+        ],
+        "type": "object"
+      },
+      "ResearchClaimSemanticsResponse": {
+        "properties": {
+          "comparator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "direction": {
+            "type": "string"
+          },
+          "evidenceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "exposureOrIntervention": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "numeric": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimNumericSnapshot"
+              }
+            ]
+          },
+          "numericEvidenceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "population": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "protocolVersion": {
+            "type": "string"
+          },
+          "quantitativeArtifactId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "snapshotFingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statistic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timepoint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "kind",
+          "outcome",
+          "population",
+          "exposureOrIntervention",
+          "comparator",
+          "timepoint",
+          "direction",
+          "evidenceIds",
+          "numericEvidenceId",
+          "quantitativeArtifactId",
+          "groupKey",
+          "snapshotFingerprint",
+          "statistic",
+          "numeric"
+        ],
+        "type": "object"
+      },
+      "ResearchPlanProvenanceResponse": {
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "originalQuestion": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "researchPlanId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "searchQueries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "researchPlanId",
+          "originalQuestion",
+          "searchQueries",
+          "provider",
+          "model",
+          "promptVersion",
+          "generatedAt"
+        ],
+        "type": "object"
+      },
+      "ResearchProvenanceCoverageResponse": {
+        "properties": {
+          "discoveryPathCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "distinctStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceEvaluationCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceExtractionCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceFindingCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "hasPersistedProviderFailureProvenance": {
+            "type": "boolean"
+          },
+          "literatureSearchCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchPlanCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchReportClaimCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "sourceMaterialCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "researchPlanCount",
+          "literatureSearchCount",
+          "discoveryPathCount",
+          "distinctStudyCount",
+          "sourceMaterialCount",
+          "evidenceExtractionCount",
+          "evidenceFindingCount",
+          "evidenceEvaluationCount",
+          "researchReportClaimCount",
+          "hasPersistedProviderFailureProvenance"
+        ],
+        "type": "object"
+      },
+      "ResearchProvenanceResponse": {
+        "properties": {
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ResearchProvenanceCoverageResponse"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPlanProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "providerAttempts": {
+            "items": {
+              "$ref": "#/components/schemas/LiteratureProviderAttemptResponse"
+            },
+            "type": "array"
+          },
+          "quantitativeContributions": {
+            "items": {
+              "$ref": "#/components/schemas/QuantitativeContributionProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          },
+          "reportClaims": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchReportClaimProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "searches": {
+            "items": {
+              "$ref": "#/components/schemas/LiteratureSearchProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "enum": [
+              "Queued",
+              "Planning",
+              "Searching",
+              "Extracting",
+              "Evaluating",
+              "Synthesizing",
+              "Completed",
+              "Failed",
+              "Cancelled"
+            ],
+            "type": "string"
+          },
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/StudyProvenanceResponse"
+            },
+            "type": "array"
+          }
+        },
         "required": [
           "researchRunId",
           "question",
@@ -434,46 +1868,772 @@
           "createdAt",
           "startedAt",
           "completedAt",
-          "failureReason",
-          "refreshedAt",
-          "processing",
-          "metrics",
-          "stages"
+          "coverage",
+          "plans",
+          "searches",
+          "studies",
+          "reportClaims",
+          "quantitativeContributions",
+          "providerAttempts"
         ],
-        "additionalProperties": false,
+        "type": "object"
+      },
+      "ResearchReportCitationResponse": {
         "properties": {
-          "researchRunId": { "type": "string", "format": "uuid" },
-          "question": { "type": "string" },
-          "status": { "$ref": "#/components/schemas/ResearchRunStatus" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "startedAt": { "type": ["string", "null"], "format": "date-time" },
-          "completedAt": { "type": ["string", "null"], "format": "date-time" },
-          "failureReason": { "type": ["string", "null"] },
-          "refreshedAt": { "type": "string", "format": "date-time" },
-          "processing": { "$ref": "#/components/schemas/ResearchRunProcessingProgressResponse" },
-          "metrics": { "$ref": "#/components/schemas/ResearchRunProgressMetricsResponse" },
-          "stages": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/ResearchRunStageProgressResponse" }
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "comparator": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "confidenceIntervalLower": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceIntervalUpper": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "confidenceLevel": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "doi": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectMeasure": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "effectValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "evidenceDirection": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "exposureOrIntervention": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "extractedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "groundingValidated": {
+            "type": "boolean"
+          },
+          "journal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ordinal": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "pValue": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "pmcid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pmid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "population": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicationDay": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "publicationMonth": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "publicationTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "publicationYear": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "reportedStandardError": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?$",
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "resultSummary": {
+            "type": "string"
+          },
+          "sampleSize": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "sourceMaterial": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchReportSourceMaterialResponse"
+              }
+            ]
+          },
+          "sourceScope": {
+            "type": "string"
+          },
+          "studyDesign": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "studySource": {
+            "type": "string"
+          },
+          "supportingText": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "evidenceId",
+          "studyId",
+          "pmid",
+          "pmcid",
+          "doi",
+          "title",
+          "journal",
+          "publicationYear",
+          "publicationMonth",
+          "publicationDay",
+          "publicationTypes",
+          "authors",
+          "studySource",
+          "outcome",
+          "resultSummary",
+          "supportingText",
+          "evidenceDirection",
+          "sourceScope",
+          "groundingValidated",
+          "population",
+          "exposureOrIntervention",
+          "comparator",
+          "studyDesign",
+          "sampleSize",
+          "effectMeasure",
+          "effectValue",
+          "confidenceIntervalLower",
+          "confidenceIntervalUpper",
+          "confidenceLevel",
+          "reportedStandardError",
+          "pValue",
+          "extractedAt",
+          "sourceMaterial",
+          "ordinal"
+        ],
+        "type": "object"
+      },
+      "ResearchReportClaimProvenanceResponse": {
+        "properties": {
+          "claimType": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "evidenceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "groundingStatus": {
+            "default": "LegacyUnverified",
+            "type": "string"
+          },
+          "ordinal": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchReportClaimId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "researchReportId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "semantics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "researchReportId",
+          "researchReportClaimId",
+          "claimType",
+          "direction",
+          "text",
+          "ordinal",
+          "evidenceIds",
+          "groundingStatus",
+          "semantics"
+        ],
+        "type": "object"
+      },
+      "ResearchReportClaimResponse": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchReportCitationResponse"
+            },
+            "type": "array"
+          },
+          "claimId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "claimType": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "groundingStatus": {
+            "default": "LegacyUnverified",
+            "type": "string"
+          },
+          "ordinal": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "semantics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "claimId",
+          "claimType",
+          "direction",
+          "text",
+          "ordinal",
+          "citations",
+          "groundingStatus",
+          "semantics"
+        ],
+        "type": "object"
+      },
+      "ResearchReportCoverageResponse": {
+        "properties": {
+          "discoveredStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evaluatedStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceFindingCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceTruncated": {
+            "type": "boolean"
+          },
+          "extractedStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "includedEvidenceFindingCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "includedStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "potentialConflictDetected": {
+            "type": "boolean"
+          },
+          "searchQueryCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "searchedSources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "studiesWithInsufficientEvaluationSource": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "studiesWithNoExtractableEvidence": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "usesAbstractLevelEvidenceOnly": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "discoveredStudyCount",
+          "extractedStudyCount",
+          "evaluatedStudyCount",
+          "evidenceFindingCount",
+          "includedStudyCount",
+          "includedEvidenceFindingCount",
+          "searchQueryCount",
+          "studiesWithNoExtractableEvidence",
+          "studiesWithInsufficientEvaluationSource",
+          "potentialConflictDetected",
+          "evidenceTruncated",
+          "usesAbstractLevelEvidenceOnly",
+          "searchedSources"
+        ],
+        "type": "object"
+      },
+      "ResearchReportResponse": {
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchReportClaimResponse"
+            },
+            "type": "array"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "conflictSummary": {
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ResearchReportCoverageResponse"
+          },
+          "deterministicLimitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "evidenceSummary": {
+            "type": "string"
+          },
+          "executiveSummary": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "insufficientEvidenceReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limitationsSummary": {
+            "type": "string"
+          },
+          "narrativeAuthority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "researchReportId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "synthesisConfidence": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "researchRunId",
+          "researchReportId",
+          "status",
+          "insufficientEvidenceReason",
+          "question",
+          "executiveSummary",
+          "evidenceSummary",
+          "conflictSummary",
+          "limitationsSummary",
+          "conclusion",
+          "synthesisConfidence",
+          "promptVersion",
+          "generatedAt",
+          "coverage",
+          "deterministicLimitations",
+          "claims",
+          "narrativeAuthority"
+        ],
+        "type": "object"
+      },
+      "ResearchReportSourceMaterialResponse": {
+        "properties": {
+          "accessStatus": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "retrievalMethod": {
+            "type": "string"
+          },
+          "retrievedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sectionNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sourceMaterialId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "wasTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sourceMaterialId",
+          "type",
+          "provider",
+          "retrievalMethod",
+          "contentVersion",
+          "retrievedAt",
+          "accessStatus",
+          "wasTruncated",
+          "sectionNames"
+        ],
+        "type": "object"
+      },
+      "ResearchRunListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchRunSummaryResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount",
+          "totalPages"
+        ],
+        "type": "object"
       },
       "ResearchRunProcessingProgressResponse": {
-        "type": "object",
-        "required": ["leaseState", "leaseExpiresAt", "lastHeartbeatAt", "leaseVersion"],
-        "additionalProperties": false,
         "properties": {
-          "leaseState": {
-            "type": "string",
-            "enum": ["None", "Active", "Expired", "Terminal"]
+          "lastHeartbeatAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "leaseExpiresAt": { "type": ["string", "null"], "format": "date-time" },
-          "lastHeartbeatAt": { "type": ["string", "null"], "format": "date-time" },
-          "leaseVersion": { "type": "integer", "format": "int64" }
-        }
+          "leaseExpiresAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "leaseState": {
+            "type": "string"
+          },
+          "leaseVersion": {
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "leaseState",
+          "leaseExpiresAt",
+          "lastHeartbeatAt",
+          "leaseVersion"
+        ],
+        "type": "object"
+      },
+      "ResearchRunProgressMetricResponse": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object"
       },
       "ResearchRunProgressMetricsResponse": {
-        "type": "object",
+        "properties": {
+          "abstractMaterialCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "completedEvidenceEvaluationCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "completedEvidenceExtractionCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "currentSourceMaterialCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "discoveryPathCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "distinctDiscoveredStudyCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceEvaluationCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceExtractionCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "evidenceFindingCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "literatureSearchCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "literatureSearchResultCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "literatureSearchSourceCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "plannedSearchQueryCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchPlanCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchReportClaimCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchReportCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "skippedEvidenceEvaluationCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "skippedEvidenceExtractionCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "structuredFullTextMaterialCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
         "required": [
           "researchPlanCount",
           "plannedSearchQueryCount",
@@ -495,87 +2655,101 @@
           "researchReportCount",
           "researchReportClaimCount"
         ],
-        "additionalProperties": false,
-        "properties": {
-          "researchPlanCount": { "type": "integer" },
-          "plannedSearchQueryCount": { "type": "integer" },
-          "literatureSearchCount": { "type": "integer" },
-          "literatureSearchSourceCount": { "type": "integer" },
-          "literatureSearchResultCount": { "type": "integer" },
-          "discoveryPathCount": { "type": "integer" },
-          "distinctDiscoveredStudyCount": { "type": "integer" },
-          "currentSourceMaterialCount": { "type": "integer" },
-          "structuredFullTextMaterialCount": { "type": "integer" },
-          "abstractMaterialCount": { "type": "integer" },
-          "evidenceExtractionCount": { "type": "integer" },
-          "completedEvidenceExtractionCount": { "type": "integer" },
-          "skippedEvidenceExtractionCount": { "type": "integer" },
-          "evidenceFindingCount": { "type": "integer" },
-          "evidenceEvaluationCount": { "type": "integer" },
-          "completedEvidenceEvaluationCount": { "type": "integer" },
-          "skippedEvidenceEvaluationCount": { "type": "integer" },
-          "researchReportCount": { "type": "integer" },
-          "researchReportClaimCount": { "type": "integer" }
-        }
+        "type": "object"
       },
-      "ResearchRunStageProgressResponse": {
-        "type": "object",
-        "required": ["stage", "state", "metrics"],
-        "additionalProperties": false,
+      "ResearchRunProgressResponse": {
         "properties": {
-          "stage": { "$ref": "#/components/schemas/ResearchRunStatus" },
-          "state": {
-            "type": "string",
-            "enum": ["Pending", "Current", "Completed"]
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "metrics": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/ResearchRunProgressMetricResponse" }
-          }
-        }
-      },
-      "ResearchRunProgressMetricResponse": {
-        "type": "object",
-        "required": ["label", "value"],
-        "additionalProperties": false,
-        "properties": {
-          "label": { "type": "string" },
-          "value": { "type": "integer" }
-        }
-      },
-      "ResearchReportResponse": {
-        "required": [
-          "researchRunId",
-          "researchReportId",
-          "status",
-          "insufficientEvidenceReason",
-          "question",
-          "executiveSummary",
-          "evidenceSummary",
-          "conflictSummary",
-          "limitationsSummary",
-          "conclusion",
-          "synthesisConfidence",
-          "promptVersion",
-          "generatedAt",
-          "coverage",
-          "deterministicLimitations",
-          "claims"
-        ],
-        "type": "object",
-        "properties": {
-          "researchRunId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "researchReportId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
+          "createdAt": {
+            "format": "date-time",
             "type": "string"
           },
-          "insufficientEvidenceReason": {
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/ResearchRunProgressMetricsResponse"
+          },
+          "processing": {
+            "$ref": "#/components/schemas/ResearchRunProcessingProgressResponse"
+          },
+          "question": {
+            "type": "string"
+          },
+          "refreshedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchRunStageProgressResponse"
+            },
+            "type": "array"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "enum": [
+              "Queued",
+              "Planning",
+              "Searching",
+              "Extracting",
+              "Evaluating",
+              "Synthesizing",
+              "Completed",
+              "Failed",
+              "Cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "researchRunId",
+          "question",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "failureReason",
+          "refreshedAt",
+          "processing",
+          "metrics",
+          "stages"
+        ],
+        "type": "object"
+      },
+      "ResearchRunResponse": {
+        "properties": {
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "failureReason": {
             "type": [
               "null",
               "string"
@@ -584,878 +2758,858 @@
           "question": {
             "type": "string"
           },
-          "executiveSummary": {
+          "researchRunId": {
+            "format": "uuid",
             "type": "string"
           },
-          "evidenceSummary": {
-            "type": "string"
-          },
-          "conflictSummary": {
-            "type": "string"
-          },
-          "limitationsSummary": {
-            "type": "string"
-          },
-          "conclusion": {
-            "type": "string"
-          },
-          "synthesisConfidence": {
-            "type": "string"
-          },
-          "promptVersion": {
-            "type": "string"
-          },
-          "generatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "coverage": {
-            "$ref": "#/components/schemas/ResearchReportCoverageResponse"
-          },
-          "deterministicLimitations": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "claims": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ResearchReportClaimResponse"
-            }
-          },
-          "narrativeAuthority": {
+          "startedAt": {
+            "format": "date-time",
             "type": [
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "ResearchReportCoverageResponse": {
-        "type": "object",
-        "required": [
-          "discoveredStudyCount",
-          "extractedStudyCount",
-          "evaluatedStudyCount",
-          "evidenceFindingCount",
-          "includedStudyCount",
-          "includedEvidenceFindingCount",
-          "searchQueryCount",
-          "studiesWithNoExtractableEvidence",
-          "studiesWithInsufficientEvaluationSource",
-          "potentialConflictDetected",
-          "evidenceTruncated",
-          "usesAbstractLevelEvidenceOnly",
-          "searchedSources"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "discoveredStudyCount": { "type": "integer" },
-          "extractedStudyCount": { "type": "integer" },
-          "evaluatedStudyCount": { "type": "integer" },
-          "evidenceFindingCount": { "type": "integer" },
-          "includedStudyCount": { "type": "integer" },
-          "includedEvidenceFindingCount": { "type": "integer" },
-          "searchQueryCount": { "type": "integer" },
-          "studiesWithNoExtractableEvidence": { "type": "integer" },
-          "studiesWithInsufficientEvaluationSource": { "type": "integer" },
-          "potentialConflictDetected": { "type": "boolean" },
-          "evidenceTruncated": { "type": "boolean" },
-          "usesAbstractLevelEvidenceOnly": { "type": "boolean" },
-          "searchedSources": {
-            "type": "array",
-            "items": { "type": "string" }
-          }
-        }
-      },
-      "ResearchReportClaimResponse": {
-        "required": [
-          "claimId",
-          "claimType",
-          "direction",
-          "text",
-          "ordinal",
-          "citations"
-        ],
-        "type": "object",
-        "properties": {
-          "claimId": {
-            "type": "string",
-            "format": "uuid"
           },
-          "claimType": {
-            "type": "string"
-          },
-          "direction": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          },
-          "ordinal": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
+          "status": {
+            "enum": [
+              "Queued",
+              "Planning",
+              "Searching",
+              "Extracting",
+              "Evaluating",
+              "Synthesizing",
+              "Completed",
+              "Failed",
+              "Cancelled"
             ],
-            "format": "int32"
-          },
-          "citations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ResearchReportCitationResponse"
-            }
-          },
-          "groundingStatus": {
-            "type": "string",
-            "default": "LegacyUnverified"
-          },
-          "semantics": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
-              }
-            ]
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "researchRunId",
+          "question",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "failureReason"
+        ],
+        "type": "object"
       },
-      "ResearchReportCitationResponse": {
-        "type": "object",
-        "required": ["evidenceId", "studyId", "pmid", "pmcid", "doi", "title", "journal", "publicationYear", "publicationMonth", "publicationDay", "publicationTypes", "authors", "studySource", "outcome", "resultSummary", "supportingText", "evidenceDirection", "sourceScope", "groundingValidated", "population", "exposureOrIntervention", "comparator", "studyDesign", "sampleSize", "effectMeasure", "effectValue", "confidenceIntervalLower", "confidenceIntervalUpper", "confidenceLevel", "reportedStandardError", "pValue", "extractedAt", "sourceMaterial", "ordinal"],
-        "additionalProperties": false,
+      "ResearchRunStageProgressResponse": {
         "properties": {
-          "evidenceId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "pmid": { "type": ["string", "null"] },
-          "pmcid": { "type": ["string", "null"] },
-          "doi": { "type": ["string", "null"] },
-          "title": { "type": "string" },
-          "journal": { "type": ["string", "null"] },
-          "publicationYear": { "type": ["integer", "null"] },
-          "publicationMonth": { "type": ["integer", "null"] },
-          "publicationDay": { "type": ["integer", "null"] },
-          "publicationTypes": { "type": "array", "items": { "type": "string" } },
-          "authors": { "type": "array", "items": { "type": "string" } },
-          "studySource": { "type": ["string", "null"] },
-          "outcome": { "type": "string" },
-          "resultSummary": { "type": ["string", "null"] },
-          "supportingText": { "type": "string" },
-          "evidenceDirection": { "type": "string" },
-          "sourceScope": { "type": "string" },
-          "groundingValidated": { "type": "boolean" },
-          "population": { "type": ["string", "null"] },
-          "exposureOrIntervention": { "type": ["string", "null"] },
-          "comparator": { "type": ["string", "null"] },
-          "studyDesign": { "type": ["string", "null"] },
-          "sampleSize": { "type": ["integer", "null"] },
-          "effectMeasure": { "type": ["string", "null"] },
-          "effectValue": { "type": ["number", "null"] },
-          "confidenceIntervalLower": { "type": ["number", "null"] },
-          "confidenceIntervalUpper": { "type": ["number", "null"] },
-          "confidenceLevel": { "type": ["number", "null"] },
-          "reportedStandardError": { "type": ["number", "null"] },
-          "pValue": { "type": ["number", "null"] },
-          "extractedAt": { "type": "string", "format": "date-time" },
-          "sourceMaterial": { "anyOf": [{ "$ref": "#/components/schemas/ResearchReportSourceMaterialResponse" }, { "type": "null" }] },
-          "ordinal": { "type": "integer" }
-        }
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchRunProgressMetricResponse"
+            },
+            "type": "array"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "state",
+          "metrics"
+        ],
+        "type": "object"
       },
-      "ResearchReportSourceMaterialResponse": {
-        "type": "object",
-        "required": ["sourceMaterialId", "type", "provider", "retrievalMethod", "contentVersion", "retrievedAt", "accessStatus", "wasTruncated", "sectionNames"],
-        "additionalProperties": false,
+      "ResearchRunSummaryResponse": {
         "properties": {
-          "sourceMaterialId": { "type": "string", "format": "uuid" },
-          "type": { "type": "string" },
-          "provider": { "type": "string" },
-          "retrievalMethod": { "type": "string" },
-          "contentVersion": { "type": "integer" },
-          "retrievedAt": { "type": "string", "format": "date-time" },
-          "accessStatus": { "type": "string" },
-          "wasTruncated": { "type": "boolean" },
-          "sectionNames": { "type": "array", "items": { "type": "string" } }
-        }
-      },
-      "QuantitativeSynthesisArtifactResponse": {
-        "type": "object",
-        "required": ["artifactId", "persistedAt", "snapshotFingerprint", "result"],
-        "additionalProperties": false,
-        "properties": {
-          "artifactId": { "type": "string", "format": "uuid" },
-          "persistedAt": { "type": "string", "format": "date-time" },
-          "snapshotFingerprint": { "type": "string" },
-          "result": { "$ref": "#/components/schemas/QuantitativeSynthesisResult" }
-        }
-      },
-      "QuantitativeSynthesisResult": {
-        "type": "object",
-        "required": ["researchRunId", "groupKey", "outcomeGroupKey", "populationCompatibilityKey", "comparatorCompatibilityKey", "studyDesignCompatibilityKey", "effectMeasureType", "status", "method", "algorithmVersion", "outputConfidenceLevel", "evidenceCount", "uniqueStudyCount", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "heterogeneityDiagnostics", "betweenStudyVariance", "randomEffects", "contributions", "rejectionReasons"],
-        "additionalProperties": false,
-        "properties": {
-          "researchRunId": { "type": "string", "format": "uuid" },
-          "groupKey": { "type": "string" },
-          "outcomeGroupKey": { "type": "string" },
-          "populationCompatibilityKey": { "type": "string" },
-          "comparatorCompatibilityKey": { "type": "string" },
-          "studyDesignCompatibilityKey": { "type": "string" },
-          "effectMeasureType": { "type": "integer" },
-          "status": { "type": "integer" },
-          "method": { "type": "integer" },
-          "algorithmVersion": { "type": "string" },
-          "outputConfidenceLevel": { "type": "number" },
-          "evidenceCount": { "type": "integer" },
-          "uniqueStudyCount": { "type": "integer" },
-          "analysisScaleEffect": { "type": ["number", "null"] },
-          "analysisScaleVariance": { "type": ["number", "null"] },
-          "analysisScaleStandardError": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "reportedScaleEffect": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "heterogeneityDiagnostics": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeHeterogeneityDiagnostics" }, { "type": "null" }] },
-          "betweenStudyVariance": { "oneOf": [{ "$ref": "#/components/schemas/BetweenStudyVarianceEstimate" }, { "type": "null" }] },
-          "randomEffects": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeRandomEffectsSynthesisResult" }, { "type": "null" }] },
-          "contributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeSynthesisContribution" } },
-          "rejectionReasons": { "type": "array", "items": { "type": "integer" } }
-        }
-      },
-      "QuantitativeHeterogeneityDiagnostics": {
-        "type": "object",
-        "required": ["cochransQ", "degreesOfFreedom", "iSquared", "studyCount", "algorithmVersion"],
-        "additionalProperties": false,
-        "properties": {
-          "cochransQ": { "type": "number" },
-          "degreesOfFreedom": { "type": "integer" },
-          "iSquared": { "type": "number" },
-          "studyCount": { "type": "integer" },
-          "algorithmVersion": { "type": "string" }
-        }
-      },
-      "BetweenStudyVarianceEstimate": {
-        "type": "object",
-        "required": ["tauSquared", "estimator", "status", "algorithmVersion", "studyCount", "converged", "iterationCount", "failureReason"],
-        "additionalProperties": false,
-        "properties": {
-          "tauSquared": { "type": ["number", "null"] },
-          "estimator": { "type": "integer" },
-          "status": { "type": "integer" },
-          "algorithmVersion": { "type": "string" },
-          "studyCount": { "type": "integer" },
-          "converged": { "type": "boolean" },
-          "iterationCount": { "type": "integer" },
-          "failureReason": { "type": ["integer", "null"] }
-        }
-      },
-      "QuantitativeRandomEffectsSynthesisResult": {
-        "type": "object",
-        "required": ["status", "method", "algorithmVersion", "confidenceIntervalMethod", "outputConfidenceLevel", "tauSquared", "tauSquaredEstimator", "tauSquaredAlgorithmVersion", "studyCount", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "hksjInference", "predictionInterval", "contributions", "failureReasons"],
-        "additionalProperties": false,
-        "properties": {
-          "status": { "type": "integer" },
-          "method": { "type": "integer" },
-          "algorithmVersion": { "type": "string" },
-          "confidenceIntervalMethod": { "type": "integer" },
-          "outputConfidenceLevel": { "type": "number" },
-          "tauSquared": { "type": ["number", "null"] },
-          "tauSquaredEstimator": { "type": "integer" },
-          "tauSquaredAlgorithmVersion": { "type": "string" },
-          "studyCount": { "type": "integer" },
-          "analysisScaleEffect": { "type": ["number", "null"] },
-          "analysisScaleVariance": { "type": ["number", "null"] },
-          "analysisScaleStandardError": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "reportedScaleEffect": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "hksjInference": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativeHksjInferenceResult" }, { "type": "null" }] },
-          "predictionInterval": { "oneOf": [{ "$ref": "#/components/schemas/QuantitativePredictionIntervalResult" }, { "type": "null" }] },
-          "contributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeSynthesisContribution" } },
-          "failureReasons": { "type": "array", "items": { "type": "integer" } }
-        }
-      },
-      "QuantitativeHksjInferenceResult": {
-        "type": "object",
-        "required": ["status", "confidenceIntervalMethod", "algorithmVersion", "outputConfidenceLevel", "studyCount", "degreesOfFreedom", "varianceAdjustment", "criticalValue", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "analysisScaleConfidenceIntervalLower", "analysisScaleConfidenceIntervalUpper", "reportedScaleEffect", "reportedScaleConfidenceIntervalLower", "reportedScaleConfidenceIntervalUpper", "failureReasons"],
-        "additionalProperties": false,
-        "properties": {
-          "status": { "type": "integer" },
-          "confidenceIntervalMethod": { "type": "integer" },
-          "algorithmVersion": { "type": "string" },
-          "outputConfidenceLevel": { "type": "number" },
-          "studyCount": { "type": "integer" },
-          "degreesOfFreedom": { "type": ["integer", "null"] },
-          "varianceAdjustment": { "type": ["number", "null"] },
-          "criticalValue": { "type": ["number", "null"] },
-          "analysisScaleEffect": { "type": ["number", "null"] },
-          "analysisScaleVariance": { "type": ["number", "null"] },
-          "analysisScaleStandardError": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "analysisScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "reportedScaleEffect": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalLower": { "type": ["number", "null"] },
-          "reportedScaleConfidenceIntervalUpper": { "type": ["number", "null"] },
-          "failureReasons": { "type": "array", "items": { "type": "integer" } }
-        }
-      },
-      "QuantitativePredictionIntervalResult": {
-        "type": "object",
-        "required": ["status", "method", "algorithmVersion", "outputConfidenceLevel", "studyCount", "degreesOfFreedom", "tauSquared", "summaryEffectVariance", "summaryEffectStandardError", "predictionVariance", "predictionStandardError", "criticalValue", "analysisScaleEffect", "analysisScaleLower", "analysisScaleUpper", "reportedScaleEffect", "reportedScaleLower", "reportedScaleUpper", "failureReasons"],
-        "additionalProperties": false,
-        "properties": {
-          "status": { "type": "integer" },
-          "method": { "type": "integer" },
-          "algorithmVersion": { "type": "string" },
-          "outputConfidenceLevel": { "type": "number" },
-          "studyCount": { "type": "integer" },
-          "degreesOfFreedom": { "type": ["integer", "null"] },
-          "tauSquared": { "type": ["number", "null"] },
-          "summaryEffectVariance": { "type": ["number", "null"] },
-          "summaryEffectStandardError": { "type": ["number", "null"] },
-          "predictionVariance": { "type": ["number", "null"] },
-          "predictionStandardError": { "type": ["number", "null"] },
-          "criticalValue": { "type": ["number", "null"] },
-          "analysisScaleEffect": { "type": ["number", "null"] },
-          "analysisScaleLower": { "type": ["number", "null"] },
-          "analysisScaleUpper": { "type": ["number", "null"] },
-          "reportedScaleEffect": { "type": ["number", "null"] },
-          "reportedScaleLower": { "type": ["number", "null"] },
-          "reportedScaleUpper": { "type": ["number", "null"] },
-          "failureReasons": { "type": "array", "items": { "type": "integer" } }
-        }
-      },
-      "QuantitativeSynthesisContribution": {
-        "type": "object",
-        "required": ["evidenceId", "studyId", "evidenceExtractionId", "sourceMaterialId", "analysisScaleEffect", "analysisScaleVariance", "analysisScaleStandardError", "weight", "normalizedWeight"],
-        "additionalProperties": false,
-        "properties": {
-          "evidenceId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "evidenceExtractionId": { "type": "string", "format": "uuid" },
-          "sourceMaterialId": { "type": "string", "format": "uuid" },
-          "analysisScaleEffect": { "type": "number" },
-          "analysisScaleVariance": { "type": "number" },
-          "analysisScaleStandardError": { "type": "number" },
-          "weight": { "type": "number" },
-          "normalizedWeight": { "type": "number" }
-        }
-      },
-      "ResearchProvenanceCoverageResponse": {
-        "type": "object",
-        "required": ["researchPlanCount", "literatureSearchCount", "discoveryPathCount", "distinctStudyCount", "sourceMaterialCount", "evidenceExtractionCount", "evidenceFindingCount", "evidenceEvaluationCount", "researchReportClaimCount", "hasPersistedProviderFailureProvenance"],
-        "properties": {
-          "researchPlanCount": { "type": "integer" },
-          "literatureSearchCount": { "type": "integer" },
-          "discoveryPathCount": { "type": "integer" },
-          "distinctStudyCount": { "type": "integer" },
-          "sourceMaterialCount": { "type": "integer" },
-          "evidenceExtractionCount": { "type": "integer" },
-          "evidenceFindingCount": { "type": "integer" },
-          "evidenceEvaluationCount": { "type": "integer" },
-          "researchReportClaimCount": { "type": "integer" },
-          "hasPersistedProviderFailureProvenance": { "type": "boolean" }
-        }
-      },
-      "ResearchPlanProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "researchPlanId": { "type": "string", "format": "uuid" },
-          "originalQuestion": { "type": "string" },
-          "searchQueries": { "type": "array", "items": { "type": "string" } },
-          "provider": { "type": "string" },
-          "model": { "type": "string" },
-          "promptVersion": { "type": "string" },
-          "generatedAt": { "type": "string", "format": "date-time" }
-        }
-      },
-      "LiteratureSearchProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "literatureSearchId": { "type": "string", "format": "uuid" },
-          "researchPlanId": { "type": ["string", "null"], "format": "uuid" },
-          "source": { "type": "string" },
-          "query": { "type": "string" },
-          "searchedAt": { "type": "string", "format": "date-time" },
-          "resultCount": { "type": "integer" },
-          "persistedStudyCount": { "type": "integer" },
-          "duplicateStudyCount": { "type": "integer" },
-          "resultStatus": { "type": "string" }
-        }
-      },
-      "StudyDiscoveryProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "researchStudyDiscoveryId": { "type": "string", "format": "uuid" },
-          "literatureSearchId": { "type": "string", "format": "uuid" },
-          "source": { "type": "string" },
-          "sourceStudyIdentifier": { "type": ["string", "null"] },
-          "query": { "type": "string" },
-          "searchedAt": { "type": "string", "format": "date-time" },
-          "discoveredAt": { "type": "string", "format": "date-time" }
-        }
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "researchQuestionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "enum": [
+              "Queued",
+              "Planning",
+              "Searching",
+              "Extracting",
+              "Evaluating",
+              "Synthesizing",
+              "Completed",
+              "Failed",
+              "Cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "researchRunId",
+          "researchQuestionId",
+          "question",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "failureReason"
+        ],
+        "type": "object"
       },
       "SourceMaterialProvenanceResponse": {
-        "type": "object",
         "properties": {
-          "sourceMaterialId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "type": { "type": "string" },
-          "provider": { "type": "string" },
-          "providerSourceId": { "type": ["string", "null"] },
-          "retrievalMethod": { "type": "string" },
-          "contentHash": { "type": "string" },
-          "contentVersion": { "type": "integer" },
-          "retrievedAt": { "type": "string", "format": "date-time" },
-          "sourceUpdatedAt": { "type": ["string", "null"], "format": "date-time" },
-          "accessStatus": { "type": "string" },
-          "characterCount": { "type": "integer" },
-          "wasTruncated": { "type": "boolean" },
-          "isCurrent": { "type": "boolean" },
-          "sectionNames": { "type": "array", "items": { "type": "string" } }
-        }
-      },
-      "EvidenceExtractionProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "evidenceExtractionId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "sourceMaterialId": { "type": ["string", "null"], "format": "uuid" },
-          "status": { "type": "string" },
-          "skipReason": { "type": ["string", "null"] },
-          "sourceScope": { "type": "string" },
-          "provider": { "type": ["string", "null"] },
-          "model": { "type": ["string", "null"] },
-          "promptVersion": { "type": "string" },
-          "extractedAt": { "type": "string", "format": "date-time" },
-          "evidenceCount": { "type": "integer" },
-          "groundingValidated": { "type": "boolean" }
-        }
-      },
-      "EvidenceProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "evidenceId": { "type": "string", "format": "uuid" },
-          "evidenceExtractionId": { "type": "string", "format": "uuid" },
-          "outcome": { "type": "string" },
-          "resultSummary": { "type": "string" },
-          "supportingText": { "type": "string" },
-          "direction": { "type": "string" },
-          "sourceScope": { "type": "string" },
-          "extractedAt": { "type": "string", "format": "date-time" },
-          "groundingValidated": { "type": "boolean" },
-          "population": { "type": ["string", "null"] },
-          "exposureOrIntervention": { "type": ["string", "null"] },
-          "comparator": { "type": ["string", "null"] },
-          "studyDesign": { "type": ["string", "null"] },
-          "sampleSize": { "type": ["integer", "null"] },
-          "effectMeasure": { "type": ["string", "null"] },
-          "effectValue": { "type": ["number", "null"] },
-          "confidenceIntervalLower": { "type": ["number", "null"] },
-          "confidenceIntervalUpper": { "type": ["number", "null"] },
-          "confidenceLevel": { "type": ["number", "null"] },
-          "reportedStandardError": { "type": ["number", "null"] },
-          "pValue": { "type": ["number", "null"] }
-        }
-      },
-      "EvidenceEvaluationProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "evidenceEvaluationId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "status": { "type": "string" },
-          "skipReason": { "type": ["string", "null"] },
-          "sourceScope": { "type": "string" },
-          "evidenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
-          "evaluatorProvider": { "type": ["string", "null"] },
-          "evaluatorModel": { "type": ["string", "null"] },
-          "promptVersion": { "type": "string" },
-          "evaluatedAt": { "type": "string", "format": "date-time" },
-          "studyDesign": { "type": "string" },
-          "sampleInformation": { "type": "string" },
-          "comparatorPresence": { "type": "string" },
-          "comparatorDescription": { "type": ["string", "null"] },
-          "randomization": { "type": "string" },
-          "blinding": { "type": "string" },
-          "allocationConcealment": { "type": "string" },
-          "attritionMissingData": { "type": "string" },
-          "precision": { "type": "string" },
-          "directness": { "type": "string" },
-          "overallConfidence": { "type": "string" },
-          "rationale": { "type": "string" },
-          "reportingLimitations": { "type": "array", "items": { "type": "string" } },
-          "authorReportedLimitations": { "type": "array", "items": { "type": "string" } },
-          "hasSampleSize": { "type": "boolean" },
-          "hasEffectEstimate": { "type": "boolean" },
-          "hasConfidenceInterval": { "type": "boolean" },
-          "hasPValue": { "type": "boolean" },
-          "hasComparator": { "type": "boolean" },
-          "unknownDomainCount": { "type": "integer" },
-          "insufficientSourceDomainCount": { "type": "integer" }
-        }
-      },
-      "ResearchReportClaimProvenanceResponse": {
-        "required": [
-          "researchReportId",
-          "researchReportClaimId",
-          "claimType",
-          "direction",
-          "text",
-          "ordinal",
-          "evidenceIds"
-        ],
-        "type": "object",
-        "properties": {
-          "researchReportId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "researchReportClaimId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "claimType": {
+          "accessStatus": {
             "type": "string"
           },
-          "direction": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          },
-          "ordinal": {
+          "characterCount": {
+            "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerSourceId": {
             "type": [
-              "integer",
+              "null",
               "string"
-            ],
-            "format": "int32"
+            ]
           },
-          "evidenceIds": {
-            "type": "array",
+          "retrievalMethod": {
+            "type": "string"
+          },
+          "retrievedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sectionNames": {
             "items": {
-              "type": "string",
-              "format": "uuid"
-            }
+              "type": "string"
+            },
+            "type": "array"
           },
-          "groundingStatus": {
-            "type": "string",
-            "default": "LegacyUnverified"
+          "sourceMaterialId": {
+            "format": "uuid",
+            "type": "string"
           },
-          "semantics": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ResearchClaimSemanticsResponse"
-              }
+          "sourceUpdatedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "wasTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sourceMaterialId",
+          "studyId",
+          "type",
+          "provider",
+          "providerSourceId",
+          "retrievalMethod",
+          "contentHash",
+          "contentVersion",
+          "retrievedAt",
+          "sourceUpdatedAt",
+          "accessStatus",
+          "characterCount",
+          "wasTruncated",
+          "isCurrent",
+          "sectionNames"
+        ],
+        "type": "object"
+      },
+      "StudyDiscoveryProvenanceResponse": {
+        "properties": {
+          "discoveredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "literatureSearchId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "researchStudyDiscoveryId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "searchedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceStudyIdentifier": {
+            "type": [
+              "null",
+              "string"
             ]
           }
-        }
-      },
-      "QuantitativeContributionProvenanceResponse": {
-        "type": "object",
-        "properties": {
-          "artifactId": { "type": "string", "format": "uuid" },
-          "groupKey": { "type": "string" },
-          "analysisMethod": { "type": "string" },
-          "ordinal": { "type": "integer" },
-          "evidenceId": { "type": "string", "format": "uuid" },
-          "studyId": { "type": "string", "format": "uuid" },
-          "evidenceExtractionId": { "type": "string", "format": "uuid" },
-          "sourceMaterialId": { "type": "string", "format": "uuid" }
-        }
-      },
-      "LiteratureProviderAttemptResponse": {
-        "type": "object",
-        "required": ["attemptId", "researchPlanId", "source", "query", "status", "resultCount", "failureCategory", "startedAt", "completedAt", "literatureSearchId"],
-        "properties": {
-          "attemptId": { "type": "string", "format": "uuid" },
-          "researchPlanId": { "type": "string", "format": "uuid" },
-          "source": { "type": "string", "enum": ["PubMed", "EuropePmc"] },
-          "query": { "type": "string", "maxLength": 2000 },
-          "status": { "type": "string", "enum": ["Started", "SucceededWithResults", "SucceededZeroResults", "Failed", "TimedOut", "Cancelled"] },
-          "resultCount": { "type": ["integer", "null"], "minimum": 0 },
-          "failureCategory": { "type": ["string", "null"], "enum": ["NetworkFailure", "Timeout", "RateLimited", "InvalidResponse", "ProviderProtocolError", "ResponseTooLarge", "Cancelled", "UnexpectedFailure", null] },
-          "startedAt": { "type": "string", "format": "date-time" },
-          "completedAt": { "type": ["string", "null"], "format": "date-time" },
-          "literatureSearchId": { "type": ["string", "null"], "format": "uuid" }
-        }
-      },
-      "ResearchProvenanceResponse": {
-        "type": "object",
-        "required": ["providerAttempts"],
-        "properties": {
-          "researchRunId": { "type": "string", "format": "uuid" },
-          "question": { "type": "string" },
-          "status": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "startedAt": { "type": ["string", "null"], "format": "date-time" },
-          "completedAt": { "type": ["string", "null"], "format": "date-time" },
-          "coverage": { "$ref": "#/components/schemas/ResearchProvenanceCoverageResponse" },
-          "plans": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchPlanProvenanceResponse" } },
-          "searches": { "type": "array", "items": { "$ref": "#/components/schemas/LiteratureSearchProvenanceResponse" } },
-          "studies": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "studyId": { "type": "string", "format": "uuid" },
-                "title": { "type": "string" },
-                "pmid": { "type": ["string", "null"] },
-                "pmcid": { "type": ["string", "null"] },
-                "doi": { "type": ["string", "null"] },
-                "journal": { "type": ["string", "null"] },
-                "publicationYear": { "type": ["integer", "null"] },
-                "publicationMonth": { "type": ["integer", "null"] },
-                "publicationDay": { "type": ["integer", "null"] },
-                "publicationTypes": { "type": "array", "items": { "type": "string" } },
-                "authors": { "type": "array", "items": { "type": "string" } },
-                "source": { "type": "string" },
-                "discoveryPaths": { "type": "array", "items": { "$ref": "#/components/schemas/StudyDiscoveryProvenanceResponse" } },
-                "sourceMaterials": { "type": "array", "items": { "$ref": "#/components/schemas/SourceMaterialProvenanceResponse" } },
-                "extractions": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceExtractionProvenanceResponse" } },
-                "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceProvenanceResponse" } },
-                "evaluations": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceEvaluationProvenanceResponse" } }
-              }
-            }
-          },
-          "reportClaims": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchReportClaimProvenanceResponse" } },
-          "quantitativeContributions": { "type": "array", "items": { "$ref": "#/components/schemas/QuantitativeContributionProvenanceResponse" } },
-          "providerAttempts": { "type": "array", "items": { "$ref": "#/components/schemas/LiteratureProviderAttemptResponse" } }
-        }
-      },
-      "ProblemDetails": {
-        "type": "object",
-        "additionalProperties": true,
-        "properties": {
-          "type": { "type": "string" },
-          "title": { "type": "string" },
-          "status": { "type": "integer" },
-          "detail": { "type": "string" },
-          "instance": { "type": "string" }
-        }
-      },
-      "ResearchClaimSemanticsResponse": {
+        },
         "required": [
-          "protocolVersion",
-          "kind",
-          "outcome",
-          "population",
-          "exposureOrIntervention",
-          "comparator",
-          "timepoint",
-          "direction",
-          "evidenceIds",
-          "numericEvidenceId",
-          "quantitativeArtifactId",
-          "groupKey",
-          "snapshotFingerprint",
-          "statistic",
-          "numeric"
+          "researchStudyDiscoveryId",
+          "literatureSearchId",
+          "source",
+          "sourceStudyIdentifier",
+          "query",
+          "searchedAt",
+          "discoveredAt"
         ],
-        "type": "object",
-        "properties": {
-          "protocolVersion": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "outcome": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "population": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "exposureOrIntervention": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "comparator": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "timepoint": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "direction": {
-            "type": "string"
-          },
-          "evidenceIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "numericEvidenceId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "quantitativeArtifactId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "groupKey": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "snapshotFingerprint": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "statistic": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "numeric": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ResearchClaimNumericSnapshot"
-              }
-            ]
-          }
-        }
+        "type": "object"
       },
-      "ResearchClaimNumericSnapshot": {
-        "required": [
-          "label",
-          "studyValue",
-          "artifactValue",
-          "studyLower",
-          "studyUpper",
-          "artifactLower",
-          "artifactUpper",
-          "confidenceLevel",
-          "operator",
-          "degreesOfFreedom",
-          "algorithmVersion"
-        ],
-        "type": "object",
+      "StudyProvenanceResponse": {
         "properties": {
-          "label": {
-            "type": "string"
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
-          "studyValue": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
+          "discoveryPaths": {
+            "items": {
+              "$ref": "#/components/schemas/StudyDiscoveryProvenanceResponse"
+            },
+            "type": "array"
           },
-          "artifactValue": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "studyLower": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "studyUpper": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "artifactLower": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "artifactUpper": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "confidenceLevel": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "operator": {
+          "doi": {
             "type": [
               "null",
               "string"
             ]
           },
-          "degreesOfFreedom": {
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceEvaluationProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "extractions": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceExtractionProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "journal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pmcid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pmid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicationDay": {
+            "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
+              "integer"
+            ]
           },
-          "algorithmVersion": {
+          "publicationMonth": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "string"
+              "integer"
             ]
+          },
+          "publicationTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "publicationYear": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceMaterials": {
+            "items": {
+              "$ref": "#/components/schemas/SourceMaterialProvenanceResponse"
+            },
+            "type": "array"
+          },
+          "studyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "studyId",
+          "title",
+          "pmid",
+          "pmcid",
+          "doi",
+          "journal",
+          "publicationYear",
+          "publicationMonth",
+          "publicationDay",
+          "publicationTypes",
+          "authors",
+          "source",
+          "discoveryPaths",
+          "sourceMaterials",
+          "extractions",
+          "evidence",
+          "evaluations"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
-  }
+  },
+  "info": {
+    "title": "MedResearch.Api | v1",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/api/research": {
+      "get": {
+        "operationId": "ListResearchRuns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      },
+      "post": {
+        "operationId": "CreateResearch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateResearchResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}": {
+      "get": {
+        "operationId": "GetResearch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}/progress": {
+      "get": {
+        "operationId": "GetResearchProgress",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunProgressResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}/provenance": {
+      "get": {
+        "operationId": "GetResearchProvenance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchProvenanceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}/quantitative": {
+      "get": {
+        "operationId": "GetQuantitativeSynthesisArtifacts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuantitativeSynthesisArtifactResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}/report": {
+      "get": {
+        "operationId": "GetResearchReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchReportResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Research"
+    }
+  ]
 }

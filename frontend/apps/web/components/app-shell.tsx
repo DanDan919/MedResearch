@@ -50,8 +50,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-3.5rem)] md:grid-cols-[224px_1fr]">
-        <aside className="border-b border-border bg-surface md:border-b-0 md:border-r">
+      <div className="grid min-h-[calc(100vh-3.5rem)] grid-cols-[minmax(0,1fr)] md:grid-cols-[224px_minmax(0,1fr)]">
+        <aside className="min-w-0 border-b border-border bg-surface md:border-b-0 md:border-r">
           <nav className="flex gap-2 overflow-x-auto p-3 md:flex-col md:gap-1">
             {navItems.map((item) => {
               const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Evidence synthesis workspace. Backend remains the scientific source of truth.
           </div>
         </aside>
-        <main className="min-w-0 p-4 md:p-6">{children}</main>
+        <main className="min-w-0 p-4 [overflow-wrap:anywhere] md:p-6">{children}</main>
       </div>
     </div>
   );

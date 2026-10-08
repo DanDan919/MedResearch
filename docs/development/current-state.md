@@ -1,5 +1,25 @@
 # Current State
 
+## F18 Web Release Candidate
+
+Implementation/local verification complete; actual trusted-HTTPS full-stack
+runtime and final CI verification are pending at this checkpoint. Starting HEAD
+39a9bd9963ddc41a53c3d1700a91d798ca1e20ab, clean main/origin/main.
+Next 16.3.8 and source-map-js 1.2.2 resolve the production audit advisories:
+production 0; full audit retains one dev-only HIGH braces advisory without a
+published patched version. Audit reports are unfiltered and production
+HIGH/CRITICAL block CI.
+
+Backend-origin OpenAPI comparison, TS/Zod alignment controls, mobile grid fix,
+standalone packaging/operator guide and a real API/PostgreSQL browser harness
+are implemented. Local Domain 45/Application 289/Infrastructure 110/Integration
+47 passed; 103 integration cases skip only because Docker is unavailable.
+Frontend API 40/web 99, security policy 5, scientific Chromium 15 and production
+OIDC Chromium 17 passed. EF has no pending model change; Compose config passes.
+The full-stack runner fails explicitly when local Docker is unavailable.
+See `f18-web-release-candidate-ru.md` for the evidence boundary and CI outcome.
+External IdP/deployed HTTPS/native Tauri/live science remain NOT VERIFIED.
+
 ## F17 Production Web Authentication
 
 Implemented configurable OIDC code/PKCE/state/nonce with pinned
