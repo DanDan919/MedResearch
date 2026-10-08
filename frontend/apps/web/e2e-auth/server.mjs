@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import selfsigned from "selfsigned";
 import { generateKeyPair, exportJWK, SignJWT, jwtVerify } from "jose";
+import { createTestCertificates } from "../e2e-fullstack/test-certificates.mjs";
 
 const issuer = "https://127.0.0.1:3443";
 const web = "https://localhost:3441";
@@ -19,12 +20,13 @@ const fullStack = process.env.MEDRESEARCH_FULL_STACK === "true";
 const { privateKey, publicKey } = await generateKeyPair("RS256");
 const wrong = await generateKeyPair("RS256");
 const jwk = { ...await exportJWK(publicKey), kid: "ephemeral-test-key", use: "sig", alg: "RS256" };
-const certificates = await selfsigned.generate([{ name: "commonName", value: "localhost" }], { keySize: 2048, days: 1,
+const temporary = await mkdtemp(join(tmpdir(), "medresearch-auth-"));
+const ca = join(temporary, "ca.pem");
+const certificates = fullStack ? await createTestCertificates(temporary) : await selfsigned.generate([{ name: "commonName", value: "localhost" }], { keySize: 2048, days: 1,
   extensions: [{ name: "basicConstraints", cA: true }, { name: "subjectAltName", altNames: [
     { type: 2, value: "localhost" }, { type: 7, ip: "127.0.0.1" }
   ] }] });
-const temporary = await mkdtemp(join(tmpdir(), "medresearch-auth-"));
-const ca = join(temporary, "ca.pem"); await writeFile(ca, certificates.cert);
+if (!fullStack) await writeFile(ca, certificates.cert);
 export { ca, temporary };
 const pending = new Map(); const codes = new Map(); const runs = new Map();
 const metrics = { exchanges: 0, pkceVerified: 0, apiRequests: 0, identityHeaderSeen: false, cookieSeenAtIssuer: false };
@@ -184,7 +186,7 @@ const standaloneAvailable = await access(standalone).then(() => true, () => fals
 if (fullStack && !standaloneAvailable) throw new Error("Full-stack release verification requires the standalone production build");
 if (standaloneAvailable) await cp(resolve(".next/static"), resolve(".next/standalone/apps/web/.next/static"), { recursive: true });
 const child = spawn(process.execPath, standaloneAvailable ? [standalone] : [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", "3440"], {
-  env: { ...process.env, NODE_ENV: "production", NODE_EXTRA_CA_CERTS: ca, WEB_AUTH_MODE: "Oidc", WEB_AUTH_ORIGIN: web,
+  env: { ...process.env, NODE_ENV: "production", NEXT_TELEMETRY_DISABLED: "1", NODE_EXTRA_CA_CERTS: ca, WEB_AUTH_MODE: "Oidc", WEB_AUTH_ORIGIN: web,
     HOSTNAME: "127.0.0.1", PORT: "3440",
     MEDRESEARCH_API_INTERNAL_URL: "http://127.0.0.1:3442", OIDC_ISSUER: issuer, OIDC_CLIENT_ID: clientId, OIDC_CLIENT_SECRET: clientSecret,
     OIDC_API_AUDIENCE: audience, OIDC_SCOPE: "openid profile research", WEB_SESSION_SECRET: sessionSecret }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"]

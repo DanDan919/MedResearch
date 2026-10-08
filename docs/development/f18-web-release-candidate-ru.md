@@ -79,6 +79,9 @@ Browser -> HTTPS proxy :3441 -> Next standalone :3440 -> реальный ASP.NE
 Production JWT API :3442 -> свежий PostgreSQL 17 Testcontainers.
 Synthetic HTTPS OIDC issuer/JWKS :3443; все listeners loopback.
 Временная CA доверяется Chromium NSS, Node extra CA и .NET SSL certificate file.
+CA и serverAuth/SAN leaf раздельные; OpenSSL проверяет цепочку, localhost и IP.
+Изолированный XDG_DATA_HOME использует текущий Chromium NSS путь. Проверена
+[официальная Chromium документация](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md).
 `ignoreHTTPSErrors:false`; нет NODE_TLS_REJECT_UNAUTHORIZED=0 или certificate
 callback, возвращающего true. Старый F17 bypass suite остаётся отдельным,
 не используется как доказательство trusted HTTPS F18.
@@ -196,6 +199,10 @@ root исправляет этот harness дефект; итоговый runtim
 Seed/fake planner используют общий constant; validator не ослаблен. Остальные
 jobs второго run success. Это ошибки новой fixture подготовки, не основание
 изменять научные инварианты или объявлять full-stack passed.
+Третий run `37809117190` достиг API/browser, но 17 cases отклонили тестовый
+сертификат (ERR_CERT_INVALID). CA/server leaf были одним certificate. Цепочка
+заменена на отдельную CA/serverAuth/SAN leaf; NSS путь актуализирован без
+TLS bypass. До повторного runtime CI это исправление не объявляется verified.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 

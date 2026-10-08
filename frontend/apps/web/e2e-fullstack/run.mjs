@@ -7,12 +7,13 @@ if (process.platform !== "linux") throw new Error("The trusted-CA full-stack run
 const originalHome = homedir();
 const { ca, temporary, stop, waitUntilReady } = await import("../e2e-auth/server.mjs");
 try {
-  const nss = join(temporary, ".pki/nssdb"); await mkdir(nss, { recursive: true });
+  const dataHome = join(temporary, ".local/share");
+  const nss = join(dataHome, "pki/nssdb"); await mkdir(nss, { recursive: true });
   execFileSync("certutil", ["-N", "-d", `sql:${nss}`, "--empty-password"]);
   execFileSync("certutil", ["-A", "-d", `sql:${nss}`, "-n", "MedResearch isolated test CA", "-t", "C,,", "-i", ca]);
   await waitUntilReady();
   const child = spawn(process.execPath, [resolve("../../node_modules/@playwright/test/cli.js"), "test", "--config", "playwright.fullstack.config.ts"], {
-    env: { ...process.env, HOME: temporary, NODE_EXTRA_CA_CERTS: ca,
+    env: { ...process.env, HOME: temporary, XDG_DATA_HOME: dataHome, NODE_EXTRA_CA_CERTS: ca,
       PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? join(originalHome, ".cache/ms-playwright") },
     stdio: "inherit"
   });

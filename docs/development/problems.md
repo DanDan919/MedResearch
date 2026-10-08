@@ -10,6 +10,11 @@
 - Second full-stack run 37808486190 reached Planning and correctly rejected a
   seed question differing from the fixed fake planner question. Seed and fake
   now share the same constant. No scientific validator was relaxed.
+- Third run 37809117190 reached the real API/browser but Chromium rejected the
+  fixture certificate (ERR_CERT_INVALID). The previous certificate doubled as
+  CA/server leaf. Full-stack now generates a separate CA and SAN/serverAuth
+  leaf, verifies its chain/hostname with OpenSSL and uses Chromium M146+ NSS
+  path under an isolated XDG_DATA_HOME. TLS bypass remains disabled.
 
 - Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped
   published patches 16.3.8/1.2.2 clear production findings. Full audit still

@@ -134,7 +134,8 @@ This opt-in executable is outside normal solution tests. It owns a fresh
 Testcontainers PostgreSQL, applies all migrations, seeds through existing fake
 scientific providers/stores, starts a real Production JWT API process, a Next
 standalone server, HTTPS proxy and synthetic issuer. Its temporary CA is trusted
-through NSS, Node's extra CA and .NET's certificate file; TLS verification is
+through Chromium's current NSS location, Node's extra CA and .NET's certificate
+file. OpenSSL generates a separate CA and SAN/serverAuth leaf; TLS verification is
 not disabled. Ports 3440..3443 must be free. Scientific fixtures are isolated,
 not production data; 97 extra discoveries exercise 100-study read-model scale,
 not generated evidence/report claims. Cleanup stops only fixture processes and
