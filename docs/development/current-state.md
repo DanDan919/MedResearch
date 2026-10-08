@@ -6,6 +6,16 @@ F15.2 removes Europe PMC indexing-date fallback from publication metadata and pr
 
 PubMed ESearch/EFetch, Europe PMC search and structured full text use inclusive streaming byte caps and explicit cancellable body deadlines. Error bodies/URI logging are disabled; typed bounded diagnostics replace raw transcripts. F15.1 source-proof protections and M17-M24 formulas are unchanged. Normal automated tests use fake providers/HTTP; PostgreSQL verification is CI-authoritative when local Docker is unavailable. Detailed final verification is recorded in `f15-2-provider-runtime-integrity-hardening-ru.md`.
 
+Production commit `bd1d285` was verified by CI `37735198597`: Domain 40,
+Application 252, Infrastructure 110, Integration 119; all 521 passed with zero
+failures/skips. All 93 Docker-backed PostgreSQL cases actually executed,
+including fresh migration application and the new attempt/fencing tests.
+EF model, Compose, frontend and Chromium jobs succeeded. Local Debug/Release
+each passed 428 tests with 93 expected unavailable-Docker skips. Frontend local
+API 24, web 29 and Playwright 12 passed, including hydration regression.
+Six opt-in live cases deliberately skipped; no live scientific workflow ran.
+Native Tauri remains unverified; desktop React/Vite build passed.
+
 ## F15.1 Scientific Trust Boundary Correction
 
 Baseline after the separately authorized audit-document commit: `360e38a`.

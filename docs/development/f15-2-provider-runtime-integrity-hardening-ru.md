@@ -211,8 +211,61 @@ Staged diff review и diff check passed; реальные credentials не до�
 
 ### CI verification
 
-Результаты strict PostgreSQL CI будут добавлены после verification push.
-До его успешного выполнения milestone не объявляется COMPLETE.
+Production commit: `bd1d28575947d454291ede44f3d933e66ff51b78`,
+`fix: harden provider provenance and response boundaries`.
+Push в разрешённый origin/main успешен, без force/rewrite.
+
+Workflow `.github/workflows/ci.yml`, runner `ubuntu-latest`, SDK `10.0.x`,
+Docker info passed. Run [37735198597](https://github.com/DanDan919/MedResearch/actions/runs/37735198597)
+completed **success**. TRX counters получены из GitHub check annotations:
+
+| Project | Executed | Passed | Failed | Skipped |
+|---|---:|---:|---:|---:|
+| Domain | 40 | 40 | 0 | 0 |
+| Application | 252 | 252 | 0 | 0 |
+| Infrastructure | 110 | 110 | 0 | 0 |
+| Integration | 119 | 119 | 0 | 0 |
+| Total | 521 | 521 | 0 | 0 |
+
+93 Docker-backed PostgreSQL cases действительно исполнились (локально они
+были skipped). В том числе 12 новых attempt cases: typed outcomes, partial/all
+failure, recovery/reuse, cancellation, owner/run isolation, wrong Plan,
+stale worker success/failure/start и optimistic status concurrency.
+Остальные 26 Integration cases не требуют Docker. Fresh migration application,
+EF pending-model check и Compose config passed. CI не заменял PostgreSQL
+InMemory/SQLite и не пропускал required database cases.
+
+Frontend job целиком success: generated-type drift check, lint/typecheck,
+unit tests, Chromium, production web build и desktop React/Vite build.
+Точные frontend counts выше получены локально; CI success не трактуется как
+native Tauri verification. Live projects не включены в workflow; scientific
+HTTP и structured LLM здесь fake. Никакого OpenAI ключа/paid call не использовано.
+CI fixes после первой публикации не потребовались.
+
+Результаты записаны отдельным docs-only commit после production verification.
+Финальный HEAD/run проверяются после его push; собственный hash этого документа
+не встраивается рекурсивно. Он доступен через `git log` и финальный ответ.
+
+### Проверка обещаний
+
+| Вопрос | Реальная гарантия |
+|---|---|
+| Может firstIndexDate стать publication date? | Нет в исправленном mapper; historical rows не исправлены автоматически |
+| Zero равно failure? | Нет: successful zero и typed operational outcomes раздельны |
+| Может partial failure исчезнуть? | Записанный outcome durable; crash/DB loss до completion оставляет Started, а не придуманное отсутствие |
+| Oversized success целиком буферизуется? | Нет: reader останавливается на cap+1 до parsing |
+| Slow body блокирует caller навсегда? | Нет: отдельный deadline и caller cancellation; общий retry budget конечен |
+| Stale worker записывает late result? | Production fenced transactions проверяют current owner/version/expiry; negative PostgreSQL tests passed |
+| Научные формулы изменились? | Нет; M17-M24 files не менялись |
+| F15.1 protections сохранились? | Все 61 adversarial/control cases passed и входят в CI Application regression |
+
+Отсутствие attempt rows не доказывает NotAttempted: enabled-source snapshot
+не сохраняется и исторические runs могут предшествовать этой модели.
+Гарантии относятся к обычным production stores/DI; прямое произвольное SQL
+администратора не является частью application fencing contract.
+
+Web dev server доступен на `http://localhost:3000/` (HTTP200 проверен).
+Это не запуск полного API/PostgreSQL stack: local Docker всё ещё недоступен.
 
 ## Security и ограничения
 
