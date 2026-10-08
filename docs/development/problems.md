@@ -2,6 +2,12 @@
 
 ## F18: Independently Observed Release Gaps (2026-10-08)
 
+- First full-stack CI run 37807605255 failed before browser startup: the
+  console harness lacked the normal test project's content-root manifest,
+  so WebApplicationFactory inferred a missing root-level MedResearch.Api.
+  Fixed by setting the actual src/MedResearch.Api test content root explicitly.
+  PostgreSQL cleanup ran; other CI jobs passed. This was not a scientific failure.
+
 - Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped
   published patches 16.3.8/1.2.2 clear production findings. Full audit still
   reports dev-only braces; no published patch, no suppression.

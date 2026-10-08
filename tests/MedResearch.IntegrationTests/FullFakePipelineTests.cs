@@ -270,6 +270,7 @@ public sealed partial class FullFakePipelineTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseContentRoot(Path.Combine(OpenApiContractTests.RepositoryRoot(), "src", "MedResearch.Api"));
             builder.UseEnvironment("Development");
             builder.UseSetting("Authentication:Mode", "DevelopmentLocal");
             builder.UseSetting("Authentication:DevelopmentSubject", _subject);

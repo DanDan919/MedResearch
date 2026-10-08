@@ -41,7 +41,7 @@ export function QuantitativeForestPlot({ result }: { result: QuantitativeResult 
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-md border border-border bg-background p-2" role="img" aria-label="Quantitative contribution plot">
+      <div className="overflow-x-auto rounded-md border border-border bg-background p-2 focus-visible:outline-2 focus-visible:outline-ring" role="img" aria-label="Quantitative contribution plot" tabIndex={0}>
         <svg className="min-w-[620px]" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
           <title id="forest-plot-title">Quantitative contribution plot</title>
           <desc id="forest-plot-description">Contribution point estimates and persisted pooled intervals on the analysis scale. Contribution confidence intervals are not persisted and are not calculated here.</desc>

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const runId = process.env.MEDRESEARCH_FIXTURE_RUN_ID!;
 const origin = "https://localhost:3441";
@@ -8,13 +8,14 @@ async function signIn(page: Page, identity = "User A", returnTo = "/research") {
   await page.getByRole("button", { name: /sign in|switch account/i }).click();
   await page.getByRole("link", { name: identity, exact: true }).click();
 }
-test.beforeEach(async ({ context }) => {
+async function guardNetwork(context: BrowserContext) {
   await context.route("**/*", route => {
     const host = new URL(route.request().url()).hostname;
     if (!new Set(["localhost", "127.0.0.1"]).has(host)) throw new Error(`Unexpected external browser request: ${host}`);
     return route.continue();
   });
-});
+}
+test.beforeEach(async ({ context }) => guardNetwork(context));
 
 test("trusted HTTPS, actual JWT API, persisted report/quantitative/provenance and API restart", async ({ page, context }) => {
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
@@ -44,6 +45,7 @@ test("trusted HTTPS, actual JWT API, persisted report/quantitative/provenance an
 test("actual database ownership rejects B on every read and ignores forged identity headers", async ({ browser }) => {
   const a = await browser.newContext({ baseURL: origin }); const b = await browser.newContext({ baseURL: origin });
   try {
+    await guardNetwork(a); await guardNetwork(b);
     const pa = await a.newPage(), pb = await b.newPage(); await signIn(pa); await signIn(pb, "User B");
     for (const suffix of suffixes) {
       const denied = await b.request.get(`/api/backend/api/research/${runId}${suffix}`, {
@@ -56,6 +58,7 @@ test("actual database ownership rejects B on every read and ignores forged ident
 });
 
 test("actual BFF create, CSRF, redirect restriction, switch and logout", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
   await signIn(page); await page.goto("/research/new");
   await page.getByLabel("Research question").fill("User A full stack queued execution");
   await page.getByRole("button", { name: "Start Research" }).click(); await page.waitForURL(/\/research\/[a-f\d-]{36}$/);
@@ -141,6 +144,26 @@ for (const width of [320, 375, 390, 768, 1280]) {
     await expect(page.locator("article[id^=study-]")).toHaveCount(1);
     await expect(page.getByRole("heading", { name: /Browser scale study 100/ })).toBeVisible();
     expect(provenanceRequests).toBe(1);
+    if (width === 390) {
+      const filter = page.getByLabel("Filter studies");
+      await filter.focus(); await expect(filter).toBeFocused();
+      await page.keyboard.press("ControlOrMeta+A"); await page.keyboard.press("Backspace");
+      await expect(page.getByText(/Source material metadata \([1-9]/).first()).toBeVisible();
+      const settings = page.locator("nav").getByRole("link", { name: "Settings", exact: true });
+      await settings.scrollIntoViewIfNeeded(); await settings.focus(); await settings.press("Enter");
+      await expect(page).toHaveURL(/\/settings$/);
+      await page.goto(`/research/${runId}/report`);
+      const support = page.locator("summary").filter({ hasText: /^Claim support$/ }).first();
+      await support.focus(); await support.press("Enter");
+      await expect(support.locator("..")).toHaveAttribute("open", "");
+      await page.goto(`/research/${runId}/quantitative`);
+      const plot = page.getByRole("img", { name: "Quantitative contribution plot" });
+      await expect(plot).toBeVisible(); await plot.focus(); await expect(plot).toBeFocused();
+      await plot.press("ArrowRight");
+      await expect.poll(() => plot.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+      expect(await plot.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe("none");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+    }
     await info.attach("responsive-measurements", { body: JSON.stringify(measures, null, 2), contentType: "application/json" });
   });
 }

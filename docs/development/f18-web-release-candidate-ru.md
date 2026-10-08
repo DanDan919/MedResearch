@@ -35,12 +35,12 @@ F18 не изменяет M17-M24, F15.1/F15.2/F16 научные алгорит
 
 | Advisory | Severity | Пакет/диапазон | Исправление / reachability |
 | --- | --- | --- | --- |
-| GHSA-cjq9-62q9-8jv4 | HIGH | Next <16.3.8 | 16.3.8; Image SSRF требует remotePatterns, здесь отсутствует, но patch установлен |
+| GHSA-cjq9-62q9-8jv4 | HIGH | Next >=16.0.0 <16.3.8 | 16.3.8; Image SSRF требует remotePatterns, здесь отсутствует, но patch установлен |
 | GHSA-3w37-wq28-93x7 | MODERATE | Next >=16.3.0 <16.3.8 | 16.3.8; use cache/DraftMode не используется |
-| GHSA-4jqv-mc3x-m676 | MODERATE | Next affected releases до 16.3.8 | 16.3.8; Pages SSG/ISR отсутствует |
-| GHSA-39w2-rjm5-chcv | LOW | Next affected releases до 16.3.8 | 16.3.8; dev MCP origin boundary |
-| GHSA-f87g-xv8r-7p7x | MODERATE | Next affected releases до 16.3.8 | 16.3.8; metadata-image webpack path здесь не используется |
-| GHSA-mcj8-r9mp-w47p | MODERATE | Next affected releases до 16.3.8 | 16.3.8; root catch-all SSG/ISR отсутствует |
+| GHSA-4jqv-mc3x-m676 | MODERATE | Next >=16.0.0 <16.3.8 | 16.3.8; Pages SSG/ISR отсутствует |
+| GHSA-39w2-rjm5-chcv | LOW | Next >=16.0.0 <16.3.8 | 16.3.8; dev MCP origin boundary |
+| GHSA-f87g-xv8r-7p7x | MODERATE | Next >=16.0.0 <16.3.8 | 16.3.8; metadata-image webpack path здесь не используется |
+| GHSA-mcj8-r9mp-w47p | MODERATE | Next >=16.0.0 <16.3.8 | 16.3.8; root catch-all SSG/ISR отсутствует |
 | GHSA-68fv-2mgg-jv7q | HIGH | source-map-js >=1.0.0 <1.2.2 | 1.2.2; malicious indexed source map DoS |
 | GHSA-vfj7-8cjw-p6xm | HIGH | braces <=3.0.3 | Published patch отсутствует; только lint dev dependency |
 
@@ -186,7 +186,11 @@ Workflow `.github/workflows/ci.yml`: Ubuntu, .NET10, Node24/pnpm11.19.
 Required PG suite ожидается 103 выполненных cases, 0 required skips. Backend
 total ожидается 594; эти числа пока ожидание, не утверждение результата CI.
 Full-stack 17 cases/trusted CA, image builds и diagnostics artifact обязательны.
-Первый push/CI outcome и итоговые commits будут записаны после проверки.
+Первый commit `20354cd1be259951748b5722ceb98be413c75ffd`, CI `37807605255`:
+frontend/build-test success, 594 backend passed, 0 failed/skipped. Новый
+web-release runner FAILED до браузера: неверный content root WebApplicationFactory
+в console entrypoint (без normal test manifest). Явный src/MedResearch.Api test
+root исправляет этот harness дефект; итоговый runtime CI остаётся pending.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 
