@@ -1,8 +1,9 @@
 # F19: реальный HTTPS/OIDC deployment - подготовка и граница доказательств
 
-Дата: 2026-10-09. Gate A: implementation/локальная проверка выполняются;
-финальный deterministic CI пока pending. Gate B: NOT RUN.
-Этот checkpoint не объявляется real deployment verified.
+Дата: 2026-10-09. F19 PREPARED - AWAITING OPERATOR CONFIGURATION.
+Gate A complete; Gate B NOT RUN. Это НЕ real deployment verified.
+Implementation `d3f305d33ef183dd32687051ac2c0629efbbda92` прошёл
+[CI 37933348386](https://github.com/DanDan919/MedResearch/actions/runs/37933348386).
 
 ## Baseline и сохранность
 
@@ -151,13 +152,53 @@ Compose config passed; docker info failed на unavailable daemon. Browser/image
 | Real key rollover | NOT VERIFIED |
 | Real deployed API/PG/restart/owner reads | NOT RUN |
 | Live science/native Tauri | NOT RUN |
-| Final deterministic CI/regression | pending |
+| Implementation deterministic CI/regression | SUCCESS, 37933348386 |
 
 F18 actual local synthetic HTTPS/API/PG test не переименован в external deployment.
-Новый CI должен сохранить real PG/Testcontainers103 без required skips,
-backend599, frontend API40/web99, security5, browser15/17/17, OpenAPI/EF/Compose,
-45 populated responsive scenarios и scientific regressions. Числа до нового CI
-остаются ожиданием. Offline preflight40 добавлен отдельным CI step без secrets.
+Новый CI сохранил real PG/Testcontainers103 без required skips, backend599,
+frontend API40/web99, security5, browser15/17/17, OpenAPI/EF/Compose,
+45 populated responsive scenarios и scientific regressions. Offline preflight40
+выполнен отдельным CI step без secrets/live requests.
+
+## Проверенный CI и Git
+
+Workflow `.github/workflows/ci.yml`, run `37933348386`: три jobs SUCCESS.
+Runner Ubuntu24.04.5 (ubuntu-latest), .NET10.0.x, Node24/pnpm11.19,
+Docker28.0.4 доступен. Check annotations и скачанные TRX независимо прочитаны:
+
+| Backend suite | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Domain | 45 | 0 | 0 |
+| Application | 289 | 0 | 0 |
+| Infrastructure | 110 | 0 | 0 |
+| Integration | 155 | 0 | 0 |
+| Total | 599 | 0 | 0 |
+
+Все103 локально Docker-skipped test names сопоставлены с CI passed; missing=0.
+Настоящий PostgreSQL, fresh migrations, lease/fencing/owner/lineage и научные
+F15.1/F15.2/F16/M17-M24 regressions не подменялись InMemory/SQLite.
+EF pending-model/Compose success; оба Docker images собраны. Production backend
+OpenAPI/canonical SDK/Zod alignment gates остались зелёными.
+
+Completed frontend job logs прочитаны: preflight40/0failed/0skipped,
+security5, API40/Web99, scientific Chromium15 и synthetic OIDC Chromium17.
+Lint/typecheck/frozen install/production Next/desktop Vite build passed.
+Скачанный full-stack JSON: expected17/skipped0/unexpected0/flaky0,
+duration65.611s. Ровно9 routes на320/375/390/768/1280, max overflow0px в каждой
+группе. Реальные Next/BFF/ASP.NET/PG проверены в isolated CI с synthetic issuer,
+не на actual внешнем staging. Реальные scientific providers не вызывались.
+
+Скачанные audit JSON: production все severity0, full HIGH1 dev-only braces.
+Finding не скрыт; F18 mitigation/standalone reachability assessment сохранены.
+Staged diff проверен на secret/private-key/token patterns и вручную: actual
+credentials/account identifiers/certificates отсутствуют. src, schema/migrations,
+lockfile/dependencies, auth/scientific production implementation не менялись.
+
+Focused commit: `d3f305d33ef183dd32687051ac2c0629efbbda92`,
+`feat: prepare authorized deployment verification`, push exact origin/main
+успешен; tree clean на проверке. Финальный report-only commit не меняет
+implementation; его HEAD/повторный CI/clean upstream сообщаются в handoff после
+фактического завершения, без самоссылочного hash в том же документе.
 
 ## Limitations и следующий шаг
 

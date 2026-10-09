@@ -2,7 +2,8 @@
 
 ## F19 Real Deployment Preparation
 
-Gate A preparation is implemented; final F19 deterministic CI is pending.
+F19 PREPARED - AWAITING OPERATOR CONFIGURATION. Gate A is complete.
+Implementation `d3f305d33ef183dd32687051ac2c0629efbbda92` passed CI `37933348386`.
 Starting HEAD `1cebd49cfb8c07d7b20665f35ce8344b3e4c91cc`, clean main/origin/main.
 Offline operator preflight reuses the actual web validator, checks effective API
 alignment/disabled worker, and supports separately approved anonymous probes with
@@ -13,6 +14,10 @@ two accounts or external-action approval. Actual offline preflight fails safely
 with network NOT RUN. Gate B is NOT RUN; no deployment or real identity proof is
 claimed. See `f19-real-https-oidc-deployment-verification-ru.md` and the operator
 runbook. Science/auth architecture/schema are unchanged.
+CI: backend599 passed/0 failed/0 skipped, including all103 required PostgreSQL
+cases; offline preflight40, security5, API40/Web99 and Chromium15/17/17 passed.
+Actual API/PG synthetic-issuer browser regression, image builds, OpenAPI/EF/Compose
+and 45 populated viewport scenarios remain green. These are not Gate B evidence.
 
 ## F18 Web Release Candidate
 
