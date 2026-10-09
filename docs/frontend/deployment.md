@@ -17,6 +17,11 @@ responses. The app does not derive issuer, API URL, owner or redirect origin
 from forwarded headers. TLS certificates/private keys belong to the proxy,
 not the repository or images.
 
+For real-environment approval, offline configuration checks, explicitly approved
+anonymous probes and the two-real-user browser checklist, follow
+[F19 deployment verification](real-deployment-verification.md). The preflight
+does not provision, deploy, sign in, create data or certify a real IdP.
+
 ## Build
 
 Requirements: .NET 10, Node 24, pnpm 11.19.0, PostgreSQL 17, Docker for the

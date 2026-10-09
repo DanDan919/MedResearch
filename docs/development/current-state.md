@@ -1,5 +1,19 @@
 # Current State
 
+## F19 Real Deployment Preparation
+
+Gate A preparation is implemented; final F19 deterministic CI is pending.
+Starting HEAD `1cebd49cfb8c07d7b20665f35ce8344b3e4c91cc`, clean main/origin/main.
+Offline operator preflight reuses the actual web validator, checks effective API
+alignment/disabled worker, and supports separately approved anonymous probes with
+exact origin allowlists, bounded reads and no credentials/redirects. 40 fake-HTTP
+controls passed; normal CI runs only these offline controls, never live preflight.
+Current environment has no operator-provided production settings, hostname/IdP,
+two accounts or external-action approval. Actual offline preflight fails safely
+with network NOT RUN. Gate B is NOT RUN; no deployment or real identity proof is
+claimed. See `f19-real-https-oidc-deployment-verification-ru.md` and the operator
+runbook. Science/auth architecture/schema are unchanged.
+
 ## F18 Web Release Candidate
 
 F18 COMPLETE - DETERMINISTIC WEB RC. Implementation HEAD

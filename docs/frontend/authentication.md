@@ -127,9 +127,11 @@ and authenticated resource quotas are separate work.
 `pnpm test:e2e` verifies scientific views in DevelopmentLocal. After `pnpm build`,
 `pnpm test:auth-e2e` runs production Next.js against an ephemeral HTTPS issuer and
 synthetic API, with real code exchange, PKCE verification and signed tokens.
-The fixture is not imported by production routes. Only the test process trusts
-its generated CA; production TLS validation is not disabled. No external IdP
-credentials or live scientific calls occur. Independently, .NET tests use the
+The fixture is not imported by production routes. This older issuer-only suite
+bypasses its test certificate validation and is not trusted-TLS evidence. F18's
+separate real API/PostgreSQL full-stack suite trusts a temporary CA without TLS
+bypass; neither is an external deployment. No external IdP credentials or live
+scientific calls occur. Independently, .NET tests use the
 actual JWT handler and PostgreSQL/Testcontainers owner stores; strict CI fails
 on required DB skips. These are complementary tests, not a real deployment.
 
@@ -144,3 +146,6 @@ on required DB skips. These are complementary tests, not a real deployment.
   and production migrations separately. Do not equate readiness with IdP uptime.
 
 Real IdP verification is NOT RUN for F17. No credentials were invented.
+For Gate A preparation and authorized real-IdP Gate B execution, use the
+[F19 operator runbook](real-deployment-verification.md); synthetic success cannot
+certify provider-specific token/callback/subject compatibility.

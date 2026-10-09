@@ -13,6 +13,8 @@
     "api:generate": "pnpm --filter @medresearch/api generate",
     "security:audit": "node scripts/security-audit.mjs",
     "security:test": "node --test scripts/security-audit-policy.test.mjs",
+    "deployment:preflight": "node --conditions=react-server scripts/deployment-preflight.mjs",
+    "deployment:test": "node --conditions=react-server --test scripts/deployment-preflight.test.mjs",
     "desktop:dev": "pnpm --filter @medresearch/desktop tauri dev",
     "desktop:build": "pnpm --filter @medresearch/desktop tauri build",
     "desktop:check": "pnpm --filter @medresearch/desktop tauri info"

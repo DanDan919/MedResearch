@@ -50,6 +50,12 @@ jobs:
         working-directory: frontend
         run: pnpm api:generate
 
+      - name: Offline deployment preflight controls (no external IdP)
+        working-directory: frontend
+        run: |
+          pnpm exec eslint scripts/deployment-preflight.mjs scripts/deployment-preflight.test.mjs
+          pnpm deployment:test
+
       - name: Verify generated API types are committed
         run: git diff --exit-code -- frontend/packages/api/src/generated/medresearch-api.ts
 
