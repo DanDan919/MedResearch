@@ -162,7 +162,11 @@ for (const width of [320, 375, 390, 768, 1280]) {
       await plot.press("ArrowRight");
       await expect.poll(() => plot.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
       expect(await plot.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe("none");
+      const lineage = page.locator("summary").filter({ hasText: /^View IDs$/ }).first();
+      await lineage.focus(); await lineage.press("Enter");
+      await expect(lineage.locator("..")).toHaveAttribute("open", "");
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+      await page.screenshot({ path: info.outputPath("mobile-keyboard-lineage.png"), fullPage: true });
     }
     await info.attach("responsive-measurements", { body: JSON.stringify(measures, null, 2), contentType: "application/json" });
   });

@@ -26,6 +26,7 @@ public sealed class ResearchApiTests
     [InlineData(true, false, HttpStatusCode.ServiceUnavailable)]
     [InlineData(true, true, HttpStatusCode.ServiceUnavailable)]
     [InlineData(false, false, HttpStatusCode.InternalServerError)]
+    [InlineData(false, true, HttpStatusCode.InternalServerError)]
     public async Task DatabaseFailures_AreOperationalErrorsWithoutPrivateDiagnostics(bool transient, bool wrapped, HttpStatusCode expected)
     {
         using var factory = new ResearchApiFactory();

@@ -167,14 +167,14 @@ Development Compose не выдаётся за production deployment template.
 | Domain | 45 | 0 | 0 |
 | Application | 289 | 0 | 0 |
 | Infrastructure | 110 | 0 | 0 |
-| Integration | 51 | 0 | 103 |
+| Integration | 52 | 0 | 103 |
 | Frontend API | 40 | 0 | 0 |
 | Web | 99 | 0 | 0 |
 | Security policy | 5 | 0 | 0 |
 | Scientific Chromium | 15 | 0 | 0 |
 | Production OIDC Chromium | 17 | 0 | 0 |
 
-Backend 495 passed, 103 local Docker skips. Restore/build: success, 0 warnings/
+Backend 496 passed, 103 local Docker skips. Restore/build: success, 0 warnings/
 errors; EF pending-model: нет изменений; Compose config и diff check проходят.
 Docker info: Linux engine pipe недоступен. Новый full-stack runner локально
 явно FAILED на Docker availability, не заявлен как passed. Его Release build
@@ -187,7 +187,7 @@ Native Tauri НЕ проверен. Screenshot production shell 320px просм
 Workflow `.github/workflows/ci.yml`: Ubuntu, .NET10, Node24/pnpm11.19.
 Три jobs: existing strict build-test, frontend и изолированный web-release.
 Required PG suite ожидается 103 выполненных cases, 0 required skips. Backend
-total ожидается 598; эти числа пока ожидание, не утверждение результата CI.
+total ожидается 599; эти числа пока ожидание, не утверждение результата CI.
 Full-stack 17 cases/trusted CA, image builds и diagnostics artifact обязательны.
 Первый commit `20354cd1be259951748b5722ceb98be413c75ffd`, CI `37807605255`:
 frontend/build-test success, 594 backend passed, 0 failed/skipped. Новый
@@ -214,9 +214,23 @@ API process restart проверяется отдельно с идентичн�
 При outage обнаружен production HTTP дефект: transient DbException в wrapper
 попадал в 400/validation. Теперь direct/wrapped transient DB error -> 503,
 non-transient -> 500, обычный InvalidOperationException validation -> 400.
-ProblemDetails 503/500 не раскрывают diagnostic marker. Четыре новые HTTP cases
+ProblemDetails 503/500 не раскрывают diagnostic marker. Пять новых HTTP cases
 локально passed; OpenAPI/TS regenerated из backend, 503 объявлен в контракте.
 Итоговый runtime CI ещё pending; scientific validators/stores не изменены.
+Пятый run `37811381039` на `6e99d4e811e985134ca2a8785cf771541106f02f`
+полностью SUCCESS: backend 598 passed, 0 failed/skipped; все 103 локально skipped
+PG cases сопоставлены по testName с passed CI TRX, missing=0. Frontend job
+success. Full-stack JSON artifact: expected=17, skipped=0, unexpected=0,
+flaky=0, duration=65.836s. Docker web/API images собраны. Docker 28.0.4,
+Ubuntu 24.04.5, .NET target 10.0.x, Node24/pnpm11.19.
+Независимо скачаны и прочитаны TRX/audit/browser artifacts; production audit
+severity=0, полный audit HIGH=1 (braces dev-only). Responsive attachments:
+ровно 9 routes для каждого width 320/375/390/768/1280, maximumOverflow=0px.
+Production 390px quantitative screenshot просмотрен: values не перекрываются,
+таблица/plot имеют ограниченный внутренний scroll. Keyboard filter/nav/support/
+plot passed; добавлен adjacent lineage IDs interaction control. Пятый negative
+HTTP case закрывает non-transient DB exception в wrapper; финальный CI по
+новому HEAD ещё ожидается, пока не объявлен прошедшим.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 

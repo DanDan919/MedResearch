@@ -23,7 +23,7 @@
 - The real outage exposed generic InvalidOperationException wrapping transient
   DbException being reported as validation 400. HTTP handling now returns safe
   503 for transient direct/wrapped DbException; non-transient remains 500,
-  ordinary validation remains 400. Four HTTP negative controls cover diagnostics
+  ordinary validation remains 400. Five HTTP negative controls cover diagnostics
   non-disclosure and classification. Scientific stores/algorithms are untouched.
 
 - Production audit found Next 16.3.6/source-map-js 1.2.1 advisories. Scoped

@@ -56,6 +56,7 @@ app.UseExceptionHandler(errorApp =>
         {
             DbException { IsTransient: true } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
             Exception { InnerException: DbException { IsTransient: true } } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
+            DbException or Exception { InnerException: DbException } => (StatusCodes.Status500InternalServerError, "An unexpected error occurred"),
             ArgumentException or InvalidOperationException => (StatusCodes.Status400BadRequest, "Invalid request"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };

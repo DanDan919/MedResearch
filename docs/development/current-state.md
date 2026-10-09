@@ -13,7 +13,7 @@ HIGH/CRITICAL block CI.
 Backend-origin OpenAPI comparison, TS/Zod alignment controls, mobile grid fix,
 standalone packaging/operator guide and a real API/PostgreSQL browser harness
 are implemented. Local Domain 45/Application 289/Infrastructure 110/Integration
-51 passed; 103 integration cases skip only because Docker is unavailable.
+52 passed; 103 integration cases skip only because Docker is unavailable.
 Frontend API 40/web 99, security policy 5, scientific Chromium 15 and production
 OIDC Chromium 17 passed. EF has no pending model change; Compose config passes.
 The full-stack runner fails explicitly when local Docker is unavailable.
