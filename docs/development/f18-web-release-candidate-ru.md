@@ -1,8 +1,9 @@
 # F18: Web Release Candidate и проверка границ развёртывания
 
-Дата: 2026-10-08. Статус checkpoint: реализация и локальная регрессия завершены;
-новый full-stack runtime и итоговый CI ещё НЕ подтверждены. Этот документ не
-объявляет release/deployment готовым до получения соответствующих результатов.
+Даты: 2026-10-08/09. Статус: F18 COMPLETE - DETERMINISTIC WEB RC.
+Implementation HEAD `1ecd40332de1e633a35916890546b29422babeb3` прошёл
+[CI 37929197670](https://github.com/DanDan919/MedResearch/actions/runs/37929197670).
+Это подтверждение deterministic web RC, НЕ реального production deployment.
 
 ## 1. Исходное состояние
 
@@ -182,18 +183,18 @@ Docker info: Linux engine pipe недоступен. Новый full-stack runne
 отдельных unit test cases; отсутствие cases не выдаётся за passed coverage.
 Native Tauri НЕ проверен. Screenshot production shell 320px просмотрен.
 
-## 9. CI и Git: результат дополняется после запуска
+## 9. CI и Git: наблюдавшиеся сбои и подтверждённый результат
 
 Workflow `.github/workflows/ci.yml`: Ubuntu, .NET10, Node24/pnpm11.19.
 Три jobs: existing strict build-test, frontend и изолированный web-release.
-Required PG suite ожидается 103 выполненных cases, 0 required skips. Backend
-total ожидается 599; эти числа пока ожидание, не утверждение результата CI.
+Required PG suite: 103 выполненных cases, 0 required skips. Backend
+total: 599 passed; окончательные counters проверены в скачанных CI TRX.
 Full-stack 17 cases/trusted CA, image builds и diagnostics artifact обязательны.
 Первый commit `20354cd1be259951748b5722ceb98be413c75ffd`, CI `37807605255`:
 frontend/build-test success, 594 backend passed, 0 failed/skipped. Новый
 web-release runner FAILED до браузера: неверный content root WebApplicationFactory
 в console entrypoint (без normal test manifest). Явный src/MedResearch.Api test
-root исправляет этот harness дефект; итоговый runtime CI остаётся pending.
+root исправил этот harness дефект; на тот момент runtime CI оставался pending.
 Второй run `37808486190` на `596f22aa1688c3d170ef2b6b4e7635813052557e`
 дошёл до Planning, где неизменённый validator отверг несовпадающий seed question.
 Seed/fake planner используют общий constant; validator не ослаблен. Остальные
@@ -202,7 +203,7 @@ jobs второго run success. Это ошибки новой fixture подг
 Третий run `37809117190` достиг API/browser, но 17 cases отклонили тестовый
 сертификат (ERR_CERT_INVALID). CA/server leaf были одним certificate. Цепочка
 заменена на отдельную CA/serverAuth/SAN leaf; NSS путь актуализирован без
-TLS bypass. До повторного runtime CI это исправление не объявляется verified.
+TLS bypass. На этом checkpoint исправление ещё не объявлялось verified.
 Четвёртый run `37810208573` на `3236a4835809281f33cd8b12ea8dd8d4dff0f7a7`:
 11 full-stack passed, 6 failed. Trusted HTTPS, actual JWT API, persisted
 report/artifact restart и user isolation прошли. Docker stop/start сменил
@@ -216,7 +217,7 @@ API process restart проверяется отдельно с идентичн�
 non-transient -> 500, обычный InvalidOperationException validation -> 400.
 ProblemDetails 503/500 не раскрывают diagnostic marker. Пять новых HTTP cases
 локально passed; OpenAPI/TS regenerated из backend, 503 объявлен в контракте.
-Итоговый runtime CI ещё pending; scientific validators/stores не изменены.
+На этом checkpoint runtime CI был pending; scientific validators/stores не изменены.
 Пятый run `37811381039` на `6e99d4e811e985134ca2a8785cf771541106f02f`
 полностью SUCCESS: backend 598 passed, 0 failed/skipped; все 103 локально skipped
 PG cases сопоставлены по testName с passed CI TRX, missing=0. Frontend job
@@ -229,8 +230,43 @@ severity=0, полный audit HIGH=1 (braces dev-only). Responsive attachments:
 Production 390px quantitative screenshot просмотрен: values не перекрываются,
 таблица/plot имеют ограниченный внутренний scroll. Keyboard filter/nav/support/
 plot passed; добавлен adjacent lineage IDs interaction control. Пятый negative
-HTTP case закрывает non-transient DB exception в wrapper; финальный CI по
-новому HEAD ещё ожидается, пока не объявлен прошедшим.
+HTTP case закрывает non-transient DB exception в wrapper; до следующего run
+новый HEAD не объявлялся прошедшим.
+
+Шестой run `37929197670` на `1ecd40332de1e633a35916890546b29422babeb3`:
+все три jobs SUCCESS. Backend: Domain 45, Application 289, Infrastructure 110,
+Integration 155; всего 599 passed, 0 failed/skipped. Повторно сопоставлены все
+103 локально Docker-skipped test names: CI passed=155, missing=0. Свежие
+migrations, EF pending-model и Compose gates прошли. Frontend: API 40/web 99,
+security policy 5, scientific Chromium 15, production OIDC Chromium 17 passed;
+lint/typecheck, canonical SDK diff, Next production и desktop Vite build passed.
+UI/desktop unit suites по-прежнему без cases, native Tauri не проверен.
+
+Скачан actual full-stack JSON: expected=17, skipped=0, unexpected=0, flaky=0,
+duration=57.367s. Trusted browser -> Next/BFF -> Production JWT API -> PG
+проверен без TLS bypass. Новый keyboard lineage control passed; screenshot с
+раскрытыми IDs при 390px просмотрен. Все 45 measurements: 9 routes на каждую
+ширину 320/375/390/768/1280, maximumOverflow=0px в каждой группе. Docker
+28.0.4/Ubuntu 24.04.5; оба images экспортированы. Скачанные unfiltered audit
+JSON подтверждают production severity=0, full HIGH=1 (dev-only braces).
+
+Implementation commits после baseline (обычные commit/push, без force):
+
+```text
+20354cd1be259951748b5722ceb98be413c75ffd feat: verify web release candidate end to end
+596f22aa1688c3d170ef2b6b4e7635813052557e fix: anchor web release fixtures to API content root
+33b12cca0427abe3733d4344dcda4e32c0bc5bc9 fix: align release seed with deterministic planner fixture
+3236a4835809281f33cd8b12ea8dd8d4dff0f7a7 fix: issue valid server certificates for trusted HTTPS tests
+6e99d4e811e985134ca2a8785cf771541106f02f fix: classify transient database outages as operational failures
+1ecd40332de1e633a35916890546b29422babeb3 fix: keep wrapped database diagnostics private
+```
+
+Финальный report-only commit не меняет implementation. Его HEAD, CI run и
+проверка clean/upstream фиксируются в итоговом сообщении после фактического CI.
+Staged diff проверен: нет реальных credentials, private keys или source bodies;
+synthetic values существуют только в fixtures. Схема/миграции и production
+Domain/Application/Infrastructure не менялись. Из quantitative UI изменены
+только keyboard focus/scroll; статистические значения не пересчитываются.
 
 ## 10. Оставшиеся ограничения / следующий milestone
 
@@ -244,3 +280,23 @@ image digest pinning/scanning требуют отдельной работы. De
 Рекомендуется ровно один следующий milestone: узкая проверка реального
 HTTPS deployment с operator-provided IdP/configuration, двумя пользователями
 и приватным API/PostgreSQL. Не запускается автоматически.
+
+## 11. Что теперь доказано, а что нет
+
+- Реальный Chromium может пройти synthetic OIDC через настоящий Next/BFF и
+  ASP.NET; API независимо проверяет JWT. User B получает 404 для данных User A.
+- Secure/HttpOnly/host-only cookie, PKCE/state/nonce, expiry/logout/switch,
+  CSRF/redirect/path restrictions и отсутствие token exposure прошли controls.
+- Реальная недоступность PG даёт ready/read 503 при live 200; API outage
+  отображается как ошибка, не пустая научная выдача. API restart сохраняет данные.
+- Изменения backend-origin paths/security/schema/required/nullability обнаруживает
+  CI drift gate. Это не доказательство неизменности всех semantic behaviours,
+  которые OpenAPI не описывает.
+- Page-wide overflow устранён в проверенных 45 populated сценариях; tables,
+  forest plot и lineage остаются доступны. Это не полный accessibility audit.
+- HIGH/CRITICAL production audit: 0. Dev-only HIGH braces остаётся с явной
+  mitigation; scanner не доказывает отсутствие всех возможных vulnerabilities.
+- Real external IdP, real deployed HTTPS, live scientific pipeline и native
+  Tauri: NOT VERIFIED. Нет заявления о production deployment readiness.
+- F18 не менял научные алгоритмы. Исторические F15.1/F15.2/F16, M17-M24 и
+  PostgreSQL lease/fencing/lineage regressions выполнились в полном suite.

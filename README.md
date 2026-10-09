@@ -8,6 +8,8 @@ Linux full-stack browser job with a trusted temporary CA, real JWT API and
 migrated Testcontainers PostgreSQL. Scientific providers in that job are fakes.
 See [deployment operations](docs/frontend/deployment.md) and the
 [Russian F18 verification report](docs/development/f18-web-release-candidate-ru.md).
+F18 is complete at the deterministic web RC level: CI `37929197670` verified
+599 backend cases without skips and 17 actual full-stack browser scenarios.
 These checks are not certification of an external IdP, deployed HTTPS, live
 scientific providers or a native Tauri release.
 

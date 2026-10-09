@@ -2,9 +2,10 @@
 
 ## F18 Web Release Candidate
 
-Implementation/local verification complete; actual trusted-HTTPS full-stack
-runtime and final CI verification are pending at this checkpoint. Starting HEAD
-39a9bd9963ddc41a53c3d1700a91d798ca1e20ab, clean main/origin/main.
+F18 COMPLETE - DETERMINISTIC WEB RC. Implementation HEAD
+`1ecd40332de1e633a35916890546b29422babeb3` passed CI `37929197670` on
+2026-10-09. Starting HEAD 39a9bd9963ddc41a53c3d1700a91d798ca1e20ab,
+clean main/origin/main; history was not rewritten.
 Next 16.3.8 and source-map-js 1.2.2 resolve the production audit advisories:
 production 0; full audit retains one dev-only HIGH braces advisory without a
 published patched version. Audit reports are unfiltered and production
@@ -20,7 +21,13 @@ The full-stack runner fails explicitly when local Docker is unavailable.
 Transient database HTTP failures are now operational 503 with bounded generic
 ProblemDetails, not validation 400; non-transient and ordinary validation controls
 are separate. Full-stack outage injection pauses PostgreSQL without changing its
-ephemeral endpoint. Runtime/final CI confirmation is still pending.
+ephemeral endpoint. CI: Domain 45/Application 289/Infrastructure 110/Integration
+155, all 599 passed, zero failures/skips. All 103 locally Docker-skipped test
+names were matched to passed CI TRX results. Frontend API 40/web 99, security
+policy 5, scientific Chromium 15 and synthetic production OIDC Chromium 17
+passed. The separate actual API/PostgreSQL/trusted-HTTPS suite passed 17 cases,
+zero skipped/flaky; its 45 populated route/viewport measurements showed zero
+page-wide overflow. Both Docker images built; EF/Compose/drift gates passed.
 See `f18-web-release-candidate-ru.md` for the evidence boundary and CI outcome.
 External IdP/deployed HTTPS/native Tauri/live science remain NOT VERIFIED.
 
