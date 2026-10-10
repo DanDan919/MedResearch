@@ -4,10 +4,11 @@ namespace MedResearch.Application.Research;
 
 public interface IResearchStore
 {
-    Task PersistInitialResearchAsync(
+    Task<CreateResearchResult> PersistInitialResearchAsync(
         ResearchQuestion question,
         ResearchRun run,
         string ownerSubjectId,
+        Guid idempotencyKey,
         CancellationToken cancellationToken);
 
     Task<ResearchRunDetails?> FindResearchRunAsync(

@@ -55,6 +55,7 @@ export class MedResearchApiClient {
 
   public async createResearch(
     request: CreateResearchRequest,
+    idempotencyKey: string,
     signal?: AbortSignal
   ): Promise<CreateResearchResponse> {
     return this.requestJson("/api/research", createResearchResponseSchema.parse, {
@@ -62,6 +63,7 @@ export class MedResearchApiClient {
       signal,
       headers: {
         "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
         Accept: "application/json"
       },
       body: JSON.stringify(request)

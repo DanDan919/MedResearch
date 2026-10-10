@@ -141,9 +141,48 @@ describe("BFF independently authorizes and constrains transport", () => {
     const dep = dependencies(); const path = "/api/research/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     for (const location of [path, "https://evil.example" + path, "http://["]) {
       dep.fetch.mockResolvedValue(Response.json({ researchRunId: data.sessionId, status: "Queued" }, { status: 201, headers: { location } }));
-      const response = await forwardBackend(request(undefined, "POST", { origin: config.webOrigin, "content-type": "application/json" }, JSON.stringify({ question: "A bounded question" })), dep);
+      const response = await forwardBackend(request(undefined, "POST", { origin: config.webOrigin, "content-type": "application/json", "Idempotency-Key": data.sessionId }, JSON.stringify({ question: "A bounded question" })), dep);
       expect(response.status).toBe(201); expect(response.headers.get("location")).toBe(location === path ? "/api/backend" + path : null);
     }
+  });
+});
+
+describe("admission BFF boundary", () => {
+  const post = (key?: string) => request(undefined, "POST", { origin: config.webOrigin, "content-type": "application/json",
+    ...(key !== undefined ? { "idempotency-key": key } : {}), authorization: "Bearer forged", "x-owner-id": "forged-owner" }, JSON.stringify({ question: "A bounded research question" }));
+
+  it.each([undefined, "", "not-uuid", "00000000-0000-0000-0000-000000000000", `${data.sessionId},${data.sessionId}`])("rejects invalid key %s before upstream", async key => {
+    const dep = dependencies(); const response = await forwardBackend(post(key), dep);
+    expect(response.status).toBe(400); expect((await response.json()).code).toBe("admission-invalid-key");
+    expect(dep.fetch).not.toHaveBeenCalled();
+  });
+
+  it("forwards validated UUID only on allowed create, never browser identity", async () => {
+    const dep = dependencies();
+    await forwardBackend(post(data.sessionId.toUpperCase()), dep);
+    const headers = new Headers(dep.fetch.mock.calls[0][1]?.headers);
+    expect(headers.get("idempotency-key")).toBe(data.sessionId);
+    expect(headers.get("authorization")).toBe("Bearer " + data.accessToken);
+    expect(headers.has("x-owner-id")).toBe(false);
+    expect(JSON.parse(dep.fetch.mock.calls[0][1]?.body as string)).toEqual({ question: "A bounded research question" });
+    await forwardBackend(request(undefined, "GET", { "idempotency-key": data.sessionId }), dep);
+    expect(new Headers(dep.fetch.mock.calls[1][1]?.headers).has("idempotency-key")).toBe(false);
+  });
+
+  it.each([[400, "admission-invalid-key"], [409, "admission-idempotency-conflict"], [429, "admission-owner-outstanding"],
+    [429, "admission-global-outstanding"], [429, "admission-owner-daily"], [429, "admission-global-daily"], [503, "admission-stopped"]])("preserves typed %s/%s without leaking upstream text", async (status, code) => {
+    const dep = dependencies(); dep.fetch.mockResolvedValue(Response.json({ code, title: "private question/key/token", detail: "private diagnostics" }, { status: Number(status), headers: { "retry-after": "123" } }));
+    const response = await forwardBackend(post(data.sessionId), dep);
+    expect(response.status).toBe(status); const payload = await response.json(); expect(payload.code).toBe(code);
+    expect(JSON.stringify(payload)).not.toContain("private");
+    expect(response.headers.get("cache-control")).toContain("private, no-store");
+    expect(response.headers.get("retry-after")).toBe(status === 429 ? "123" : null);
+  });
+
+  it.each(["unknown-code", "__proto__", "admission-stopped"])("does not trust unknown or mismatched codes %s", async code => {
+    const dep = dependencies(); dep.fetch.mockResolvedValue(Response.json({ code, title: "private diagnostic" }, { status: 429 }));
+    const response = await forwardBackend(post(data.sessionId), dep);
+    expect((await response.json()).code).toBe("upstream-error");
   });
 });
 

@@ -9,6 +9,16 @@ import { clearSession, readPrivateSession, sessionOptions, type PrivateSession }
 const id = "[a-f\\d]{8}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{12}";
 const researchPath = new RegExp(`^/api/research(?:/${id}(?:/(?:progress|report|quantitative|provenance))?)?$`, "i");
 const statuses = new Set(["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]);
+const submissionKey = new RegExp(`^${id}$`, "i");
+const admissionProblems: Record<string, { status: number; title: string }> = {
+  "admission-invalid-key": { status: 400, title: "A valid submission key is required" },
+  "admission-idempotency-conflict": { status: 409, title: "This submission key was already used for a different question" },
+  "admission-owner-outstanding": { status: 429, title: "Your outstanding research limit has been reached. Wait for your active research to finish." },
+  "admission-global-outstanding": { status: 429, title: "Research capacity is currently full. Try again later." },
+  "admission-owner-daily": { status: 429, title: "Your daily research limit has been reached. Try again after midnight UTC." },
+  "admission-global-daily": { status: 429, title: "Daily research capacity has been reached. Try again after midnight UTC." },
+  "admission-stopped": { status: 503, title: "New research submissions are temporarily paused." }
+};
 
 export function allowedUpstreamPath(url: URL, method: string): string | null {
   if (!url.pathname.startsWith("/api/backend/")) return null;
@@ -64,6 +74,10 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
       body = JSON.stringify({ question: incoming.question });
       headers["Content-Type"] = "application/json";
     } catch (error) { return problem(error instanceof BodyLimitExceeded ? 413 : 400, "Invalid research request", "invalid-request"); }
+    const key = request.headers.get("idempotency-key");
+    if (!key || !submissionKey.test(key) || key === "00000000-0000-0000-0000-000000000000")
+      return problem(400, "A valid submission key is required", "admission-invalid-key");
+    headers["Idempotency-Key"] = key.toLowerCase();
   }
   try {
     const upstream = await (dependencies.fetch ?? fetch)(config.apiBaseUrl + upstreamPath, {
@@ -74,10 +88,18 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
       return problem(502, "API response unavailable", "upstream-redirect-rejected");
     }
     if (!upstream.ok) {
-      await upstream.body?.cancel();
+      let admission: { code: string; title: string } | undefined;
+      if (request.method === "POST" && [400, 409, 429, 503].includes(upstream.status)) {
+        try {
+          const payload: unknown = JSON.parse(new TextDecoder().decode(await readBoundedBody(upstream, 4096, signal)));
+          const code = payload && typeof payload === "object" && "code" in payload ? payload.code : undefined;
+          if (typeof code === "string" && Object.hasOwn(admissionProblems, code) && admissionProblems[code].status === upstream.status)
+            admission = { code, title: admissionProblems[code].title };
+        } catch { /* Error payloads are optional and untrusted; retain the sanitized fallback. */ }
+      } else await upstream.body?.cancel();
       const title = upstream.status === 401 ? "Sign in required" : upstream.status === 404 ? "Resource not found" :
-        upstream.status === 409 ? "Report is not ready" : upstream.status === 429 ? "Too many requests" : "API request could not be completed";
-      const response = problem(upstream.status, title, upstream.status === 401 ? "backend-rejected" : "upstream-error");
+        upstream.status === 409 ? (request.method === "GET" ? "Report is not ready" : "Submission conflict") : upstream.status === 429 ? "Too many requests" : "API request could not be completed";
+      const response = problem(upstream.status, admission?.title ?? title, admission?.code ?? (upstream.status === 401 ? "backend-rejected" : "upstream-error"));
       if (upstream.status === 401 && config.mode === "oidc") await clearSession(request, response, config);
       const retryAfter = upstream.headers.get("retry-after");
       if (upstream.status === 429 && retryAfter && /^\d{1,5}$/.test(retryAfter)) response.headers.set("Retry-After", retryAfter);

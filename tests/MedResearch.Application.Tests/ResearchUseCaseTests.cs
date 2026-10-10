@@ -14,7 +14,7 @@ public sealed class ResearchUseCaseTests
         var useCase = new CreateResearchUseCase(store, new TestCurrentActor(), NullLogger<CreateResearchUseCase>.Instance);
 
         var result = await useCase.ExecuteAsync(
-            new CreateResearchCommand("Does chronic sleep deprivation impair working memory in adults?"),
+            new CreateResearchCommand("Does chronic sleep deprivation impair working memory in adults?", Guid.NewGuid().ToString()),
             CancellationToken.None);
 
         Assert.Equal(ResearchRunStatus.Queued.ToString(), result.Status);
@@ -35,7 +35,7 @@ public sealed class ResearchUseCaseTests
         var useCase = new CreateResearchUseCase(store, new TestCurrentActor(), NullLogger<CreateResearchUseCase>.Instance);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            useCase.ExecuteAsync(new CreateResearchCommand(question), CancellationToken.None));
+            useCase.ExecuteAsync(new CreateResearchCommand(question, Guid.NewGuid().ToString()), CancellationToken.None));
 
         Assert.Null(store.SavedQuestion);
         Assert.Null(store.SavedRun);
@@ -50,6 +50,15 @@ public sealed class ResearchUseCaseTests
         var result = await useCase.ExecuteAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task CreateResearch_RejectsOverlongQuestionBeforeStore()
+    {
+        var store = new CapturingResearchStore();
+        var useCase = new CreateResearchUseCase(store, new TestCurrentActor(), NullLogger<CreateResearchUseCase>.Instance);
+        await Assert.ThrowsAsync<ArgumentException>(() => useCase.ExecuteAsync(new CreateResearchCommand(new string('x', 1001), Guid.NewGuid().ToString()), CancellationToken.None));
+        Assert.Null(store.SavedQuestion);
     }
 
     [Fact]
@@ -101,15 +110,16 @@ public sealed class ResearchUseCaseTests
 
         public ResearchRun? SavedRun { get; private set; }
 
-        public Task PersistInitialResearchAsync(
+        public Task<CreateResearchResult> PersistInitialResearchAsync(
             ResearchQuestion question,
             ResearchRun run,
             string ownerSubjectId,
+            Guid idempotencyKey,
             CancellationToken cancellationToken)
         {
             SavedQuestion = question;
             SavedRun = run;
-            return Task.CompletedTask;
+            return Task.FromResult(new CreateResearchResult(run.Id, run.Status.ToString()));
         }
 
         public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)

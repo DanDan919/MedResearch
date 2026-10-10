@@ -26,8 +26,8 @@ public sealed class ResearchStorePersistenceTests
 
         await using (var context = _fixture.CreateDbContext())
         {
-            var store = new EfResearchStore(context);
-            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+            var store = ResearchCreateTestClient.SharedFixtureStore(context);
+            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, Guid.NewGuid(), CancellationToken.None);
         }
 
         await using var verificationContext = _fixture.CreateDbContext();
@@ -53,8 +53,8 @@ public sealed class ResearchStorePersistenceTests
 
         await using (var context = _fixture.CreateDbContext())
         {
-            var store = new EfResearchStore(context);
-            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+            var store = ResearchCreateTestClient.SharedFixtureStore(context);
+            await store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, Guid.NewGuid(), CancellationToken.None);
         }
 
         await using var retrievalContext = _fixture.CreateDbContext();
@@ -110,10 +110,10 @@ public sealed class ResearchStorePersistenceTests
 
         await using (var context = _fixture.CreateDbContext())
         {
-            var store = new EfResearchStore(context);
+            var store = ResearchCreateTestClient.SharedFixtureStore(context);
 
             await Assert.ThrowsAsync<DbUpdateException>(() =>
-                store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
+                store.PersistInitialResearchAsync(question, run, ResearchOwnership.LegacyUnownedSubjectId, Guid.NewGuid(), CancellationToken.None));
         }
 
         await using var verificationContext = _fixture.CreateDbContext();
@@ -230,9 +230,9 @@ public sealed class ResearchStorePersistenceTests
 
         await using (var context = _fixture.CreateDbContext())
         {
-            var store = new EfResearchStore(context);
-            await store.PersistInitialResearchAsync(questionA, runA, "UserA", CancellationToken.None);
-            await store.PersistInitialResearchAsync(questionB, runB, "UserB", CancellationToken.None);
+            var store = ResearchCreateTestClient.SharedFixtureStore(context);
+            await store.PersistInitialResearchAsync(questionA, runA, "UserA", Guid.NewGuid(), CancellationToken.None);
+            await store.PersistInitialResearchAsync(questionB, runB, "UserB", Guid.NewGuid(), CancellationToken.None);
         }
 
         await using var verificationContext = _fixture.CreateDbContext();

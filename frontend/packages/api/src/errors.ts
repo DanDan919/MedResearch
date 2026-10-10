@@ -1,7 +1,7 @@
 import { problemDetailsSchema } from "./schemas";
 import type { ProblemDetails } from "./types";
 
-export type ApiErrorKind = "unauthorized" | "not-found" | "conflict" | "validation" | "server" | "network" | "unexpected";
+export type ApiErrorKind = "unauthorized" | "not-found" | "conflict" | "quota" | "validation" | "server" | "network" | "unexpected";
 
 export class MedResearchApiError extends Error {
   public readonly kind: ApiErrorKind;
@@ -33,6 +33,8 @@ export function mapStatusToKind(status: number): ApiErrorKind {
   if (status === 400) {
     return "validation";
   }
+
+  if (status === 429) return "quota";
 
   if (status >= 500) {
     return "server";

@@ -99,7 +99,7 @@ public sealed class ResearchApiTests
         using var ownerClient = factory.CreateClientFor("UserA");
         using var otherClient = factory.CreateClientFor("UserB");
 
-        var created = await ownerClient.PostAsJsonAsync("/api/research", new CreateResearchRequest("User A private question"));
+        var created = await ownerClient.PostResearchAsync(new CreateResearchRequest("User A private question"));
         var createdBody = await created.Content.ReadFromJsonAsync<CreateResearchResponse>();
 
         var ownerRead = await ownerClient.GetAsync($"/api/research/{createdBody!.ResearchRunId}");
@@ -238,7 +238,7 @@ public sealed class ResearchApiTests
         using var factory = new ResearchApiFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest(
+        var response = await client.PostResearchAsync(new CreateResearchRequest(
             "Does chronic sleep deprivation impair working memory in adults?"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -258,7 +258,7 @@ public sealed class ResearchApiTests
         using var factory = new ResearchApiFactory();
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest("   "));
+        var response = await client.PostResearchAsync(new CreateResearchRequest("   "));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -270,7 +270,7 @@ public sealed class ResearchApiTests
         using var client = factory.CreateClient();
         const string question = "Does chronic sleep deprivation impair working memory in adults?";
 
-        var createResponse = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest(question));
+        var createResponse = await client.PostResearchAsync(new CreateResearchRequest(question));
         var created = await createResponse.Content.ReadFromJsonAsync<CreateResearchResponse>();
 
         var getResponse = await client.GetAsync($"/api/research/{created!.ResearchRunId}");
@@ -746,10 +746,11 @@ public sealed class ResearchApiTests
             _owners[details.ResearchRunId] = ownerSubjectId;
         }
 
-        public Task PersistInitialResearchAsync(
+        public Task<CreateResearchResult> PersistInitialResearchAsync(
             ResearchQuestion question,
             ResearchRun run,
             string ownerSubjectId,
+            Guid idempotencyKey,
             CancellationToken cancellationToken)
         {
             _runs[run.Id] = new ResearchRunDetails(
@@ -762,7 +763,7 @@ public sealed class ResearchApiTests
                 run.FailureReason);
             _owners[run.Id] = ownerSubjectId;
 
-            return Task.CompletedTask;
+            return Task.FromResult(new CreateResearchResult(run.Id, run.Status.ToString()));
         }
 
         public Task<ResearchRunDetails?> FindResearchRunAsync(Guid researchRunId, string ownerSubjectId, CancellationToken cancellationToken)

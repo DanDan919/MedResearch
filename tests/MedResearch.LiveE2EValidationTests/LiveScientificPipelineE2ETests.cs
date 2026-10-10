@@ -42,7 +42,9 @@ public sealed class LiveScientificPipelineE2ETests
             readiness.StatusCode == HttpStatusCode.OK,
             $"Readiness returned {(int)readiness.StatusCode} {readiness.StatusCode}: {readinessBody}");
 
-        var createdResponse = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest(Question));
+        using var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/research") { Content = JsonContent.Create(new CreateResearchRequest(Question)) };
+        createRequest.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
+        var createdResponse = await client.SendAsync(createRequest);
         Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
         var created = await createdResponse.Content.ReadFromJsonAsync<CreateResearchResponse>();
         Assert.NotNull(created);

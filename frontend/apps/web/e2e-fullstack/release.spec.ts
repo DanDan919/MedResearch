@@ -60,10 +60,23 @@ test("actual database ownership rejects B on every read and ignores forged ident
 test("actual BFF create, CSRF, redirect restriction, switch and logout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await signIn(page); await page.goto("/research/new");
+  const createRequest = page.waitForRequest(request => request.method() === "POST" && new URL(request.url()).pathname === "/api/backend/api/research");
   await page.getByLabel("Research question").fill("User A full stack queued execution");
   await page.getByRole("button", { name: "Start Research" }).click(); await page.waitForURL(/\/research\/[a-f\d-]{36}$/);
   const id = new URL(page.url()).pathname.split("/").pop()!;
+  const key = (await createRequest).headers()["idempotency-key"];
+  expect(key).toMatch(/^[a-f\d-]{36}$/i);
   expect((await (await page.request.get(`/api/backend/api/research/${id}`)).json()).status).toBe("Queued");
+  const retry = await page.request.post("/api/backend/api/research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question: "User A full stack queued execution" } });
+  expect(retry.status()).toBe(201); expect((await retry.json()).researchRunId).toBe(id);
+  const conflict = await page.request.post("/api/backend/api/research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question: "Different full stack research" } });
+  expect(conflict.status()).toBe(409); expect((await conflict.json()).code).toBe("admission-idempotency-conflict");
+  expect((await page.request.post("/api/backend/api/research", { headers: { Origin: origin }, data: { question: "Missing submission key" } })).status()).toBe(400);
+  await page.goto("/research/new");
+  await page.getByLabel("Research question").fill("Another queued execution is not allowed");
+  await page.getByRole("button", { name: "Start Research" }).click();
+  await expect(page.getByText(/Your outstanding research limit has been reached/)).toBeVisible();
+  await expect(page).toHaveURL(/\/research\/new$/);
   for (const path of ["/api/auth/login", "/api/auth/logout", "/api/backend/api/research"])
     expect((await page.request.post(path, { headers: { Origin: "https://evil.example" }, data: {} })).status()).toBe(403);
   expect((await page.request.get("/api/backend/https://evil.example")).status()).toBe(404);

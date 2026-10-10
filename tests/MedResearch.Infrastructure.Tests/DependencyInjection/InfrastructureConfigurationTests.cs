@@ -1,5 +1,6 @@
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Ai;
+using MedResearch.Application.Research.Admission;
 using MedResearch.Infrastructure.Ai.CodexCli;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +10,25 @@ namespace MedResearch.Infrastructure.Tests.DependencyInjection;
 
 public sealed class InfrastructureConfigurationTests
 {
+    [Fact]
+    public void AddInfrastructure_MissingAdmissionConfigurationKeepsPilotLimits()
+    {
+        var services = new ServiceCollection().AddInfrastructure(CreateConfiguration([]));
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<ResearchAdmissionOptions>();
+        Assert.Equal(1, options.OwnerOutstandingLimit);
+        Assert.Equal(2, options.GlobalOutstandingLimit);
+        Assert.Equal(2, options.OwnerDailyLimit);
+        Assert.Equal(10, options.GlobalDailyLimit);
+    }
+
+    [Fact]
+    public void AddInfrastructure_InvalidAdmissionPolicyFailsStartupInProduction()
+    {
+        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddInfrastructure(CreateConfiguration(new()
+        { ["ASPNETCORE_ENVIRONMENT"] = "Production", ["ResearchAdmission:OwnerOutstandingLimit"] = "0" })));
+    }
+
     [Fact]
     public void AddInfrastructure_RejectsHeartbeatIntervalAtOrAboveLeaseDuration()
     {

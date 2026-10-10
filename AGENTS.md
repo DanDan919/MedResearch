@@ -82,3 +82,5 @@ Use ADRs for significant architectural decisions. If a decision is replaced, mar
 55. External success bodies must have explicit byte caps and cancellation-aware read deadlines; HTTP 200 is not permission to buffer an unlimited response.
 56. Citation existence proves lineage, not entailment; authoritative report claims must have deterministically validated structured semantics and backend-rendered text.
 57. Model-authored numeric prose cannot override grounded Evidence or persisted quantitative artifact values; mixed Evidence cannot become a uniform effect, and insufficient Evidence is not evidence of no effect.
+58. Research creation must use the serialized PostgreSQL admission transaction: owner-scoped idempotency, quota reservation, Question and Run must commit atomically; never replace it with an in-process counter.
+59. Committed create replays precede new-admission limits. Terminal/expired-lease processing must not erase daily reservations; admission limits are not monetary budgets.

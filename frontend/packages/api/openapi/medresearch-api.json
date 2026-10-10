@@ -3228,6 +3228,20 @@
       },
       "post": {
         "operationId": "CreateResearch",
+        "parameters": [
+          {
+            "description": "Owner-scoped submission UUID. Reuse for retries of the same canonical question.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "maxLength": 36,
+              "minLength": 36,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3265,6 +3279,26 @@
           "403": {
             "description": "Invalid authenticated subject"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -3276,7 +3310,14 @@
             "description": "Internal Server Error"
           },
           "503": {
-            "description": "Research database temporarily unavailable"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "security": [

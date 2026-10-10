@@ -691,6 +691,44 @@ The result is nested under `QuantitativeSynthesisResult.RandomEffects` and proje
 
 M22 deliberately stopped before HKSJ. M23 implements canonical HKSJ summary-effect inference beside the Wald result. M24 implements a Cochrane-style random-effects prediction interval beside Wald and HKSJ. Modified/ad-hoc HKSJ, tau-squared confidence intervals, automatic model selection, p-values, subgroup analysis, meta-regression, publication-bias methods, forest plots, and broader effect families remain out of scope.
 
+## Atomic Research Admission
+
+The existing create path is `POST /api/research -> CreateResearchUseCase ->
+IResearchStore.PersistInitialResearchAsync -> EfResearchStore`. Identity comes
+only from the authenticated actor. Application validates the UUID and canonical
+trimmed question; Infrastructure owns the database serialization/ledger. Domain
+and scientific stage code have no quota/HTTP/persistence implementation added.
+
+One READ COMMITTED transaction acquires the database-wide transaction advisory
+lock `(1297237323, 1)` before reading admission state. It resolves the owner/key
+mapping first, then checks operator stop, owner/global outstanding, and
+owner/global daily limits. PostgreSQL `clock_timestamp()` is read after lock
+acquisition, so waiting across midnight and API replica clock skew do not use a
+stale transaction-start or application admission clock. The short transaction
+inserts Question, Queued Run and reservation together; exceptions/cancellation
+roll back all three. No transaction spans a scientific provider call.
+
+`research_admissions` contains the owner/key primary key, versioned SHA-256
+request fingerprint (not another question copy), unique run FK, and accepted
+timestamp. Daily windows are `[00:00 UTC, next 00:00 UTC)` and include terminal
+admissions plus pre-migration runs without reservations. Outstanding counts
+derive from authoritative nonterminal Run state, not an independent counter.
+Worker reclaim/fencing never writes the admission ledger.
+
+Terminal states release outstanding capacity but do not erase admission history.
+The ledger's restrictive Run FK prevents ordinary cascade deletion from silently
+refunding daily usage/replay history. Future deletion/retention requires an
+explicit policy; privileged manual database changes are outside this guarantee.
+All API writers must use this create transaction and all replicas must agree on
+configuration. A rolling mixed-policy deployment is not an atomic operator stop.
+
+The BFF forwards a validated UUID only on allowlisted create POST, retains its
+private token and CSRF boundary, and projects only allowlisted error codes into
+constant public messages. The form preserves its key for same-question retries
+within one mounted submission. Admission prevents duplicate accepted jobs, not
+exactly-once execution of external provider requests or guaranteed money limits.
+See ADR-033 for the serialization and accounting decisions.
+
 ## Quantitative Results Workspace V1
 
 F7 adds a frontend read-only workspace over the immutable F6 artifact endpoint. The route remains ResearchRun-scoped and TanStack Query keys include the run ID. Multiple artifact groups are selected explicitly; an empty artifact response is not treated as a zero estimate.

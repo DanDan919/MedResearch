@@ -15,7 +15,7 @@ export function useCreateResearch() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: CreateResearchRequest) => client.createResearch(request),
+    mutationFn: ({ idempotencyKey, ...request }: CreateResearchRequest & { idempotencyKey: string }) => client.createResearch(request, idempotencyKey),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.research.list() });
       queryClient.invalidateQueries({ queryKey: queryKeys.research.detail(response.researchRunId) });

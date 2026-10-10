@@ -1,5 +1,19 @@
 # Current State
 
+## SAAS-003 Atomic Research Admission
+
+Implemented bounded pilot admission in the existing create transaction with a
+PostgreSQL transaction advisory lock, immutable daily reservations and required
+owner-scoped UUID Idempotency-Key. Defaults owner/global outstanding 1/2 and daily
+2/10; invalid configuration fails startup. PostgreSQL UTC daily accounting never
+refunds terminal outcomes. Stop blocks only new work; all replicas need identical
+startup configuration. Existing scientific stages/worker fencing are unchanged.
+Backend-origin SDK/BFF/form are updated; legacy clients must supply the header.
+Read ADR-033 and `saas-003-atomic-research-admission-ru.md` for exact guarantees,
+red-before-green evidence, local results and pending final CI verification.
+Not a money budget: SAAS-002 cost/lifetime recovery bounds remain unresolved;
+Gate B/live scientific validation is not claimed.
+
 ## F19 Real Deployment Preparation
 
 F19 PREPARED - AWAITING OPERATOR CONFIGURATION. Gate A is complete.

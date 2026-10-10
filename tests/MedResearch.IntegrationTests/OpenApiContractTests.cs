@@ -20,6 +20,11 @@ public sealed class OpenApiContractTests
         if (Environment.GetEnvironmentVariable("MEDRESEARCH_UPDATE_OPENAPI") == "true")
             await File.WriteAllTextAsync(snapshot, actual.ToJsonString(new() { WriteIndented = true }) + "\n");
         var expected = Normalize(JsonNode.Parse(await File.ReadAllTextAsync(snapshot))!);
+        var create = actual["paths"]!["/api/research"]!["post"]!;
+        var key = create["parameters"]!.AsArray().Single(parameter => parameter!["name"]!.GetValue<string>() == "Idempotency-Key")!;
+        Assert.True(key["required"]!.GetValue<bool>());
+        Assert.Equal("uuid", key["schema"]!["format"]!.GetValue<string>());
+        foreach (var status in new[] { "400", "409", "429", "503" }) Assert.NotNull(create["responses"]![status]);
         Assert.True(JsonNode.DeepEquals(expected, actual), "Backend OpenAPI drift: regenerate the canonical snapshot with MEDRESEARCH_UPDATE_OPENAPI=true, review, then pnpm api:generate.");
         foreach (var path in actual["paths"]!.AsObject().Where(path => path.Key.StartsWith("/api/research", StringComparison.Ordinal)))
             foreach (var operation in path.Value!.AsObject()) Assert.NotNull(operation.Value!["security"]);

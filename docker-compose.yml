@@ -28,6 +28,11 @@ services:
       Authentication__Audience: ${AUTHENTICATION_AUDIENCE:-}
       ConnectionStrings__MedResearch: Host=postgres;Port=5432;Database=${POSTGRES_DB:-medresearch};Username=${POSTGRES_USER:-medresearch};Password=${POSTGRES_PASSWORD:-medresearch_dev_password}
       Database__ApplyMigrationsOnStartup: "true"
+      ResearchAdmission__OwnerOutstandingLimit: ${RESEARCH_ADMISSION_OWNER_OUTSTANDING_LIMIT:-1}
+      ResearchAdmission__GlobalOutstandingLimit: ${RESEARCH_ADMISSION_GLOBAL_OUTSTANDING_LIMIT:-2}
+      ResearchAdmission__OwnerDailyLimit: ${RESEARCH_ADMISSION_OWNER_DAILY_LIMIT:-2}
+      ResearchAdmission__GlobalDailyLimit: ${RESEARCH_ADMISSION_GLOBAL_DAILY_LIMIT:-10}
+      ResearchAdmission__StopNewAdmissions: ${RESEARCH_ADMISSION_STOP_NEW_ADMISSIONS:-false}
       ResearchProcessing__Enabled: "true"
       ResearchProcessing__IdleDelayMilliseconds: "1000"
       ResearchProcessing__LeaseDurationSeconds: ${RESEARCH_PROCESSING_LEASE_DURATION_SECONDS:-900}

@@ -1,5 +1,49 @@
 # MedResearch
 
+## Atomic Research Admission (SAAS-003)
+
+`POST /api/research` now requires `Idempotency-Key: <non-empty UUID>`.
+Generate one random key per deliberate submission and reuse it with the same
+trimmed question after a lost/ambiguous response. Same owner/key/question returns
+the original 201/Queued creation response and Location, even after processing;
+GET the run for its current status. Different question with that key returns 409.
+Keys are owner-scoped, never an authorization credential. Existing API clients
+must supply this header; the SDK's `createResearch` takes it explicitly.
+
+Pilot .NET settings (environment variables use `ResearchAdmission__...`):
+
+| Setting | Default |
+| --- | --- |
+| OwnerOutstandingLimit | 1 |
+| GlobalOutstandingLimit | 2 |
+| OwnerDailyLimit | 2 |
+| GlobalDailyLimit | 10 |
+| StopNewAdmissions | false |
+
+Every numeric limit must be 1..10000, with owner limits no greater than their
+global equivalents. Missing configuration keeps these defaults; invalid
+configuration prevents startup. Compose aliases are in `.env.example`.
+Restart **all API replicas with the same policy** to change limits/stop; this is
+not a shared dynamic admin switch. Stop blocks new work, not committed replays,
+reads or already-running work.
+
+Queued and every nonterminal stage consume outstanding capacity, even with an
+expired lease. Daily accepted work is counted in PostgreSQL UTC calendar days;
+Completed/Failed/Cancelled or an insufficient report do not refund it. Existing
+pre-migration runs also count. Admission uses one short serialized PostgreSQL
+transaction, with no scientific HTTP/LLM call. Typed ProblemDetails `code` values
+separate invalid key (400), key conflict (409), quota/capacity (429), and stop
+(503). Database outages retain the existing operational error contract.
+
+The form retains the key for retries while mounted; changing the question or
+opening a fresh form starts another submission. Reload recovery is **not**
+implemented. SDK consumers must retain their key themselves.
+See [ADR-033](docs/architecture/decisions/ADR-033-atomic-research-admission.md)
+and [Russian verification report](docs/development/saas-003-atomic-research-admission-ru.md).
+Admission count is **not a dollar budget**: token/cost accounting, per-run spend
+ceilings and cumulative recovered-work limits remain SAAS-002 work. Public
+unlimited live use is not financially safe.
+
 ## Web Release Candidate (F18)
 
 The web app has standalone Node/Docker packaging, an actual-backend OpenAPI

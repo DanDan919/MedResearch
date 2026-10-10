@@ -2,9 +2,9 @@ using MedResearch.Domain;
 
 namespace MedResearch.Application.Research;
 
-public sealed record CreateResearchCommand(string? Question);
+public sealed record CreateResearchCommand(string? Question, string? IdempotencyKey);
 
-public sealed record CreateResearchResult(Guid ResearchRunId, string Status);
+public sealed record CreateResearchResult(Guid ResearchRunId, string Status, bool Replayed = false);
 
 public sealed record ResearchRunDetails(
     Guid ResearchRunId,

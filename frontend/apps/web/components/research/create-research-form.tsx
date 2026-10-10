@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Textarea } from "@medresearch/ui";
@@ -14,9 +14,12 @@ export function CreateResearchForm() {
   const [question, setQuestion] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const mutation = useCreateResearch();
+  const submission = useRef<{ question: string; key: string } | null>(null);
+  const inFlight = useRef(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     const trimmed = question.trim();
     if (trimmed.length < minimumQuestionLength) {
       setValidationError("Enter a specific research question before starting a run.");
@@ -24,12 +27,15 @@ export function CreateResearchForm() {
     }
 
     setValidationError(null);
+    if (submission.current?.question !== trimmed)
+      submission.current = { question: trimmed, key: crypto.randomUUID() };
+    inFlight.current = true;
     try {
-      const response = await mutation.mutateAsync({ question: trimmed });
+      const response = await mutation.mutateAsync({ question: trimmed, idempotencyKey: submission.current.key });
       router.push(`/research/${response.researchRunId}`);
     } catch {
       // The mutation error is rendered below as the user-facing outcome.
-    }
+    } finally { inFlight.current = false; }
   }
 
   const backendError =
@@ -60,6 +66,7 @@ export function CreateResearchForm() {
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="Does chronic sleep deprivation impair working memory in adults?"
             rows={6}
+            maxLength={1000}
             disabled={mutation.isPending}
           />
           {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}

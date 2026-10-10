@@ -5,6 +5,8 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using MedResearch.Api.Research;
+using MedResearch.Application.Research.Admission;
+using MedResearch.Infrastructure.Research;
 using MedResearch.Api.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -67,13 +69,13 @@ public sealed class JwtPostgreSqlOwnershipTests(PostgreSqlFixture fixture)
     public async Task SignedJwtUsers_AreIsolatedByActualPostgreSqlStores()
     {
         Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
-        using var factory = new JwtApiFactory(fixture.ConnectionString);
+        using var factory = new JwtApiFactory(fixture.ConnectionString, sharedFixtureLimits: true);
         using var owner = factory.CreateClient();
         using var other = factory.CreateClient();
         owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", factory.Token("valid", "UserA-" + Guid.NewGuid()));
         other.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", factory.Token("valid", "UserB-" + Guid.NewGuid()));
         other.DefaultRequestHeaders.Add("X-Owner-Id", "UserA");
-        var created = await owner.PostAsJsonAsync("/api/research", new CreateResearchRequest("JWT owner isolation test"));
+        var created = await owner.PostResearchAsync(new CreateResearchRequest("JWT owner isolation test"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var run = (await created.Content.ReadFromJsonAsync<CreateResearchResponse>())!;
         foreach (var suffix in new[] { "", "/progress", "/report", "/quantitative", "/provenance" })
@@ -90,7 +92,8 @@ public sealed class JwtPostgreSqlOwnershipTests(PostgreSqlFixture fixture)
 }
 
 // Only the metadata source/key is synthetic; the production JWT handler and policy remain intact.
-internal sealed class JwtApiFactory(string? connectionString = null) : WebApplicationFactory<Program>
+internal sealed class JwtApiFactory(string? connectionString = null, bool sharedFixtureLimits = false,
+    ResearchAdmissionOptions? admissionOptions = null, IResearchAdmissionClock? admissionClock = null) : WebApplicationFactory<Program>
 {
     private const string Issuer = "https://synthetic-issuer.example.org/";
     private const string Audience = "medresearch-api";
@@ -121,9 +124,25 @@ internal sealed class JwtApiFactory(string? connectionString = null) : WebApplic
         builder.UseSetting("Database:ApplyMigrationsOnStartup", "false");
         builder.UseSetting("ResearchProcessing:Enabled", "false");
         builder.UseSetting("AI:Provider", "OpenAI");
+        if (sharedFixtureLimits)
+            foreach (var limit in new[] { "OwnerOutstandingLimit", "GlobalOutstandingLimit", "OwnerDailyLimit", "GlobalDailyLimit" })
+                builder.UseSetting("ResearchAdmission:" + limit, "10000");
+        if (admissionOptions is not null)
+        {
+            builder.UseSetting("ResearchAdmission:OwnerOutstandingLimit", admissionOptions.OwnerOutstandingLimit.ToString());
+            builder.UseSetting("ResearchAdmission:GlobalOutstandingLimit", admissionOptions.GlobalOutstandingLimit.ToString());
+            builder.UseSetting("ResearchAdmission:OwnerDailyLimit", admissionOptions.OwnerDailyLimit.ToString());
+            builder.UseSetting("ResearchAdmission:GlobalDailyLimit", admissionOptions.GlobalDailyLimit.ToString());
+            builder.UseSetting("ResearchAdmission:StopNewAdmissions", admissionOptions.StopNewAdmissions.ToString());
+        }
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
+            if (admissionClock is not null)
+            {
+                services.RemoveAll<IResearchAdmissionClock>();
+                services.AddSingleton(admissionClock);
+            }
             services.PostConfigure<JwtBearerOptions>(AuthenticationConfiguration.JwtScheme, options =>
             {
                 var metadata = new OpenIdConnectConfiguration { Issuer = Issuer };

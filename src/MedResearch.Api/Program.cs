@@ -4,6 +4,7 @@ using MedResearch.Api;
 using MedResearch.Domain;
 using MedResearch.Application.DependencyInjection;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Admission;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
 using MedResearch.Application.Research.Provenance;
@@ -54,6 +55,7 @@ app.UseExceptionHandler(errorApp =>
 
         var (statusCode, title) = exception switch
         {
+            ResearchAdmissionException admission => (ResearchAdmissionProblems.Describe(admission.Failure).Status, ResearchAdmissionProblems.Describe(admission.Failure).Title),
             DbException { IsTransient: true } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
             Exception { InnerException: DbException { IsTransient: true } } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
             DbException or Exception { InnerException: DbException } => (StatusCodes.Status500InternalServerError, "An unexpected error occurred"),
@@ -61,7 +63,13 @@ app.UseExceptionHandler(errorApp =>
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
 
-        if (statusCode >= StatusCodes.Status500InternalServerError)
+        if (exception is ResearchAdmissionException admissionFailure)
+        {
+            logger.LogInformation("Research admission refused. AdmissionOutcome: {AdmissionOutcome}", admissionFailure.Failure);
+            if (admissionFailure.RetryAfterSeconds is int retryAfter)
+                context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        else if (statusCode >= StatusCodes.Status500InternalServerError)
         {
             logger.LogError(exception, "Unhandled exception while processing HTTP request.");
         }
@@ -71,10 +79,13 @@ app.UseExceptionHandler(errorApp =>
         }
 
         context.Response.StatusCode = statusCode;
+        context.Response.Headers.CacheControl = "private, no-store";
         await Results.Problem(
             title: title,
             statusCode: statusCode,
-            extensions: statusCode == StatusCodes.Status400BadRequest
+            extensions: exception is ResearchAdmissionException rejection
+                ? new Dictionary<string, object?> { ["code"] = ResearchAdmissionProblems.Describe(rejection.Failure).Code }
+                : statusCode == StatusCodes.Status400BadRequest
                 ? new Dictionary<string, object?> { ["error"] = exception?.Message }
                 : null)
             .ExecuteAsync(context);
@@ -108,10 +119,11 @@ var research = app.MapGroup("/api/research")
 
 research.MapPost("/", async (
         CreateResearchRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CreateResearchUseCase useCase,
         CancellationToken cancellationToken) =>
     {
-        var result = await useCase.ExecuteAsync(new CreateResearchCommand(request.Question), cancellationToken);
+        var result = await useCase.ExecuteAsync(new CreateResearchCommand(request.Question, idempotencyKey), cancellationToken);
         var response = new CreateResearchResponse(result.ResearchRunId, result.Status);
 
         return Results.Created($"/api/research/{result.ResearchRunId}", response);
@@ -120,6 +132,9 @@ research.MapPost("/", async (
     .Accepts<CreateResearchRequest>("application/json")
     .Produces<CreateResearchResponse>(StatusCodes.Status201Created)
     .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+    .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+    .Produces<ProblemDetails>(StatusCodes.Status429TooManyRequests)
+    .Produces<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)
     .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
 research.MapGet("/", async (

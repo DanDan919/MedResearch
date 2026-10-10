@@ -68,7 +68,7 @@ public sealed partial class FullFakePipelineTests
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
 
-        var createResponse = await client.PostAsJsonAsync("/api/research", new CreateResearchRequest(question));
+        var createResponse = await client.PostResearchAsync(new CreateResearchRequest(question));
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await createResponse.Content.ReadFromJsonAsync<CreateResearchResponse>();
         Assert.NotNull(created);
@@ -275,6 +275,8 @@ public sealed partial class FullFakePipelineTests
             builder.UseEnvironment("Development");
             builder.UseSetting("Authentication:Mode", "DevelopmentLocal");
             builder.UseSetting("Authentication:DevelopmentSubject", _subject);
+            foreach (var limit in new[] { "OwnerOutstandingLimit", "GlobalOutstandingLimit", "OwnerDailyLimit", "GlobalDailyLimit" })
+                builder.UseSetting("ResearchAdmission:" + limit, "10000");
             builder.ConfigureLogging(logging => logging.AddProvider(LogProvider));
             builder.ConfigureAppConfiguration(configuration =>
             {

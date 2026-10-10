@@ -54,6 +54,16 @@ internal static class ApiOpenApiConfiguration
                     operation.Value.Responses.TryAdd("401", new OpenApiResponse { Description = "Authentication required" });
                     operation.Value.Responses.TryAdd("403", new OpenApiResponse { Description = "Invalid authenticated subject" });
                     operation.Value.Responses.TryAdd("503", new OpenApiResponse { Description = "Research database temporarily unavailable" });
+                    if (route == "/api/research" && description.HttpMethod == "POST")
+                    {
+                        var header = operation.Value.Parameters?.OfType<OpenApiParameter>().Single(parameter => parameter.Name == "Idempotency-Key");
+                        if (header is not null)
+                        {
+                            header.Required = true;
+                            header.Description = "Owner-scoped submission UUID. Reuse for retries of the same canonical question.";
+                            header.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid", MinLength = 36, MaxLength = 36 };
+                        }
+                    }
                 }
             }
             return Task.CompletedTask;

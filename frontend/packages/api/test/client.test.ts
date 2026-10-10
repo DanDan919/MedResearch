@@ -2,6 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 import { MedResearchApiClient } from "../src/client";
 
 describe("MedResearchApiClient research history", () => {
+  it("sends the caller's stable key on create, outside the JSON body", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => jsonResponse({ researchRunId: "11111111-1111-4111-8111-111111111111", status: "Queued" }));
+    const client = new MedResearchApiClient({ baseUrl: "https://api.example.test", fetch: fetchMock });
+    const key = "22222222-2222-4222-8222-222222222222";
+    await client.createResearch({ question: "Scientific question" }, key);
+    await client.createResearch({ question: "Scientific question" }, key);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(key);
+      expect(JSON.parse(init?.body as string)).toEqual({ question: "Scientific question" });
+    }
+  });
+
+  it("classifies quota separately from scientific or generic server failure", async () => {
+    const client = new MedResearchApiClient({ fetch: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ title: "Daily limit", status: 429, code: "admission-owner-daily" }, { status: 429 })) });
+    await expect(client.createResearch({ question: "Scientific question" }, "22222222-2222-4222-8222-222222222222")).rejects.toMatchObject({ kind: "quota", status: 429, problem: { code: "admission-owner-daily" } });
+  });
   it("adds a bearer token through the centralized transport option", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }));
     const client = new MedResearchApiClient({

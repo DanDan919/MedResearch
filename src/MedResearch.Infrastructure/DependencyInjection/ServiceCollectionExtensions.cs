@@ -1,5 +1,6 @@
 using System.Globalization;
 using MedResearch.Application.Research;
+using MedResearch.Application.Research.Admission;
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
@@ -49,6 +50,10 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString));
         services.AddDbContextFactory<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString), ServiceLifetime.Scoped);
 
+        var admissionOptions = configuration.GetSection("ResearchAdmission").Get<ResearchAdmissionOptions>() ?? new();
+        admissionOptions.Validate();
+        services.AddSingleton(admissionOptions);
+        services.AddSingleton<IResearchAdmissionClock, PostgreSqlResearchAdmissionClock>();
         services.AddScoped<IResearchStore, EfResearchStore>();
         services.AddScoped<IResearchProgressStore, EfResearchProgressStore>();
         services.AddScoped<IResearchProvenanceStore, EfResearchProvenanceStore>();
