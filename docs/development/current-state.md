@@ -9,8 +9,14 @@ owner-scoped UUID Idempotency-Key. Defaults owner/global outstanding 1/2 and dai
 refunds terminal outcomes. Stop blocks only new work; all replicas need identical
 startup configuration. Existing scientific stages/worker fencing are unchanged.
 Backend-origin SDK/BFF/form are updated; legacy clients must supply the header.
+SAAS-003 COMPLETE - DETERMINISTIC: implementation
+`6f918b7dd69eff8401aa05b7098159135cb877ff`, CI `38078055334` SUCCESS.
+642 backend cases passed, 0 failed/skipped, including 132 real PostgreSQL cases
+and separate OS API-process admission tests. All frontend and actual API/PG/HTTPS
+browser/container gates passed. Local Docker remains unavailable: 510 passed,
+132 honest skips; SDK 42/Web 122, Chromium 15/17 passed locally. No live providers.
 Read ADR-033 and `saas-003-atomic-research-admission-ru.md` for exact guarantees,
-red-before-green evidence, local results and pending final CI verification.
+red-before-green evidence, UTC/replay/rollback tests and verification boundaries.
 Not a money budget: SAAS-002 cost/lifetime recovery bounds remain unresolved;
 Gate B/live scientific validation is not claimed.
 

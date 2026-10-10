@@ -167,9 +167,75 @@ audit: production 0 advisories; прежний dev-only HIGH braces остаёт
 stale empty-key assertion и ожидаемый drift были устранены rebuild/generation,
 не ослаблением assertions/gates.
 
-CI verification pending на момент implementation commit: COMPLETE пока не заявлен.
-Настоящие внешние scientific/paid API не вызывались. Real deployment Gate B и
-production IdP этим milestone не подтверждены.
+## Финальная CI-проверка 2026-10-11
+
+SAAS-003 COMPLETE - DETERMINISTIC на уровне реализации и проверенных гарантий.
+Implementation commit: 6f918b7dd69eff8401aa05b7098159135cb877ff,
+`feat: add atomic research admission limits`, push в origin/main успешен.
+CI [38078055334](https://github.com/DanDan919/MedResearch/actions/runs/38078055334)
+завершён SUCCESS. Все три jobs прошли: Build and test, Frontend,
+Actual API PostgreSQL HTTPS web RC. CI fixes не потребовались.
+Runner ubuntu-latest, .NET 10.0.x, Node 24.x, frozen pnpm 11.19.0; локально
+доступный pnpm 11.25.0 тоже использовал неизменённый lockfile.
+
+Backend counters независимо прочитаны из публичных check annotations
+(check 114289077954), а не перенесены из локальных skips:
+
+| Suite | Executed | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: | ---: |
+| Domain | 45 | 45 | 0 | 0 |
+| Application | 301 | 301 | 0 | 0 |
+| Infrastructure | 112 | 112 | 0 | 0 |
+| Integration | 184 | 184 | 0 | 0 |
+| Итого backend | 642 | 642 | 0 | 0 |
+
+132 PostgreSQL/Testcontainers cases являются подмножеством Integration, не
+добавляются к общему числу второй раз. Это 103 прежних случая + 29 admission cases.
+Все выполнены: strict MEDRESEARCH_REQUIRE_DOCKER_TESTS=true запрещает skips,
+полный Integration TRX подтверждает 184 executed/184 passed/0 skipped.
+В том числе SeparateApiProcesses_SameOwner_AtomicCapAndReplay и
+SeparateApiProcesses_DifferentOwners_AtomicGlobalCap: настоящие отдельные
+процессы dotnet API, одна мигрированная PostgreSQL БД, разные подключения.
+
+Наблюдённый green: 10 parallel owner requests -> 1 принят/9 rejected; четыре
+owners/two hosts -> 2 приняты/2 rejected; 10 same-key retries -> один Run/reservation;
+OS-process global case -> 2 приняты/1 rejected. UTC midnight, terminal daily
+без refund, stop/replay, DB FK/PK/unique constraints, rollback/cancellation и
+worker reclaim/stale-owner fence прошли тем же настоящим PostgreSQL suite.
+
+Docker info, fresh PostgreSQL migration application, EF pending-model и Compose
+config gates прошли. Fresh fixture применяет все миграции к пустой БД, migration
+test сравнивает configured/applied history и требует отсутствие pending migrations.
+Не только EnsureCreated или уже готовая schema.
+
+Frontend CI: frozen install, unfiltered dependency audit, backend-origin API
+generation/drift, offline preflight, lint/typecheck/unit tests, scientific/hydration
+Chromium, production Next build, synthetic OIDC Chromium и desktop React shell
+build - SUCCESS. Локально их непосредственно измеренные totals: SDK 42/Web 122,
+scientific Chromium 15, production OIDC Chromium 17, offline controls 40/security 5.
+Публичная выдача raw frontend job logs требует авторизацию (HTTP 403), поэтому
+эти локальные счётчики не выдаются за независимо скачанные CI machine counters.
+Успех конкретных CI steps проверен через публичный GitHub jobs API.
+
+Actual API/PostgreSQL/trusted HTTPS browser gate - SUCCESS (17 сценариев в
+нефильтрованной конфигурации). Сценарий create дополнен required key, lost-response
+replay того же Run, conflict 409, missing key 400 и UI outstanding quota без
+перехода в scientific failure. JWT A/B isolation, CSRF, logout/expiry, 45 populated
+route/viewport checks, outage injection и container builds не ослаблены.
+Публичные raw full-stack logs также 403; CI job outcome/steps непосредственно
+проверены, точные внутренние machine counters из artifact не скачивались.
+
+Staged diff проверен до implementation commit, git diff --check passed.
+Science calculators/stages, Domain lifecycle, JWT policy и прежние migrations
+не изменены. Secrets scan staged additions нашёл только документацию и synthetic
+forged bearer assertions, не credentials. .env не добавлен; dependency versions
+не менялись. Прежние Node-action/ubuntu-latest notices не являются test failure.
+
+Настоящие внешние scientific/paid API не вызывались. Real deployment Gate B,
+production IdP и OpenAI runtime этим milestone не подтверждены.
+После этой проверки результат записан отдельным docs-only follow-up commit;
+код реализации не переписывался, force-push/amend не применялись. Проверка его
+финального HEAD сообщается в итоговом ответе, не предполагается заранее.
 
 ## Остаточные риски и ровно одна следующая задача
 
