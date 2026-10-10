@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MedResearch.Application.Research.Extraction;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -130,7 +131,9 @@ public sealed class ResearchRunProcessor
 
             var markedFailed = await _researchRunQueue.MarkFailedAsync(
                 claimedRun,
-                SafeFailureReason,
+                run.Status == ResearchRunStatus.Extracting && exception is EvidenceGroundingValidationException
+                    ? "Evidence extraction could not verify a unique source quotation. Unverified findings were not accepted."
+                    : SafeFailureReason,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
 

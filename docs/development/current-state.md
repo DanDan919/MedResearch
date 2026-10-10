@@ -1,5 +1,29 @@
 # Current State
 
+## Local Extraction Diagnostics Follow-Up (2026-10-11)
+
+The current extractor prompt is `evidence-extractor-v4-literal-quotes`:
+one contiguous unique literal excerpt, preserving markup, punctuation, units
+and source typos. Indexed typed repair issues distinguish absent from repeated
+quotes. The same exact-source/tuple validator and default one-repair budget
+remain authoritative; unsupported findings are not accepted. This is a prompt
+and diagnostics improvement, not a demonstrated live LLM success.
+
+Worker grounding failures in Extracting now persist a fixed safe reason without
+raw model/provider content. Historical generic failures are not rewritten.
+Terminal progress no longer treats SourceMaterial presence alone as completed
+extraction. Exact failed-stage history and partial-stage completion still cannot
+be reconstructed from output counters alone; see technical debt.
+
+Local validation: build 0 warnings/errors; Domain 45, Application 314,
+Infrastructure 136, Integration 52 passed/133 unavailable-Docker skips,
+0 failures. Targeted grounding/processing/progress regression: 61 passed.
+Six new cases failed before production edits; four negative controls already
+passed. EF reports no pending model changes; Compose config passes. Read-only
+local API/DB and installed-Chrome desktop/mobile smoke passed with zero browser
+console/page errors; the historical failed run and zero extractions are retained.
+New live research was NOT RUN. CI verification is recorded after push.
+
 ## Search Query Contract Correction (2026-10-11)
 
 Starting HEAD `d14d4abeaccb74470473489e918699147f360066`, clean main.

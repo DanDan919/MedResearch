@@ -1,5 +1,22 @@
 # Technical Debt
 
+## Literal Extraction Quotes And Terminal Progress (2026-10-11)
+
+Live Codex CLI responses can still fail exact-source quotation validation after
+the bounded replacement attempt. v4 instructions and indexed repair guidance
+do not guarantee model obedience. Some provider abstracts contain literal HTML
+and source typographical errors; existing immutable snapshots and anchor
+normalization must not be rewritten or made fuzzy to accept model edits.
+Rejected raw candidates remain deliberately unpersisted, so a historical exact
+quote mismatch cannot be reconstructed from safe issue metadata alone.
+
+Terminal stage projections infer recorded output from counters, not a persisted
+stage-completion/failure journal. SourceMaterial alone no longer completes
+Extracting, but a partly persisted set of extractions/evaluations/searches still
+cannot prove that the entire stage completed. Exact failed stage and partial vs
+complete output need a separate focused execution-history decision; do not infer
+them from a stack trace or an invented progress percentage.
+
 ## Query Compatibility And Topic Relevance (2026-10-11)
 
 The Europe PMC query bridge supports Title/Abstract/tiab and Title/ti only.

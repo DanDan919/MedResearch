@@ -117,7 +117,7 @@ public sealed class GetResearchProgressUseCase
             ResearchRunStatus.Queued => true,
             ResearchRunStatus.Planning => metrics.ResearchPlanCount > 0,
             ResearchRunStatus.Searching => metrics.LiteratureSearchCount > 0 || metrics.DiscoveryPathCount > 0,
-            ResearchRunStatus.Extracting => metrics.CurrentSourceMaterialCount > 0 || metrics.EvidenceExtractionCount > 0,
+            ResearchRunStatus.Extracting => metrics.EvidenceExtractionCount > 0,
             ResearchRunStatus.Evaluating => metrics.EvidenceEvaluationCount > 0,
             ResearchRunStatus.Synthesizing => metrics.ResearchReportCount > 0,
             ResearchRunStatus.Completed => snapshotTerminalCompleted(metrics),

@@ -6,7 +6,7 @@ namespace MedResearch.Application.Research.Extraction;
 
 public static class EvidenceExtractionPrompt
 {
-    public const string Version = "evidence-extractor-v3-bound-tuples";
+    public const string Version = "evidence-extractor-v4-literal-quotes";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "evidence_extraction",
@@ -51,7 +51,7 @@ public static class EvidenceExtractionPrompt
                         {
                             outcome = NullableString("Reported outcome or endpoint, otherwise null.", 300),
                             resultSummary = NullableString("Concise reported result for this outcome, otherwise null.", 800),
-                            supportingText = NullableString("Verbatim excerpt from the supplied SourceMaterial supporting this finding.", 1000),
+                            supportingText = NullableString("One contiguous, unique verbatim excerpt from the exact supplied SourceMaterial supporting this finding; preserve literal markup, punctuation and source typos.", 1000),
                             direction = new
                             {
                                 type = new[] { "string", "null" },
@@ -110,6 +110,7 @@ public static class EvidenceExtractionPrompt
             The LLM is not a scientific source. Do not add background knowledge, causal interpretation, clinical advice, diagnoses, treatments, or conclusions beyond the supplied source text.
             Use null for absent data. Do not guess missing sample sizes, effect sizes, confidence intervals, confidence levels, standard errors, p-values, study designs, comparators, populations, or effect directions.
             supportingText must be a short verbatim excerpt from the supplied SourceMaterial. Do not paraphrase supportingText. For reported numeric findings, include the complete local statistical expression in supportingText, including the measure, estimate, confidence interval and p-value when they are reported together. Do not combine numbers from separate outcomes, populations, subgroups, timepoints, or sentences into one finding; use null when the local relationship is not explicit.
+            Copy supportingText as one contiguous passage that occurs exactly once in the literal supplied text, not a rendered or edited version. Preserve any markup inside the passage, punctuation, units and symbols. Do not correct source typos, remove intervening tags, concatenate separate passages, add ellipses or quotation marks, or rewrite statistical notation. Prefer an excerpt within a text section when it provides sufficient support. If no unique literal passage supports a finding, omit it; findings=[] is valid when no findings can be grounded.
             Include the exact outcome, population, intervention, comparator and timepoint context in the supporting excerpt where reported. Missing timepoint stays null. ResultSummary is an untrusted extraction description, not numeric authority for synthesis.
             Prefer reported findings only. If a confidence interval is reported with an explicit level, return the level as a fraction such as 0.95; otherwise keep confidenceLevel null. ReportedStandardError must be null unless the source directly reports SE/standard error. Preserve the exact p-value operator when one is reported. If a direction is not explicitly supported, use NotReported rather than inferring no effect.
             Return only the strict structured object requested by the schema.

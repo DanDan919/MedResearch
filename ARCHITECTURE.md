@@ -329,7 +329,15 @@ Flow: Study -> SourceMaterial snapshot -> EvidenceExtractor -> IStructuredLlmCli
 
 SourceMaterial is immutable scientific content identity: content is normalized only for line endings and outer whitespace, then hashed with SHA-256 over UTF-8. A changed provider representation creates a new version and leaves historical versions available for old extractions. Europe PMC structured full text is parsed only from the official bounded fullTextXML endpoint with DTD/entity resolution disabled. Abstract fallback is a scientific coverage decision, not a pipeline failure; no usable source produces a persisted NoExtractableText skip and no LLM call.
 
-The prompt version is `evidence-extractor-v3-bound-tuples`. Supporting excerpts resolve uniquely against the exact selected source using `source-text-v1`, including overlapping occurrences. Numeric proof retains canonical offsets/hash and source-derived case-preserving lexical text. Bare OR requires this lexical proof, not a case-folded English conjunction. `statistical-tuple-v1` selects one explicit signed measure/value with directly bound outcome reporting syntax, and binds CI/level, SE and p/operator through an attached statistical-expression grammar. Multiple plausible results are ambiguous; token presence or sentence proximity is insufficient. Participant counts need explicit enrollment/randomization/analysis/overall scope, not hospital/arm/subgroup counts. An n= label must directly bind the participant role, not coexist with a patient word. StructuredFullText is source coverage, not methodological quality. See ADR-029 for the grammar's conservative limits.
+The prompt version is `evidence-extractor-v4-literal-quotes`. Supporting excerpts resolve uniquely against the exact selected source using `source-text-v1`, including overlapping occurrences. Numeric proof retains canonical offsets/hash and source-derived case-preserving lexical text. Bare OR requires this lexical proof, not a case-folded English conjunction. `statistical-tuple-v1` selects one explicit signed measure/value with directly bound outcome reporting syntax, and binds CI/level, SE and p/operator through an attached statistical-expression grammar. Multiple plausible results are ambiguous; token presence or sentence proximity is insufficient. Participant counts need explicit enrollment/randomization/analysis/overall scope, not hospital/arm/subgroup counts. An n= label must directly bind the participant role, not coexist with a patient word. StructuredFullText is source coverage, not methodological quality. See ADR-029 for the grammar's conservative limits.
+
+Literal-quote instructions require one contiguous passage, not concatenated or
+rendered HTML text. The prompt forbids editing source typos, punctuation, units
+or intervening markup; model compliance is not assumed. Typed repair guidance names the rejected array index
+and distinguishes missing from repeated quotation; it contains only bounded
+server-authored instructions, not the rejected model payload. Unique grounding
+is still required after repair. Empty findings are allowed, but are not proof of
+scientific absence. This does not change immutable snapshots or anchor rules.
 
 Quantitative eligibility independently rechecks exact source membership, immutable content hash, known normalization, offsets/hash, source case, completed same-run/Study/extraction/scope lineage and required persisted facts. Intervention/comparator roles and outcome timepoint must be explicit. Missing intervention/timepoint is ineligible, never a wildcard. The `estimand-v2` key includes normalized outcome/population/comparator/design/measure/intervention/timepoint without fuzzy equivalence. M17-M24 formulas are unchanged for the same valid contributions. Old artifacts remain historical snapshots, not retroactively revalidated outputs.
 
@@ -506,6 +514,14 @@ Lifecycle fencing extends to stage output. The scoped worker claim is attached t
 ## Failure And Cancellation
 
 If processing fails, Application logs the full exception internally and asks Infrastructure to persist the run as `Failed` with a safe failure reason. The API can then observe the failed state through `GET /api/research/{researchRunId}`.
+
+An `EvidenceGroundingValidationException` during Extracting has a fixed safe
+reason explaining that a unique source quotation could not be verified;
+untrusted exception messages are not returned. Other failures retain the generic
+safe reason. Historical failures are not rewritten. Terminal progress must not
+mark extraction complete from SourceMaterial availability alone. Persisted
+output counters still do not reconstruct exact failed-stage history or prove
+all work in a partly persisted stage completed.
 
 OpenAI configuration failures, authentication failures, timeouts, rate limiting, network failures, malformed structured responses, and non-repairable validation failures follow the existing safe run failure path. Repairable extraction/synthesis validation failures get only the bounded replacement attempt described above; if the replacement is invalid, the same safe failure path is used. PubMed network failures, timeouts, rate limiting, invalid upstream responses, and parsing failures follow the same path. Host shutdown cancellation is propagated as cancellation and is not automatically recorded as a scientific processing failure.
 

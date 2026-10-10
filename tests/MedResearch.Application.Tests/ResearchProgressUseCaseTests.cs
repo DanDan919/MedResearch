@@ -85,6 +85,26 @@ public sealed class ResearchProgressUseCaseTests
         Assert.Equal("Current", result.Stages.Single(stage => stage.Stage == "Searching").State);
     }
 
+    [Theory]
+    [InlineData(ResearchRunStatus.Failed)]
+    [InlineData(ResearchRunStatus.Cancelled)]
+    public async Task ExecuteAsync_TerminalRunWithOnlySourceMaterialsDoesNotCompleteExtraction(ResearchRunStatus status)
+    {
+        var runId = Guid.NewGuid();
+        var store = new FakeProgressStore(new ResearchRunProgressSnapshot(
+            runId, "Does source availability prove extraction?", status,
+            DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddMinutes(-4),
+            DateTimeOffset.UtcNow, null, null, null, 1,
+            Metrics(currentSourceMaterialCount: 6, abstractMaterialCount: 6)));
+
+        var result = await new GetResearchProgressUseCase(store, new TestCurrentActor())
+            .ExecuteAsync(runId, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("Pending", result.Stages.Single(stage => stage.Stage == "Extracting").State);
+        Assert.Equal(0, result.Metrics.EvidenceExtractionCount);
+    }
+
     private static ResearchRunProgressMetrics Metrics(
         int researchPlanCount = 0,
         int plannedSearchQueryCount = 0,

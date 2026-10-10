@@ -1,4 +1,5 @@
 using MedResearch.Domain;
+using MedResearch.Application.Research.Validation;
 
 namespace MedResearch.Application.Research.Extraction;
 
@@ -56,8 +57,9 @@ public sealed class EvidenceExtractionDraftValidator
         var accepted = new List<AcceptedEvidenceFinding>(findings.Length);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var finding in findings)
+        for (var index = 0; index < findings.Length; index++)
         {
+            var finding = findings[index];
             var outcome = NormalizeRequired(finding.Outcome, "Evidence outcome is required.", 300);
             var resultSummary = NormalizeRequired(finding.ResultSummary, "Evidence result summary is required.", 800);
             var supportingText = NormalizeRequired(finding.SupportingText, "Evidence supporting text is required.", 1_000);
@@ -65,7 +67,16 @@ public sealed class EvidenceExtractionDraftValidator
             var anchorResolution = _sourceAnchorResolver.Resolve(context.SourceMaterialId!.Value, context.SourceContent, supportingText);
             if (anchorResolution.Status != NumericGroundingStatus.Verified || anchorResolution.Anchor is null)
             {
-                throw new EvidenceGroundingValidationException(anchorResolution.Reason ?? "Supporting text could not be uniquely anchored to SourceMaterial.");
+                var correction = anchorResolution.Status == NumericGroundingStatus.Ambiguous
+                    ? "The excerpt occurs more than once in the supplied SourceMaterial. Include enough adjacent source text to identify one unique occurrence."
+                    : "The excerpt does not occur in the supplied SourceMaterial. Copy one contiguous excerpt literally, preserving markup, punctuation, units and source typos; do not join separate passages or add ellipses.";
+                throw new EvidenceGroundingValidationException(
+                    anchorResolution.Reason ?? "Supporting text could not be uniquely anchored to SourceMaterial.",
+                    new ValidationIssue(
+                        ValidationIssueCodes.SupportingTextNotGrounded,
+                        $"findings[{index}].supportingText",
+                        correction + " Omit the finding if a unique supporting excerpt is unavailable; findings=[] is allowed. Do not invent a replacement quotation.",
+                        ValidationIssueDisposition.Repairable));
             }
 
             var numericGrounding = _numericGroundingVerifier.Verify(finding, anchorResolution.Anchor);

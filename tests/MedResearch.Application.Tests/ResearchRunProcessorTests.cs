@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research.Extraction;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -108,6 +109,38 @@ public sealed class ResearchRunProcessorTests
         Assert.True(queue.ReleaseLeaseWasCalled);
     }
 
+    [Fact]
+    public async Task ProcessNextQueuedRunAsync_GroundingFailureHasSafeActionableReason()
+    {
+        var run = CreateClaimedRun();
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
+        var executor = new RecordingStageExecutor(ResearchRunStatus.Extracting,
+            new EvidenceGroundingValidationException("Untrusted detail: raw source, provider secret, local path"));
+        var processor = new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance);
+
+        await processor.ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
+
+        Assert.Equal(ResearchRunStatus.Failed, run.Status);
+        Assert.Equal("Evidence extraction could not verify a unique source quotation. Unverified findings were not accepted.", run.FailureReason);
+        Assert.DoesNotContain("Untrusted detail", run.FailureReason);
+        Assert.DoesNotContain(ResearchRunStatus.Evaluating, queue.SavedStatuses);
+        Assert.True(queue.MarkFailedWasCalled);
+    }
+
+    [Fact]
+    public async Task ProcessNextQueuedRunAsync_GroundingExceptionOutsideExtractionDoesNotMisidentifyStage()
+    {
+        var run = CreateClaimedRun();
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
+        var executor = new RecordingStageExecutor(ResearchRunStatus.Planning,
+            new EvidenceGroundingValidationException("Untrusted exception message"));
+        var processor = new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance);
+
+        await processor.ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
+
+        Assert.Equal("Research processing failed.", run.FailureReason);
+    }
+
     private static ResearchRun CreateClaimedRun()
     {
         var run = new ResearchRun(Guid.NewGuid(), DateTimeOffset.UtcNow);
@@ -184,10 +217,12 @@ public sealed class ResearchRunProcessorTests
     private sealed class RecordingStageExecutor : IResearchStageExecutor
     {
         private readonly ResearchRunStatus? _stageToFail;
+        private readonly Exception? _failure;
 
-        public RecordingStageExecutor(ResearchRunStatus? stageToFail = null)
+        public RecordingStageExecutor(ResearchRunStatus? stageToFail = null, Exception? failure = null)
         {
             _stageToFail = stageToFail;
+            _failure = failure;
         }
 
         public List<ResearchStageExecutionContext> Contexts { get; } = [];
@@ -198,7 +233,7 @@ public sealed class ResearchRunProcessorTests
 
             if (context.Stage == _stageToFail)
             {
-                throw new InvalidOperationException("Synthetic stage failure for processor testing.");
+                throw _failure ?? new InvalidOperationException("Synthetic stage failure for processor testing.");
             }
 
             return Task.CompletedTask;

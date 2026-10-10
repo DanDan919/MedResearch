@@ -134,6 +134,76 @@ public sealed class EvidenceExtractorTests
     }
 
     [Fact]
+    public async Task ExtractAsync_RepairIdentifiesExactFindingAndPreservesMarkupSource()
+    {
+        const string source = "Recall improved after sleep.<h4>Results</h4>Accuracy was 42%.";
+        var first = new EvidenceFindingDraft("recall", "Recall improved.", "Recall improved after sleep.",
+            "Positive", null, null, null, null, null, null, null, null, null, null);
+        var invalid = new EvidenceFindingDraft("accuracy", "Accuracy was reported.",
+            "Recall improved after sleep. Accuracy was 42%.",
+            "NotReported", null, null, null, null, null, null, null, null, null, null);
+        var repaired = invalid with { SupportingText = "Accuracy was 42%." };
+        var llm = new SequenceStructuredLlmClient(new EvidenceExtractionDraft([first, invalid]),
+            new EvidenceExtractionDraft([first, repaired]));
+
+        var result = await CreateExtractor(llm).ExtractAsync(CreateContext(source), CancellationToken.None);
+
+        Assert.Equal(2, llm.CallCount);
+        Assert.Equal(2, result.Findings.Count);
+        Assert.Contains("Path=findings[1].supportingText", llm.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Contains("contiguous", llm.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Contains("markup", llm.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Contains(source, llm.Requests[0].UserPrompt, StringComparison.Ordinal);
+        Assert.Contains(source, llm.Requests[1].UserPrompt, StringComparison.Ordinal);
+        Assert.Equal(llm.Requests[0].OutputSchema, llm.Requests[1].OutputSchema);
+    }
+
+    [Fact]
+    public void Validate_RepeatedQuoteOffersDifferentRepairThanAbsentQuote()
+    {
+        var draft = new EvidenceExtractionDraft([
+            new EvidenceFindingDraft("recall", "Recall improved.", "Recall improved.",
+                "Positive", null, null, null, null, null, null, null, null, null, null)
+        ]);
+
+        var exception = Assert.Throws<EvidenceGroundingValidationException>(() =>
+            new EvidenceExtractionDraftValidator().Validate(CreateContext("Recall improved. Recall improved."), draft));
+
+        var issue = Assert.Single(exception.Issues);
+        Assert.Equal("findings[0].supportingText", issue.Path);
+        Assert.Contains("more than once", issue.RepairInstruction, StringComparison.Ordinal);
+        Assert.Contains("unique", issue.RepairInstruction, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreatePrompt_RequiresLiteralContiguousExcerptWithoutSourceCorrections()
+    {
+        var prompt = EvidenceExtractionPrompt.Create(CreateContext("<h4>Results</h4>Recall improved."));
+
+        Assert.Contains("one contiguous", prompt.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("Do not correct source typos", prompt.SystemPrompt, StringComparison.Ordinal);
+        Assert.Contains("findings=[]", prompt.SystemPrompt, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("<h4>Results</h4>Recall improved.", "Results Recall improved.")]
+    [InlineData("Accuracy was 42%.", "Accuracy was 43%.")]
+    [InlineData("Recall improved. Accuracy was reported.", "Recall improved ... Accuracy was reported.")]
+    public async Task ExtractAsync_DoesNotAcceptSourceEditingAfterRepair(string source, string editedQuote)
+    {
+        var invalid = new EvidenceExtractionDraft([
+            new EvidenceFindingDraft("recall", "Recall improved.", editedQuote,
+                "NotReported", null, null, null, null, null, null, null, null, null, null)
+        ]);
+        var llm = new SequenceStructuredLlmClient(invalid, invalid);
+
+        await Assert.ThrowsAsync<EvidenceGroundingValidationException>(() =>
+            CreateExtractor(llm).ExtractAsync(CreateContext(source), CancellationToken.None));
+
+        Assert.Equal(2, llm.CallCount);
+    }
+
+    [Fact]
     public async Task ExtractAsync_RejectsBlankSupportingExcerpt()
     {
         var llm = new FakeStructuredLlmClient(new EvidenceExtractionDraft([

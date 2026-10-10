@@ -1,5 +1,40 @@
 # Problems
 
+## 2026-10-11: Live Extraction Quote Rejection And Misleading Progress
+
+Two isolated local Codex CLI runs failed in Extracting with
+`EvidenceGroundingValidationException: Candidate anchor does not occur in the exact SourceMaterial.`
+Planning and Europe PMC search succeeded; each default bounded replacement was
+also rejected. No extraction or Evidence was persisted for these runs. PubMed
+was disabled, so this is not evidence of an NCBI outage or an admission failure.
+
+The selected immutable abstract contains literal HTML section tags and unusual
+source typography. Rejected model candidates were not stored or logged, so the
+exact mismatch cannot be reconstructed: markup removal, source typo correction,
+or another edit are possibilities, not proven causes. Do not manufacture that
+diagnosis or make containment fuzzy to accept the answer.
+
+Confirmed application defects: repair used `findings[].supportingText` without
+identifying the failing array item or distinguishing an absent quote from a
+repeated one; the public failure reason was generic; terminal progress treated
+mere global SourceMaterial availability as completed extraction even with zero
+extractions. Six regression cases reproduced these gaps before changes.
+
+Fix: v4 literal-quote instructions, indexed and bounded server-authored repair
+guidance, a fixed safe extraction-grounding failure reason, and removal of the
+SourceMaterial-only completion condition. Exact membership, uniqueness, tuple
+proof, repair budget, lease fencing and historical source/run data are unchanged.
+Four negative controls already passed before the fix and still reject edited
+quotes/wrong-stage classification. A fake repaired response passes the same
+validator; this is not proof that a new live response will succeed.
+
+Local full regression: Domain 45, Application 314, Infrastructure 136 and
+Integration 52 passed; 133 integration cases honestly skipped without Docker.
+Build has zero warnings/errors; EF has no pending model changes; Compose passes.
+Read-only API and installed-Chrome smoke confirm PostgreSQL readiness and
+Pending extraction for the historical failed run, with zero browser errors.
+No new live research was submitted as part of verification.
+
 ## 2026-10-11: Provider Query Dialect And Local Smoke Diagnostics
 
 Observed: run `9f774708-5034-4c65-8153-491f2cdd7e16` planned
