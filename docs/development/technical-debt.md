@@ -1,5 +1,26 @@
 # Technical Debt
 
+## Query Compatibility And Topic Relevance (2026-10-11)
+
+The Europe PMC query bridge supports Title/Abstract/tiab and Title/ti only.
+MeSH expansion, other PubMed fields, proximity/ranges and mixed dialects require
+a deliberately designed query contract; they are rejected rather than stripped
+or mapped to a scientifically different search. The planner still generates
+PubMed-style strings and can propose an unsupported query. If only Europe PMC
+is enabled, such a query can fail the Searching stage; operator/provider logs
+and attempts distinguish it from zero results. A future portable typed query
+model must include backward-compatible recovery/provenance rules.
+
+Search hits and source-grounded extraction do not prove topical relevance to the
+question. The observed gastroduodenitis run retrieved unrelated papers and
+retained source-grounded pain findings, while synthesis ultimately produced an
+insufficient-evidence report. The syntax defect is fixed for supported fields;
+universal semantic screening, synonym/PICO harmonization and a durable relevance
+decision are not implemented. Do not replace this gap with a title/token overlap
+heuristic marketed as scientific validation. Old search/evidence snapshots are
+not automatically repaired or rerun. Live provider relevance is not a CI claim.
+
+
 ## F18 Release Limits (Supersedes F17 Release Follow-Ups Below)
 
 Next/source-map-js production advisories, backend-origin OpenAPI drift and

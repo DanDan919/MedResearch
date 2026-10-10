@@ -7,6 +7,55 @@ namespace MedResearch.Application.Tests;
 public sealed class ScientificLiteratureSearchCoordinatorTests
 {
     [Fact]
+    public async Task SearchAsync_UsesPreparedQueryForHttpAttemptPersistenceAndRecovery()
+    {
+        var source = new RecordingScientificSource("EuropePmc", []) { PreparedQuery = "TITLE_ABS:(sleep)" };
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([source], store);
+        var runId = Guid.NewGuid();
+        var planId = Guid.NewGuid();
+
+        await coordinator.SearchAsync(runId, planId, ["sleep[tiab]"], CancellationToken.None);
+        await coordinator.SearchAsync(runId, planId, ["sleep[tiab]"], CancellationToken.None);
+
+        Assert.Equal("TITLE_ABS:(sleep)", Assert.Single(source.Requests).Query);
+        Assert.Equal("TITLE_ABS:(sleep)", Assert.Single(store.Requests).Query);
+        Assert.Equal("TITLE_ABS:(sleep)", Assert.Single(store.AttemptQueries));
+    }
+
+    [Fact]
+    public async Task SearchAsync_QueryPreparationFailureIsDurableAndDoesNotBlockAnotherSource()
+    {
+        var rejected = new RecordingScientificSource("EuropePmc", [])
+        {
+            PreparationFailure = new ScientificLiteratureSourceException("Unsupported query syntax.", LiteratureProviderFailureCategory.ProviderProtocolError)
+        };
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([rejected, new RecordingScientificSource("PubMed", [])], store);
+        await coordinator.SearchAsync(Guid.NewGuid(), Guid.NewGuid(), ["Adult[mh]"], CancellationToken.None);
+
+        Assert.Empty(rejected.Requests);
+        Assert.Equal(LiteratureProviderFailureCategory.ProviderProtocolError, Assert.Single(store.Failures).Category);
+        Assert.Equal("PubMed", Assert.Single(store.Requests).Source);
+        Assert.Equal(2, store.Attempts.Count);
+    }
+
+    [Fact]
+    public async Task SearchAsync_DoesNotRewriteOrRepeatHistoricalSuccessfulQueries()
+    {
+        var source = new RecordingScientificSource("EuropePmc", []);
+        var store = new RecordingSearchResultStore();
+        var coordinator = CreateCoordinator([source], store);
+        var runId = Guid.NewGuid();
+        var planId = Guid.NewGuid();
+        await coordinator.SearchAsync(runId, planId, ["sleep[tiab]"], CancellationToken.None);
+        source.PreparedQuery = "TITLE_ABS:(sleep)";
+        await coordinator.SearchAsync(runId, planId, ["sleep[tiab]"], CancellationToken.None);
+        Assert.Single(source.Requests);
+        Assert.Equal("sleep[tiab]", Assert.Single(store.Requests).Query);
+    }
+
+    [Fact]
     public async Task SearchAsync_ExecutesEachEnabledSourceAsSeparateSearchExecution()
     {
         var pubMed = new RecordingScientificSource("PubMed", [CreateCandidate("123", null, "10.1000/shared", "PubMed")]);
@@ -169,6 +218,15 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
 
         public string SourceName { get; }
 
+        public string? PreparedQuery { get; set; }
+        public Exception? PreparationFailure { get; init; }
+
+        public string PrepareQuery(string query)
+        {
+            if (PreparationFailure is not null) throw PreparationFailure;
+            return PreparedQuery ?? query;
+        }
+
         public List<ScientificSearchRequest> Requests { get; } = [];
 
         public Task<ScientificSearchResult> SearchAsync(ScientificSearchRequest request, CancellationToken cancellationToken)
@@ -188,11 +246,13 @@ public sealed class ScientificLiteratureSearchCoordinatorTests
     private sealed class RecordingSearchResultStore : IScientificSearchResultStore
     {
         public List<Guid> Attempts { get; } = [];
+        public List<string> AttemptQueries { get; } = [];
         public List<(Guid Id, LiteratureProviderFailureCategory Category)> Failures { get; } = [];
         public Exception? PersistenceFailure { get; init; }
         public Task BeginAttemptAsync(Guid attemptId, Guid researchRunId, Guid researchPlanId, string source, string query, DateTimeOffset startedAt, CancellationToken cancellationToken)
         {
             Attempts.Add(attemptId);
+            AttemptQueries.Add(query);
             return Task.CompletedTask;
         }
         public Task FailAttemptAsync(Guid attemptId, LiteratureProviderFailureCategory category, DateTimeOffset completedAt, CancellationToken cancellationToken)

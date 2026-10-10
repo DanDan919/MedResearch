@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test("application shell loads and navigates to New Research", async ({ page }) => {
   await page.goto("/");
+  const icon = await page.locator('link[rel="icon"]').getAttribute("href");
+  expect(icon).toBe("/favicon.ico");
+  const iconResponse = await page.request.get(icon!);
+  expect(iconResponse.ok()).toBe(true);
+  expect(iconResponse.headers()["content-type"]).toContain("image/png");
+  expect(Array.from((await iconResponse.body()).subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await page.getByRole("main").getByRole("link", { name: "New Research" }).click();
   await expect(page.getByRole("heading", { name: "New Research" })).toBeVisible();

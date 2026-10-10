@@ -13,6 +13,33 @@ namespace MedResearch.IntegrationTests;
 [Collection(PostgreSqlCollection.Name)]
 public sealed class ProviderAttemptPersistenceTests(PostgreSqlFixture fixture)
 {
+    [SkippableFact]
+    public async Task PreparedQuerySurvivesFreshContextAndRecoveryWithoutDuplicateDiscoveries()
+    {
+        Available();
+        var seed = await Seed();
+        var source = new FakeSource("EuropePmc", false, withResults: true) { PreparedQuery = "TITLE_ABS:(sleep)" };
+        await using (var context = fixture.CreateDbContext())
+        {
+            var coordinator = new ScientificLiteratureSearchCoordinator([source], await Store(context, seed), NullLogger<ScientificLiteratureSearchCoordinator>.Instance);
+            await coordinator.SearchAsync(seed.RunId, seed.PlanId, ["sleep[tiab]"], CancellationToken.None);
+        }
+        await using (var recovered = fixture.CreateDbContext())
+        {
+            var coordinator = new ScientificLiteratureSearchCoordinator([source], await Store(recovered, seed), NullLogger<ScientificLiteratureSearchCoordinator>.Instance);
+            await coordinator.SearchAsync(seed.RunId, seed.PlanId, ["sleep[tiab]"], CancellationToken.None);
+        }
+        Assert.Equal(1, source.Calls);
+        await using var verify = fixture.CreateDbContext();
+        var attempt = await verify.LiteratureProviderAttempts.SingleAsync(x => x.ResearchRunId == seed.RunId);
+        var search = await verify.LiteratureSearches.SingleAsync(x => x.ResearchRunId == seed.RunId);
+        Assert.Equal("TITLE_ABS:(sleep)", attempt.Query);
+        Assert.Equal(attempt.Query, search.Query);
+        Assert.Equal(LiteratureProviderAttemptStatus.SucceededWithResults, attempt.Status);
+        Assert.Equal(search.Id, attempt.LiteratureSearchId);
+        Assert.Equal(1, await verify.ResearchStudyDiscoveries.CountAsync(x => x.ResearchRunId == seed.RunId));
+    }
+
     [SkippableTheory]
     [InlineData(LiteratureProviderFailureCategory.NetworkFailure, LiteratureProviderAttemptStatus.Failed)]
     [InlineData(LiteratureProviderFailureCategory.Timeout, LiteratureProviderAttemptStatus.TimedOut)]
@@ -187,6 +214,8 @@ public sealed class ProviderAttemptPersistenceTests(PostgreSqlFixture fixture)
     {
         public string SourceName => source;
         public int Calls { get; private set; }
+        public string? PreparedQuery { get; init; }
+        public string PrepareQuery(string query) => PreparedQuery ?? query;
         public Task<ScientificSearchResult> SearchAsync(ScientificSearchRequest request, CancellationToken token)
         {
             Calls++;

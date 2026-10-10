@@ -294,6 +294,30 @@ PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, foll
 
 Europe PMC uses `GET /search` against `https://www.ebi.ac.uk/europepmc/webservices/rest/` with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination using `cursorMark` and `nextCursorMark`. `core` is used so the metadata search pipeline can receive title, abstract, identifiers, authors, publication date metadata, journal metadata, and publication types without a second detail endpoint per result.
 
+`IScientificLiteratureSource.PrepareQuery` is a deterministic adapter-owned
+boundary. Its default preserves the query; Application does not parse provider
+fields. Europe PMC's bounded parser maps PubMed Title/Abstract/tiab and Title/ti
+operands to native TITLE_ABS/TITLE, retaining Boolean groups, quoted terms and
+suffix wildcards. Mixed operators are explicitly grouped left-to-right following
+PubMed's documented order, independently of the target engine's precedence.
+The bridge bounds input/output to 2000 characters and nesting to 32 levels.
+Native/unfielded queries pass through. Unsupported fielded syntax,
+including MeSH whose expansion is not equivalent, fails closed before HTTP.
+This rejection is a logical failed provider attempt, not a successful zero or
+proof that a network call occurred. One rejected source does not block another
+successful source; storage/fence failures still abort orchestration.
+
+Attempts and successful searches use the actual prepared query as their
+execution key. ResearchPlan retains the original. For backward compatibility,
+recovery first reuses an original historical success, then a prepared success.
+Historical malformed-dialect results are not retroactively corrected or
+reprocessed. Query preparation must be idempotent because adapters also enforce
+it for direct callers. Selected-source/adaptation/rejection logs carry run,
+source and execution IDs without credentials. Correct query syntax and exact
+source grounding do not prove question relevance: unfielded search may include
+full text, provider vocabularies differ, and no universal topic/synonym screening
+gate currently exists before extraction.
+
 Both source adapters use HttpClientFactory, headers timeouts, explicit body deadlines, cancellation propagation, process-local rate limiting, and bounded transient retry for 429/5xx/network/timeout failures with existing bounded `Retry-After` handling. `BoundedProviderBody` reads at most one byte past an inclusive cap and never parses partial output. Defaults are 256,000 bytes for ESearch and 2,000,000 for EFetch/Europe PMC search/full text. Bad requests, oversized responses and malformed successful payloads fail fast. Non-success bodies are not read or logged; status is enough for typed diagnostics. Automatic HTTP URI logging is disabled. Normal automated tests use fake HTTP and do not call live scientific providers.
 
 Europe PMC `firstIndexDate` is not publication metadata. Mapping prefers actual first/print/electronic publication fields, then explicit `pubYear`; a real date wins a conflicting year field. Partial/missing dates remain partial/null. Study date enrichment rejects a conflicting date as a group rather than combining unrelated parts. No historical metadata correction is inferred from stored values. ADR-030 records these boundaries.

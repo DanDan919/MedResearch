@@ -41,6 +41,10 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
             throw new ScientificLiteratureSourceException("No scientific literature sources are enabled.");
         }
 
+        _logger.LogInformation(
+            "ScientificSearchSourcesSelected. ResearchRunId: {ResearchRunId}; Sources: {Sources}; SourceCount: {SourceCount}",
+            researchRunId, string.Join(",", _sources.Select(source => source.SourceName)), _sources.Count);
+
         foreach (var query in queries)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -79,7 +83,37 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
 
             var searchExecutionId = Guid.NewGuid();
             var stopwatch = Stopwatch.StartNew();
-            await _searchResultStore.BeginAttemptAsync(searchExecutionId, researchRunId, researchPlanId, source.SourceName, query, DateTimeOffset.UtcNow, cancellationToken);
+            string executionQuery;
+            try
+            {
+                executionQuery = source.PrepareQuery(query);
+            }
+            catch (ScientificLiteratureSourceException exception)
+            {
+                await _searchResultStore.BeginAttemptAsync(searchExecutionId, researchRunId, researchPlanId, source.SourceName, query, DateTimeOffset.UtcNow, cancellationToken);
+                await _searchResultStore.FailAttemptAsync(searchExecutionId, exception.FailureCategory, DateTimeOffset.UtcNow, cancellationToken);
+                failures.Add(exception);
+                _logger.LogWarning(
+                    "ScientificSearchQueryRejected. ResearchRunId: {ResearchRunId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}; FailureCategory: {FailureCategory}",
+                    researchRunId, source.SourceName, searchExecutionId, exception.FailureCategory);
+                continue;
+            }
+
+            // Keep old successful execution keys intact; new executions use the actual provider query.
+            if (executionQuery != query && await _searchResultStore.HasPersistedSearchAsync(
+                    researchRunId, researchPlanId, source.SourceName, executionQuery, cancellationToken))
+            {
+                successfulSources++;
+                _logger.LogInformation("ScientificSearchReused. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; Query: {Query}",
+                    researchRunId, researchPlanId, source.SourceName, executionQuery);
+                continue;
+            }
+
+            await _searchResultStore.BeginAttemptAsync(searchExecutionId, researchRunId, researchPlanId, source.SourceName, executionQuery, DateTimeOffset.UtcNow, cancellationToken);
+
+            if (executionQuery != query)
+                _logger.LogInformation("ScientificSearchQueryAdapted. ResearchRunId: {ResearchRunId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}",
+                    researchRunId, source.SourceName, searchExecutionId);
 
             _logger.LogInformation(
                 "ScientificSearchStarted. ResearchRunId: {ResearchRunId}; ResearchPlanId: {ResearchPlanId}; Source: {Source}; SearchExecutionId: {SearchExecutionId}",
@@ -92,7 +126,7 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
             try
             {
                 searchResult = await source.SearchAsync(
-                    new ScientificSearchRequest(researchRunId, searchExecutionId, query),
+                    new ScientificSearchRequest(researchRunId, searchExecutionId, executionQuery),
                     cancellationToken);
                 if (searchResult.Source != source.SourceName || searchResult.ReturnedResultCount < 0)
                     throw new ScientificLiteratureSourceException("Scientific source returned an inconsistent result.", LiteratureProviderFailureCategory.InvalidResponse);
@@ -146,7 +180,7 @@ public sealed class ScientificLiteratureSearchCoordinator : IScientificLiteratur
                     researchRunId,
                     researchPlanId,
                     searchResult.Source,
-                    query,
+                    executionQuery,
                     searchResult.SearchedAt,
                     searchResult.ReturnedResultCount,
                     searchResult.Candidates),

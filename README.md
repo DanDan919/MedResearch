@@ -323,6 +323,23 @@ The prompt version is `research-planner-v1`. The planner is allowed to produce q
 
 `Searching` is now multi-source. Application depends on provider-neutral literature contracts and a single `IScientificLiteratureSearchCoordinator`; Infrastructure supplies enabled `IScientificLiteratureSource` adapters for PubMed and Europe PMC.
 
+Adapters prepare their execution query before provider I/O. Europe PMC translates
+the planner's supported PubMed suffixes `[Title/Abstract]`/`[tiab]` to
+`TITLE_ABS:` and `[Title]`/`[ti]` to `TITLE:`, preserving Boolean groups,
+quoted phrases and suffix wildcards. Unsupported suffixes (including MeSH),
+mixed dialects and malformed fielded expressions fail before HTTP with a durable
+`ProviderProtocolError`; they are never silently stripped. Native/unfielded
+Europe PMC queries remain unchanged. This is a bounded syntax bridge, not proof
+of identical indexing, MeSH expansion or topical relevance across providers.
+New attempts/search rows store the prepared query; the original remains in
+ResearchPlan. Recovery checks both historical and prepared successful keys,
+without rewriting or automatically rerunning old searches. Structured logs
+include `ScientificSearchSourcesSelected`, `ScientificSearchQueryAdapted` and
+`ScientificSearchQueryRejected`. A disabled provider is not a failed request.
+Mixed Boolean operators receive explicit left-to-right grouping following
+[PubMed's documented evaluation order](https://pubmed.ncbi.nlm.nih.gov/help/).
+The native fields follow [Europe PMC search help](https://europepmc.org/help).
+
 ```text
 ResearchQuestion -> ResearchPlan -> SearchQueries -> source-specific searches -> normalized Study candidates -> Study identity resolution -> ResearchStudyDiscovery -> PostgreSQL
 ```

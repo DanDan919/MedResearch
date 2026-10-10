@@ -1,5 +1,34 @@
 # Problems
 
+## 2026-10-11: Provider Query Dialect And Local Smoke Diagnostics
+
+Observed: run `9f774708-5034-4c65-8153-491f2cdd7e16` planned
+`gastroduodenitis[Title/Abstract] AND (treatment[Title/Abstract] OR therapy[Title/Abstract] OR management[Title/Abstract])`.
+Europe PMC received that string unchanged and returned three publications about
+hemorrhoids, IBS and pain. An extraction retained eight pain findings; synthesis
+correctly abstained with InsufficientEvidence. The exact remote interpretation
+of the old expression was not independently proven. The confirmed defect is
+absence of provider dialect adaptation, not evidence that NCBI was down.
+PubMed was disabled in this isolated process; no PubMed request occurred.
+
+Fix: adapter-owned, bounded query preparation maps supported title/abstract and
+title suffixes; unsupported syntax fails without HTTP. The coordinator persists
+the prepared query for attempts/success/recovery and logs selected sources.
+Historical successful rows are not rewritten. Six new tests failed before the
+fix (four HTTP parameter cases, two orchestration cases), then passed unchanged.
+Additional regressions cover malformed/unsupported fields, native/literal
+brackets, preparation idempotency, historical reuse and fresh-context PostgreSQL
+recovery. No statistical or grounding validator was weakened.
+Two further red-before-green cases caught Boolean precedence in the first local
+patch. Mixed operators now retain PubMed's documented left-to-right grouping;
+prefix wildcards/operators and mixed field dialects fail closed.
+
+The local Chrome smoke also exposed `/favicon.ico` 404. Added a local 32x32 PNG
+response and metadata; browser coverage checks HTTP success/type/PNG signature.
+Remaining: general semantic relevance is not guaranteed; Docker-backed tests
+must be verified in CI because local Docker Desktop's Linux pipe is unavailable.
+
+
 ## F18: Independently Observed Release Gaps (2026-10-08)
 
 - First full-stack CI run 37807605255 failed before browser startup: the

@@ -43,6 +43,8 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
 
     public string SourceName => EuropePmcSourceName;
 
+    public string PrepareQuery(string query) => EuropePmcQueryTranslator.Translate(query);
+
     public async Task<ScientificSearchResult> SearchAsync(
         ScientificSearchRequest request,
         CancellationToken cancellationToken)
@@ -54,6 +56,8 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         {
             throw new ScientificLiteratureSourceException("Europe PMC source is disabled by configuration.");
         }
+
+        var executionQuery = PrepareQuery(request.Query);
 
         try
         {
@@ -70,7 +74,7 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
                 var pageSize = Math.Min(_options.BoundedPageSize, remaining);
                 var uri = BuildUri("search", new Dictionary<string, string?>
                 {
-                    ["query"] = request.Query,
+                    ["query"] = executionQuery,
                     ["format"] = "json",
                     ["resultType"] = "core",
                     ["pageSize"] = pageSize.ToString(CultureInfo.InvariantCulture),

@@ -8,7 +8,8 @@ import { publicSession, readPrivateSession, sessionOptions } from "../lib/auth/s
 
 export const metadata: Metadata = {
   title: "MedResearch",
-  description: "Evidence synthesis research workspace"
+  description: "Evidence synthesis research workspace",
+  icons: { icon: { url: "/favicon.ico", type: "image/png", sizes: "32x32" } }
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

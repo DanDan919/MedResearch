@@ -42,6 +42,72 @@ public sealed class ScientificIdentifierNormalizerTests
 public sealed class EuropePmcScientificLiteratureSourceTests
 {
     [Theory]
+    [InlineData("gastroduodenitis[Title/Abstract] AND (treatment[Title/Abstract] OR therapy[Title/Abstract])", "TITLE_ABS:(gastroduodenitis) AND (TITLE_ABS:(treatment) OR TITLE_ABS:(therapy))")]
+    [InlineData("\"working memory\"[tiab] AND adult*[TIAB]", "TITLE_ABS:(\"working memory\") AND TITLE_ABS:(adult*)")]
+    [InlineData("sleep duration[Title/Abstract] NOT children[Title]", "TITLE_ABS:(sleep duration) NOT TITLE:(children)")]
+    [InlineData("(sleep[tiab] OR cognition[tiab]) AND β[tiab]", "(TITLE_ABS:(sleep) OR TITLE_ABS:(cognition)) AND TITLE_ABS:(β)")]
+    [InlineData("\"change [baseline]\"[tiab]", "TITLE_ABS:(\"change [baseline]\")")]
+    [InlineData("sleep[tiab] OR cognition[tiab] AND adult*[tiab]", "(TITLE_ABS:(sleep) OR TITLE_ABS:(cognition)) AND TITLE_ABS:(adult*)")]
+    [InlineData("sleep[tiab] AND cognition[tiab] OR adults[tiab] NOT children[ti]", "((TITLE_ABS:(sleep) AND TITLE_ABS:(cognition)) OR TITLE_ABS:(adults)) NOT TITLE:(children)")]
+    public async Task SearchAsync_TranslatesSupportedPubMedFieldsWithoutLosingBooleanScope(string plannedQuery, string executedQuery)
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*")));
+        var source = CreateSource(handler);
+        var prepared = source.PrepareQuery(plannedQuery);
+        Assert.Equal(executedQuery, prepared);
+        Assert.Equal(prepared, source.PrepareQuery(prepared));
+        await source.SearchAsync(new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), prepared), CancellationToken.None);
+        Assert.Equal(executedQuery, QueryParameters(Assert.Single(handler.Requests))["query"]);
+    }
+
+    [Theory]
+    [InlineData("TITLE_ABS:(sleep OR cognition) AND adult*")]
+    [InlineData("sleep deprivation AND (working memory OR cognition) β")]
+    [InlineData("\"response [baseline]\"")]
+    public async Task SearchAsync_PreservesNativeAndUnfieldedQueries(string query)
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*")));
+        await CreateSource(handler).SearchAsync(new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), query), CancellationToken.None);
+        Assert.Equal(query, QueryParameters(Assert.Single(handler.Requests))["query"]);
+    }
+
+    [Theory]
+    [InlineData("\"Adult\"[MeSH Terms] OR adult*[tiab]")]
+    [InlineData("sleep[Unknown]")]
+    [InlineData("sleep[tiab] AND")]
+    [InlineData("(sleep[tiab] OR cognition[tiab]")]
+    [InlineData("sleep[tiab]]")]
+    [InlineData("[tiab]sleep")]
+    [InlineData("sleep[tiab] OR OR cognition[tiab]")]
+    [InlineData("\"sleep[tiab]")]
+    [InlineData("(sleep OR cognition)[tiab]")]
+    [InlineData("*sleep[tiab]")]
+    [InlineData("-sleep[tiab]")]
+    [InlineData("sleep^2[tiab]")]
+    [InlineData("sleep[tiab] AND TITLE:cognition")]
+    public async Task SearchAsync_RejectsUnsupportedOrMalformedPubMedSyntaxBeforeHttp(string query)
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*")));
+        var exception = await Assert.ThrowsAsync<ScientificLiteratureSourceException>(() => CreateSource(handler).SearchAsync(
+            new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), query), CancellationToken.None));
+        Assert.Equal(MedResearch.Domain.LiteratureProviderFailureCategory.ProviderProtocolError, exception.FailureCategory);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task SearchAsync_BoundsQueryLengthAndNestingBeforeHttp()
+    {
+        var handler = new RecordingEuropePmcHandler(Response(HttpStatusCode.OK, PageJson("*")));
+        var source = CreateSource(handler);
+        foreach (var query in new[] { new string('x', 2001), new string('(', 33) + "sleep[tiab]" + new string(')', 33) })
+        {
+            await Assert.ThrowsAsync<ScientificLiteratureSourceException>(() => source.SearchAsync(
+                new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), query), CancellationToken.None));
+        }
+        Assert.Empty(handler.Requests);
+    }
+
+    [Theory]
     [InlineData("\"pubYear\":\"1998\",\"firstPublicationDate\":\"1998-05-06\",\"firstIndexDate\":\"2025-03-17\"", 1998, "1998-05-06")]
     [InlineData("\"pubYear\":\"1998\"", 1998, null)]
     [InlineData("\"firstIndexDate\":\"2025-03-17\"", null, null)]

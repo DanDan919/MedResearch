@@ -1,5 +1,28 @@
 # Current State
 
+## Search Query Contract Correction (2026-10-11)
+
+Starting HEAD `d14d4abeaccb74470473489e918699147f360066`, clean main.
+A local Codex CLI run exposed PubMed-style queries sent unchanged to Europe PMC
+and off-topic retrieved publications. Europe PMC now prepares supported
+Title/Abstract/tiab and Title/ti operands into native fields before HTTP.
+Unsupported/malformed fielded syntax fails closed and records a typed logical
+attempt; new success/attempt provenance stores the actual executed query.
+Historical successful keys and rows remain unchanged. Source selection is now
+explicit in structured logs. No schema, planner prompt or scientific validator
+was changed. The local run's PubMed was disabled by temporary configuration,
+not demonstrated to be unavailable. Its report correctly abstained; retrieval
+and grounding still do not establish universal question relevance. That gap
+remains technical debt, not a claimed fix. A browser favicon 404 is corrected
+with a local PNG response and browser regression coverage.
+
+Local validation: restore/build passed with 0 warnings/errors; Domain 45,
+Application 304, Infrastructure 136, Integration 52 passed/133 Docker skips,
+0 failures. SDK 42/Web 122, browser 15 and synthetic production OIDC 17 passed;
+lint/typecheck/production build, EF pending-model and Compose checks passed.
+These local skips are not PostgreSQL verification; new CI status is pending.
+
+
 ## SAAS-003 Atomic Research Admission
 
 Implemented bounded pilot admission in the existing create transaction with a
