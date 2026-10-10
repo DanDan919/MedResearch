@@ -22,7 +22,15 @@ Six new cases failed before production edits; four negative controls already
 passed. EF reports no pending model changes; Compose config passes. Read-only
 local API/DB and installed-Chrome desktop/mobile smoke passed with zero browser
 console/page errors; the historical failed run and zero extractions are retained.
-New live research was NOT RUN. CI verification is recorded after push.
+Local frontend regressions: SDK 42/Web 122 passed. New live research was NOT RUN.
+Implementation `ce69fb20a1e97a2b34d142a3da88bec1cd015100` passed
+[CI 38088974542](https://github.com/DanDan919/MedResearch/actions/runs/38088974542).
+All three jobs succeeded on ubuntu-latest/.NET 10.0.x. TRX: Domain 45,
+Application 314, Infrastructure 136, Integration 185; 680 passed, 0 failed/skipped,
+including all 133 locally Docker-skipped PostgreSQL cases. Docker, EF model and
+Compose checks, frontend/browser gates, actual API/migrated-PG/trusted-HTTPS
+smoke and container builds passed. This certifies deterministic regression,
+not live model correction or a completed scientific answer.
 
 ## Search Query Contract Correction (2026-10-11)
 
