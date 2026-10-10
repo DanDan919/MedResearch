@@ -20,8 +20,16 @@ Local validation: restore/build passed with 0 warnings/errors; Domain 45,
 Application 304, Infrastructure 136, Integration 52 passed/133 Docker skips,
 0 failures. SDK 42/Web 122, browser 15 and synthetic production OIDC 17 passed;
 lint/typecheck/production build, EF pending-model and Compose checks passed.
-These local skips are not PostgreSQL verification; new CI status is pending.
-
+Implementation `d3b36ed91602646f49753318c4c05a981fb416a8` passed
+[CI 38081961226](https://github.com/DanDan919/MedResearch/actions/runs/38081961226):
+all three jobs succeeded. TRX: Domain 45, Application 304, Infrastructure 136,
+Integration 185; 670 passed, 0 failed/skipped, including all 133 required
+PostgreSQL cases. Fresh migrations, EF pending-model/Compose, deterministic
+frontend, actual API/PG/HTTPS browser and Docker image gates passed. No live
+scientific provider or paid LLM call was added to normal tests. A read-only local
+Chrome smoke of the preserved run after restart returned favicon 200 and zero
+console/page errors. Post-fix live scientific relevance was NOT verified;
+the existing reports/evidence were preserved, not regenerated.
 
 ## SAAS-003 Atomic Research Admission
 
