@@ -296,7 +296,7 @@ public static class ServiceCollectionExtensions
         {
             MaxStudies = ReadPositiveInt(section["MaxStudies"], 10, "Synthesis:MaxStudies"),
             MaxEvidenceFindings = ReadPositiveInt(section["MaxEvidenceFindings"], 40, "Synthesis:MaxEvidenceFindings"),
-            MaxClaims = ReadPositiveInt(section["MaxClaims"], 12, "Synthesis:MaxClaims")
+            MaxClaims = ReadPositiveInt(section["MaxClaims"], SynthesisOptions.DefaultMaxClaims, "Synthesis:MaxClaims")
         };
     }
 

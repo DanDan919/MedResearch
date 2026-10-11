@@ -1,6 +1,7 @@
 using MedResearch.Application.Research.Literature;
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Admission;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Infrastructure.Ai.CodexCli;
 using MedResearch.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,32 @@ namespace MedResearch.Infrastructure.Tests.DependencyInjection;
 
 public sealed class InfrastructureConfigurationTests
 {
+    [Theory]
+    [InlineData(null, 12)]
+    [InlineData("3", 3)]
+    [InlineData("25", 25)]
+    [InlineData("100", 25)]
+    public void AddInfrastructure_SynthesisLimitUsesConfiguredEffectivePolicy(string? configured, int expected)
+    {
+        var settings = new Dictionary<string, string?>();
+        if (configured is not null) settings["Synthesis:MaxClaims"] = configured;
+        using var provider = new ServiceCollection().AddInfrastructure(CreateConfiguration(settings)).BuildServiceProvider();
+        var validator = new ResearchReportDraftValidator(provider.GetRequiredService<SynthesisOptions>());
+        Assert.Equal(expected, validator.MaximumClaims);
+        using var schema = System.Text.Json.JsonDocument.Parse(ResearchSynthesisPrompt.CreateOutputSchema(validator.MaximumClaims).JsonSchema);
+        Assert.Equal(expected, schema.RootElement.GetProperty("properties").GetProperty("claims").GetProperty("maxItems").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public void AddInfrastructure_NonPositiveSynthesisLimitFailsStartup(string configured)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddInfrastructure(CreateConfiguration(new()
+            { ["Synthesis:MaxClaims"] = configured })));
+        Assert.Contains("Synthesis:MaxClaims", exception.Message);
+    }
+
     [Fact]
     public void AddInfrastructure_MissingAdmissionConfigurationKeepsPilotLimits()
     {

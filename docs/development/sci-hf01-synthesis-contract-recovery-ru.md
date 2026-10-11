@@ -52,6 +52,10 @@ validator по умолчанию принимали 12, prompt не сообщ�
 Default остаётся **12**. Существующая явно конфигурируемая политика 1..25
 с clamping сохранена, не расширена ради старого отчёта. `Synthesis__MaxClaims`
 переопределяет обычную .NET configuration; локальный стенд оставлен на 12.
+DI default теперь тоже ссылается на `SynthesisOptions.DefaultMaxClaims`.
+Конфигурационные 0/negative отклоняются при startup; positive >25 использует
+существующий bounded ceiling25. Отдельный `MaxEvidencePerClaim=12` ограничивает
+references одного claim, а не количество claims; он и его schema не менялись.
 
 | Поверхность | Контракт |
 | --- | --- |
@@ -182,12 +186,30 @@ exact source lineage и blinded expected categories; измерить accepted o
 - Existing owner isolation, stale worker writes, leases, F15..F19, M17..M24,
   numeric grounding/provenance/contradictions и OpenAPI drift остаются в full suite.
 
-Локальный final backend: Domain 45, Application 341, Infrastructure 191,
-Integration 57 passed / 137 skipped; итого **634 passed, 0 failed, 137 skipped**.
+Локальный final backend: Domain 45, Application 341, Infrastructure 197,
+Integration 57 passed / 137 skipped; итого **640 passed, 0 failed, 137 skipped**.
 Причина всех 137 skips: недоступный Docker Desktop Linux daemon; эти skips
 не считаются доказательством PostgreSQL. CI включает strict
 `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` и блокирует любой required skip.
 Результат фактического CI после push должен проверяться, не выводиться из YAML.
+
+Первый полный CI hotfix подтверждён:
+[38126867952](https://github.com/DanDan919/MedResearch/actions/runs/38126867952),
+commit `2c5d8457f72b72bcc111d584abff79d19984aafc`, **success** во всех трёх jobs.
+Ubuntu runner/.NET10, Docker available. TRX annotations: Domain45,
+Application341, Infrastructure191, Integration194; **771 passed, 0 failed,
+0 skipped**. Значит все137 PostgreSQL cases, включая новые3, выполнены.
+EF pending-model, Compose, frontend и actual API/migrated PostgreSQL/HTTPS
+browser smoke passed, container builds passed. Normal CI не использует live
+scientific providers. Nonblocking warnings: actions v4 Node20 runtime migration
+и объявленная будущая смена ubuntu-latest image.
+
+При заключительной DI-сверке обнаружен оставшийся literal default12. Follow-up
+использует общий constant и добавляет6 Infrastructure cases: absent/3/25/100
+configuration соответствует effective schema, 0/-1 fail startup. Local197
+Infrastructure cases прошли. Для этого final follow-up также требуется зелёный
+CI; результат последнего run проверяется и приводится в итоговом отчёте,
+а success предыдущего commit не подменяет final verification.
 
 Frontend: SDK45, Web141; lint/typecheck/production Next build passed.
 Installed Chrome: 18 deterministic cases passed, включая 1280px/390px partial
@@ -202,6 +224,10 @@ Compose config passed; docker info failed по отсутствующему Linu
 успешна. PGDATA и предыдущие run artifacts сохранены. Один новый API-version
 test сначала получил 404 из-за отсутствующего run в fake store; фикстура
 исправлена, все три whitelist cases прошли. Это test fixture error, не auth bypass.
+После rebuild локальный API запущен с прежними normal10-Study bounds и
+MaxClaims12. Liveness/readiness/BFF200; GET старого Failed run подтверждает
+29 Evidence,10 evaluations,0 reports и исторический ProcessingFailed category.
+Новых research POST не было.
 
 ## Остаточные ограничения
 

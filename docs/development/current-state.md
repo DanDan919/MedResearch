@@ -12,9 +12,13 @@ authorized Evidence remains readable. Three visible UI phases retain optional
 technical details. Failed/cancelled report routes no longer promise completion.
 Targeted synthesis-only retry is **NOT IMPLEMENTED**: Failed is terminal and lacks
 durable failed-stage/retry/idempotency metadata; lease fencing is not bypassed.
-Local634 backend cases passed/137 Docker skips; SDK45/Web141 and18 Chrome/17
+Local640 backend cases passed/137 Docker skips; SDK45/Web141 and18 Chrome/17
 synthetic production-OIDC cases passed. Required PostgreSQL verification still
-depends on actually successful strict CI, not local skips. No new live scientific
+depends on actually successful strict CI, not local skips. Initial hotfix CI
+38126867952 (2c5d845) succeeded:771 passed,0 failed,0 skipped including137 real
+PostgreSQL cases and actual API/PostgreSQL HTTPS smoke. Final DI follow-up reuses
+the canonical default and adds6 configuration cases; its CI must also pass.
+No new live scientific
 or LLM calls, migration or scientific algorithm changes. Details and evaluation
 cost audit: `sci-hf01-synthesis-contract-recovery-ru.md`.
 
