@@ -12,6 +12,13 @@ not yet expose it. No admission/cost safeguards or idempotent creation are claim
 Local and strict CI verification is recorded in `quick-q0-skeleton-ru.md`; local
 Docker unavailability is not PostgreSQL runtime certification. Existing unrelated
 dirty frontend tests and the separate audit document are excluded from Q0.
+Q0 COMPLETE -- DETERMINISTIC at `d87bde32f63fc7025e4de9c781be92f80db419b8`:
+CI38167362242 success in all three jobs. Domain62/Application349/Infrastructure202/
+Integration233 passed, 0 failed/skipped; all166 required PostgreSQL cases ran,
+including6 Q0. EF/model/Compose, full frontend and HTTPS API/PostgreSQL release
+checks passed. Local680 backend passed/166 Docker skips; the two preserved dirty
+Deep UI tests fail locally and remain excluded. No user DB/stand changes or live
+provider calls. One initial CI assertion-only failure was fixed normally.
 
 ## SCI-R01 Synthesis-Only Recovery (2026-10-11)
 

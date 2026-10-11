@@ -150,8 +150,25 @@ Frontend generation/lint/typecheck/production build: passed. SDK: 45 passed. Web
 Q0 API case остановился на непереносимом assertion порядка Cache-Control: Linux
 выдал `no-store, private` вместо `private, no-store`. Это одинаковые directives,
 не нарушение cache policy. Assertion исправлен на `Private` + `NoStore`, без
-production changes. Полный restart/completion API case до зелёного повторного
-CI не считается подтверждённым. Итоговый CI runtime результат пока ожидается.
+production changes. Первый run не является успешным completion/restart proof.
+
+Повторный CI [38167362242](https://github.com/DanDan919/MedResearch/actions/runs/38167362242)
+на `d87bde32f63fc7025e4de9c781be92f80db419b8` — **SUCCESS во всех трёх jobs**.
+Runner: ubuntu-latest, .NET 10.0.x, Docker info passed. TRX counters независимо
+прочитаны через GitHub check annotations: Domain 62, Application 349,
+Infrastructure 202, Integration 233 — все passed; **846 passed, 0 failed, 0 skipped**.
+Все 166 Docker-required PostgreSQL cases реально исполнились, включая шесть Q0.
+Fresh migrations выполнены существующим Testcontainers fixture на пустой PostgreSQL;
+source/answer reload, exclusive claim/reclaim/fencing, owner/history isolation,
+Deep isolation и API completion/restart checks теперь прошли целиком.
+EF pending-model check, Compose validation, frontend tests/browser checks,
+production auth checks, HTTPS API/PostgreSQL smoke и container builds прошли.
+CI не включал live providers и не требовал OpenAI key; Q0 вообще не имеет provider port.
+
+Коммиты: `1b31962afbd0fdc5acd255a4d3a73d8ac4f19246` (Q0) и
+`d87bde32f63fc7025e4de9c781be92f80db419b8` (только assertion + process log).
+Оба отправлены в main обычным push. Последующий documentation commit фиксирует
+эти факты; его собственный CI проверяется отдельно и не заменяет runtime proof выше.
 
 ## Сохранённая сторонняя работа
 
