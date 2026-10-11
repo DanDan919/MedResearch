@@ -32,7 +32,8 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
             using var owner = firstHost.ForOwner(subject);
             var response = await owner.PostAsJsonAsync("/api/quick-research", new { question = "Synthetic medical question" });
             Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-            Assert.Equal("private, no-store", response.Headers.CacheControl!.ToString());
+            Assert.True(response.Headers.CacheControl!.Private);
+            Assert.True(response.Headers.CacheControl.NoStore);
             var accepted = (await response.Content.ReadFromJsonAsync<QuickResearchDetails>())!;
             id = accepted.Id;
             Assert.Equal("Queued", accepted.Status);

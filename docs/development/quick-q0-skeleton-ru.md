@@ -144,9 +144,14 @@ Domain: 62 passed; Application: 349; Infrastructure: 202; Integration: 67 passed
 Добавлен 31 Q0 case, включая 6 PostgreSQL и 4 non-Docker HTTP cases.
 EF pending-model check: no changes; `docker compose config --quiet`: passed;
 `docker info`: failed из-за отсутствующего dockerDesktopLinuxEngine pipe.
-Frontend generation/lint/typecheck: passed. SDK: 45 passed. Web: 157 passed,
+Frontend generation/lint/typecheck/production build: passed. SDK: 45 passed. Web: 157 passed,
 2 failed — только сохранённые, не включаемые в commit Deep retry tests.
-CI runtime результаты пока ожидаются; успех PostgreSQL не заявляется заранее.
+Первый CI `38167053481` исполнил все 233 Integration cases без skips, но один
+Q0 API case остановился на непереносимом assertion порядка Cache-Control: Linux
+выдал `no-store, private` вместо `private, no-store`. Это одинаковые directives,
+не нарушение cache policy. Assertion исправлен на `Private` + `NoStore`, без
+production changes. Полный restart/completion API case до зелёного повторного
+CI не считается подтверждённым. Итоговый CI runtime результат пока ожидается.
 
 ## Сохранённая сторонняя работа
 
