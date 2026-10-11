@@ -8,9 +8,14 @@ reservations (default2/max3). Existing worker claims queued retry intent straigh
 into Synthesizing, not Planning. Pending/uncertain calls stop as OutcomeUnknown;
 prior stages and scientific/quantitative validators remain unchanged. Legacy
 generic failures remain unavailable, without backfill or operator override.
-Local655 backend passed/160 Docker skips; strict PostgreSQL CI verification is
-required before claiming deterministic completion. No live research/provider calls
-or user database changes. See `sci-r01-synthesis-only-retry-ru.md` and ADR-035.
+SCI-R01 COMPLETE -- DETERMINISTIC at implementation commit
+`bf18bb9af84a69c16328185249f409823cadcfe4`: CI38130490169 success in all three jobs.
+Domain50/Application345/Infrastructure197/Integration223 passed, 0 failed/skipped;
+all160 required PostgreSQL cases ran, including23 new recovery cases. Fresh EF
+migrations, pending-model check, production frontend/auth/HTTPS API smoke and
+container builds passed. Local655 passed/160 honest Docker skips. No live
+research/provider calls or user database changes. The existing local stand was
+not migrated/restarted. See `sci-r01-synthesis-only-retry-ru.md` and ADR-035.
 
 ## SCI-HF01 Synthesis Contract Hotfix (2026-10-11)
 

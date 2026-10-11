@@ -156,7 +156,39 @@ locator ограничен recovery region, полный повтор **20 passe
 Security policy5 / offline deployment40 tests и desktop Vite build passed.
 Desktop/mobile screenshots проверены: recovery states и partial navigation
 видны, новая панель не создаёт горизонтального overflow.
-Compose config и git diff --check passed. CI/финальный commit пока pending.
+Compose config и git diff --check passed.
+
+## Фактический CI и Git
+
+Implementation commit `bf18bb9af84a69c16328185249f409823cadcfe4`
+(`feat: add safe synthesis-only recovery`) отправлен без force в origin/main.
+[CI38130490169](https://github.com/DanDan919/MedResearch/actions/runs/38130490169)
+завершился **success**: Build and test, Frontend, Actual API PostgreSQL HTTPS web RC.
+Workflow `.github/workflows/ci.yml`, ubuntu-latest, .NET10.0.x, Node24.x, pnpm11.19.0.
+Docker info passed; strict MEDRESEARCH_REQUIRE_DOCKER_TESTS=true.
+
+Фактические TRX notices из GitHub Checks: Domain50 / Application345 /
+Infrastructure197 / Integration223, **815 executed,815 passed,0 failed,0 skipped**.
+Все160 Docker-required cases (включая23 SCI-R01) выполнены на настоящем PostgreSQL,
+не EF InMemory/SQLite. Два изолированных Testcontainers fixtures применяют все
+forward migrations к свежим PostgreSQL17-alpine databases. Fresh-migration
+regression, EF pending-model check и Compose config passed.
+
+Frontend job прошёл frozen install, credential-free dependency security gate,
+generated API diff, lint/typecheck, unit tests,20 scientific browser fixtures,
+production Next build,17 synthetic OIDC/BFF cases и desktop Vite build.
+Отдельный web-release job прошёл production Next + actual API + migrated
+PostgreSQL + trusted HTTPS browser smoke и обе контейнерные сборки.
+Recovery browser fixtures остаются fake HTTP; десяти-study runtime recovery
+проверен отдельным fake LLM + real PostgreSQL тестом, не реальным vaping request.
+Никакой paid/scientific external network validation не заявляется.
+
+Первый CI зелёный; production stabilization fix после push не потребовался.
+Этот documentation-only follow-up фиксирует уже наблюдённый результат;
+финальный CI/HEAD будут также проверены и сообщены в чате. Исторические SCI-HF01/S0
+документы и старые migrations не изменены. Staged diff просмотрен, credential-shaped
+added lines:0. Local stand не перезапущен и пользовательская БД не мигрирована.
+Статус: **SCI-R01 COMPLETE — DETERMINISTIC** для новых trusted failures.
 
 ## Ограничения
 
