@@ -8,7 +8,7 @@ import type { ResearchRunProgressResponse } from "@medresearch/api";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@medresearch/ui";
 import { useResearchProgress } from "../../lib/api";
 import { ErrorPanel, LoadingPanel } from "../state-panel";
-import { ProgressPipelineStatus } from "./pipeline-status";
+import { ResearchPhases } from "./pipeline-status";
 import { ResearchStatusPill } from "./research-status-pill";
 
 export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
@@ -39,17 +39,19 @@ export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
         <ResearchStatusPill status={progress.status} />
       </div>
 
-      <ProgressPipelineStatus stages={progress.stages} />
+      <ResearchPhases progress={progress} />
 
       {progress.failureReason ? (
         <Card className="border-destructive">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <TriangleAlert className="h-4 w-4 text-destructive" />
-              Processing Failed
+              {progress.failureCategory === "ReportClaimLimitExceeded" ? "Report unavailable" : "Processing Failed"}
             </CardTitle>
             <CardDescription>
-              The backend stores a safe failure reason, not arbitrary provider payloads or a guessed failed stage.
+              {progress.metrics.evidenceFindingCount > 0 && progress.metrics.researchReportCount === 0
+                ? "Previously processed evidence is still available. No report was generated."
+                : "Processing stopped. Available results are listed below."}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm font-medium">{progress.failureReason}</CardContent>

@@ -443,7 +443,7 @@ static ResearchRunProgressResponse ToProgressResponse(ResearchRunProgress progre
             stage.State,
             stage.Metrics.Select(metric => new ResearchRunProgressMetricResponse(
                 metric.Label,
-                metric.Value)).ToArray())).ToArray());
+                metric.Value)).ToArray())).ToArray(), progress.FailureCategory);
 }
 
 static ResearchProvenanceResponse ToProvenanceResponse(ResearchProvenanceReadModel provenance)

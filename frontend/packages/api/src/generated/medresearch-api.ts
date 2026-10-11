@@ -768,6 +768,7 @@ export interface components {
             completedAt: null | string;
             /** Format: date-time */
             createdAt: string;
+            failureCategory: null | string;
             failureReason: null | string;
             metrics: components["schemas"]["ResearchRunProgressMetricsResponse"];
             processing: components["schemas"]["ResearchRunProcessingProgressResponse"];

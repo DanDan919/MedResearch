@@ -2,6 +2,7 @@ using System.Diagnostics;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Validation;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -133,6 +134,9 @@ public sealed class ResearchRunProcessor
 
             var failureReason = (run.Status, exception) switch
             {
+                (ResearchRunStatus.Synthesizing, ResearchSynthesisValidationException synthesis)
+                    when synthesis.Issues.Any(issue => issue.Code == ValidationIssueCodes.SynthesisClaimCountExceeded) =>
+                    ResearchProcessingFailures.ReportClaimLimitMessage,
                 (ResearchRunStatus.Extracting, EvidenceGroundingValidationException) =>
                     "Evidence extraction could not verify a unique source quotation. Unverified findings were not accepted.",
                 (ResearchRunStatus.Evaluating, EvidenceEvaluationValidationException evaluation)

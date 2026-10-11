@@ -210,6 +210,7 @@ function progressResponse() {
     completedAt: null,
     failureReason: null,
     refreshedAt: "2026-09-28T12:02:00Z",
+    failureCategory: null,
     processing: {
       leaseState: "Active",
       leaseExpiresAt: "2026-09-28T12:05:00Z",

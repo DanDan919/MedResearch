@@ -1,6 +1,7 @@
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Quantitative;
 using MedResearch.Application.Research.Synthesis;
+using System.Text.Json;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -307,6 +308,93 @@ public sealed class SynthesisContextBuilderTests
 
 public sealed class ResearchSynthesizerTests
 {
+    [Theory]
+    [InlineData(3)]
+    [InlineData(12)]
+    [InlineData(25)]
+    public async Task ClaimLimit_SchemaAndPromptMatchConfiguredValidator(int maximum)
+    {
+        var (context, draft) = ClaimCountScenario(1);
+        var client = new FakeStructuredLlmClient(draft);
+        await CreateSynthesizer(client, new SynthesisOptions { MaxClaims = maximum }).SynthesizeAsync(context, CancellationToken.None);
+        using var schema = JsonDocument.Parse(client.Request!.OutputSchema.JsonSchema);
+        Assert.Equal(maximum, schema.RootElement.GetProperty("properties").GetProperty("claims").GetProperty("maxItems").GetInt32());
+        Assert.Contains($"Generate no more than {maximum} scientific claims.", client.Request.SystemPrompt);
+        Assert.Contains($"Maximum scientific claims: {maximum}", client.Request.UserPrompt);
+    }
+
+    [Fact]
+    public void ClaimLimit_TwelveSupportedClaimsAreAccepted()
+    {
+        var (context, draft) = ClaimCountScenario(12);
+        var result = new ResearchReportDraftValidator(new()).Validate(context, draft, "fake", "fake", DateTimeOffset.UtcNow);
+        Assert.Equal(12, result.Claims.Count);
+    }
+
+    [Theory]
+    [InlineData(13)]
+    [InlineData(25)]
+    public void ClaimLimit_OverflowHasExactSafeRepairFeedback(int actual)
+    {
+        var (context, draft) = ClaimCountScenario(actual);
+        var error = Assert.Throws<ResearchSynthesisValidationException>(() =>
+            new ResearchReportDraftValidator(new()).Validate(context, draft, "fake", "fake", DateTimeOffset.UtcNow));
+        var issue = Assert.Single(error.Issues);
+        Assert.Equal("SynthesisClaimCountExceeded", issue.Code);
+        Assert.Equal("claims", issue.Path);
+        Assert.Contains($"Actual count: {actual}", issue.RepairInstruction);
+        Assert.Contains("Maximum allowed: 12", issue.RepairInstruction);
+        Assert.Contains("at most 12 claims", issue.RepairInstruction);
+    }
+
+    [Fact]
+    public async Task ClaimLimit_RepairReplacesAndRevalidatesWholeReport()
+    {
+        var (context, excessive) = ClaimCountScenario(13);
+        var corrected = excessive with { Claims = excessive.Claims!.Take(12).ToArray() };
+        var client = new SequenceStructuredLlmClient(excessive, corrected);
+        var result = await CreateSynthesizer(client).SynthesizeAsync(context, CancellationToken.None);
+        Assert.Equal(12, result.Claims.Count);
+        Assert.Equal(2, client.CallCount);
+        Assert.Contains("Actual count: 13", client.Requests[1].UserPrompt);
+        Assert.Contains("Maximum allowed: 12", client.Requests[1].UserPrompt);
+        Assert.Equal(client.Requests[0].OutputSchema, client.Requests[1].OutputSchema);
+    }
+
+    [Fact]
+    public async Task ClaimLimit_RepeatedOverflowStopsAfterExistingRepairBudget()
+    {
+        var (context, draft) = ClaimCountScenario(25);
+        var client = new SequenceStructuredLlmClient(draft, draft);
+        var error = await Assert.ThrowsAsync<ResearchSynthesisValidationException>(() =>
+            CreateSynthesizer(client).SynthesizeAsync(context, CancellationToken.None));
+        Assert.Equal(2, client.CallCount);
+        Assert.Equal("SynthesisClaimCountExceeded", Assert.Single(error.Issues).Code);
+    }
+
+    [Fact]
+    public async Task ClaimLimit_WithinLimitRepairStillRejectsUnsupportedScope()
+    {
+        var (context, draft) = ClaimCountScenario(13);
+        var bad = draft with { Claims = draft.Claims!.Take(12).Select(claim => claim with { Population = "invented population" }).ToArray() };
+        var client = new SequenceStructuredLlmClient(draft, bad);
+        await Assert.ThrowsAsync<ResearchSynthesisValidationException>(() => CreateSynthesizer(client).SynthesizeAsync(context, CancellationToken.None));
+        Assert.Equal(2, client.CallCount);
+    }
+
+    private static (SynthesisContext Context, ResearchReportDraft Draft) ClaimCountScenario(int count)
+    {
+        var run = Guid.NewGuid();
+        var studies = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray();
+        var evidence = Enumerable.Range(0, 29).Select(index =>
+            CreateEvidence(run, studies[index % 10], Guid.NewGuid(), EvidenceDirection.Positive) with { Outcome = $"outcome {index}" }).ToArray();
+        var context = CreateContext(evidence);
+        var claims = evidence.Take(count).Select((item, index) =>
+            CreateClaimDraft(index == 0 ? ResearchReportClaimType.Conclusion : ResearchReportClaimType.Finding,
+                ResearchReportClaimDirection.Positive, [item.EvidenceId]) with { Outcome = item.Outcome }).ToArray();
+        return (context, CreateValidDraft(evidence[0].EvidenceId) with { Claims = claims });
+    }
+
     [Fact]
     public async Task SynthesizeAsync_ValidDraftBecomesTraceableReport()
     {

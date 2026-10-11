@@ -1,5 +1,19 @@
 # MedResearch
 
+## Synthesis Contract And Partial Results (SCI-HF01)
+
+Structured report claims default to at most12. `Synthesis__MaxClaims` uses the
+existing bounded1..25 configuration; schema, prompt, validator and bounded repair
+feedback share the same effective value. Rejected drafts are never truncated or
+accepted without scientific revalidation. Previously persisted structured v3
+reports remain readable and are not regenerated merely by the v4 prompt bump.
+Failed report generation does not delete owner-scoped Evidence/provenance.
+Progress shows three user-facing phases with optional technical details; new
+claim-overflow failures have a safe category. Historical unknown failures stay
+unknown. Failed-run synthesis-only retry is not implemented; do not reset a run
+to repeat earlier paid stages. See the [Russian hotfix audit](docs/development/sci-hf01-synthesis-contract-recovery-ru.md).
+
+
 ## Atomic Research Admission (SAAS-003)
 
 `POST /api/research` now requires `Idempotency-Key: <non-empty UUID>`.

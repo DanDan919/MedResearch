@@ -1,5 +1,20 @@
 # Problems
 
+## 2026-10-11: Synthesis Claim Ceiling Mismatch
+
+Existing vaping run fe069f24 persisted10 extractions,29 Evidence and10
+InsufficientInformation evaluations, then rejected the report after two CLI
+outputs. Static schema allowed25 claims, default validator allowed12 and prompt
+did not communicate the ceiling. Actual rejected count was not persisted.
+SCI-HF01 aligns runtime schema/prompt/validator and bounded typed overflow repair
+feedback at the same configured limit, retaining default12 and full scientific
+revalidation. Seven contract tests failed before the fix; nine now pass.
+The failed report UI preserves partial owner-scoped reads without implying a
+report exists. Failed-run retry is deferred, not implemented through an unsafe
+status flip. Evaluation remains independent; abstract-only insufficient methods
+do not prove low quality or demonstrate that calls could safely be removed.
+See `sci-hf01-synthesis-contract-recovery-ru.md`.
+
 ## 2026-10-11: Live Cursor Ranking And Evaluation Contract Failures
 
 Real browser inspection also found a UI omission: report responses persisted

@@ -6,6 +6,21 @@ namespace MedResearch.Application.Tests;
 
 public sealed class ResearchProgressUseCaseTests
 {
+    [Theory]
+    [InlineData(ResearchRunStatus.Failed, true, "ReportClaimLimitExceeded")]
+    [InlineData(ResearchRunStatus.Failed, false, "ProcessingFailed")]
+    [InlineData(ResearchRunStatus.Completed, true, null)]
+    [InlineData(ResearchRunStatus.Cancelled, true, null)]
+    public async Task FailureCategory_UsesOnlyKnownPersistedFailureNotArtifactCounts(ResearchRunStatus status, bool knownFailure, string? expected)
+    {
+        var runId = Guid.NewGuid();
+        var reason = knownFailure ? MedResearch.Application.Research.Processing.ResearchProcessingFailures.ReportClaimLimitMessage : "Research processing failed.";
+        var store = new FakeProgressStore(new(runId, "Question", status, DateTimeOffset.UtcNow, null,
+            DateTimeOffset.UtcNow, reason, null, null, 1, Metrics(evidenceFindingCount: 29)));
+        var progress = await new GetResearchProgressUseCase(store, new TestCurrentActor()).ExecuteAsync(runId, CancellationToken.None);
+        Assert.Equal(expected, progress!.FailureCategory);
+    }
+
     [Fact]
     public async Task ExecuteAsync_ForActiveRunReportsCurrentStageAndActiveLease()
     {

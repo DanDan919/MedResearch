@@ -441,6 +441,21 @@ public sealed class ResearchApiTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData(true, "ReportClaimLimitExceeded")]
+    [InlineData(false, "ProcessingFailed")]
+    public async Task GetResearchProgress_FailureCategoryPreservesHistoricalUnknownCause(bool known, string category)
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        var id = Guid.NewGuid();
+        var reason = known ? MedResearch.Application.Research.Processing.ResearchProcessingFailures.ReportClaimLimitMessage : "Research processing failed.";
+        factory.Store.Seed(new(id, "Question", "Failed", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, reason));
+        var body = await client.GetFromJsonAsync<ResearchRunProgressResponse>($"/api/research/{id}/progress");
+        Assert.Equal(category, body!.FailureCategory);
+        Assert.Equal(reason, body.FailureReason);
+    }
+
 
     [Fact]
     public async Task GetResearchReport_WithCompletedReport_ReturnsReportAndCitationProjection()
@@ -481,6 +496,21 @@ public sealed class ResearchApiTests
         var response = await client.GetAsync($"/api/research/{runId}/report");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("research-synthesizer-v3-structured-claims", "StructuredClaims")]
+    [InlineData("research-synthesizer-v4-bounded-claims", "StructuredClaims")]
+    [InlineData("research-synthesizer-v3-structured-claims-unknown", "LegacyUnverified")]
+    public async Task GetResearchReport_RecognizesOnlyExplicitStructuredVersions(string version, string authority)
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        var id = Guid.NewGuid();
+        factory.Store.Seed(new(id, "Question", "Completed", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null));
+        factory.ReportStore.Seed(CreateReport(id, Guid.NewGuid(), ResearchReportStatus.Completed) with { PromptVersion = version });
+        var report = await client.GetFromJsonAsync<ResearchReportResponse>($"/api/research/{id}/report");
+        Assert.Equal(authority, report!.NarrativeAuthority);
     }
 
     [Fact]

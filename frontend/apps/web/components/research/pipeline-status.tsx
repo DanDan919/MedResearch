@@ -42,6 +42,36 @@ const progressIconByState = {
   Pending: Circle
 } as const;
 
+const phases = [
+  { label: "Finding sources", stages: ["Queued", "Planning", "Searching"] },
+  { label: "Analyzing evidence", stages: ["Extracting", "Evaluating"] },
+  { label: "Preparing report", stages: ["Synthesizing", "Completed"] }
+] as const;
+
+export function ResearchPhases({ progress }: { progress: ResearchRunProgressResponse }) {
+  const terminalFailure = progress.status === "Failed" || progress.status === "Cancelled";
+  return <div className="space-y-3">
+    <ol aria-label="Research phases" className="grid gap-3 sm:grid-cols-3">
+      {phases.map(phase => {
+        const stages = progress.stages.filter(stage => (phase.stages as readonly string[]).includes(stage.stage));
+        const hasSavedOutput = stages.some(stage => stage.stage !== "Queued" && stage.metrics.some(metric => metric.value > 0));
+        const state = terminalFailure ? hasSavedOutput ? "saved" : "unavailable"
+          : stages.some(stage => stage.state === "Current") ? "current"
+          : stages.length === phase.stages.length && stages.every(stage => stage.state === "Completed") ? "complete" : "pending";
+        const Icon = state === "current" ? Loader2 : state === "complete" ? CheckCircle2 : state === "unavailable" ? CircleAlert : Circle;
+        return <li key={phase.label} data-state={state} className={cn("min-h-16 border-b border-border py-3 text-sm", state === "current" && "border-primary")}>
+          <div className="flex items-center gap-2 font-medium"><Icon className={cn("h-4 w-4 shrink-0", state === "current" && "animate-spin text-primary")} />{phase.label}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{state === "saved" ? "Saved results" : state === "unavailable" ? "Unavailable" : state === "current" ? "In progress" : state === "complete" ? "Completed" : "Pending"}</p>
+        </li>;
+      })}
+    </ol>
+    <details className="border-b border-border pb-3">
+      <summary className="cursor-pointer text-sm text-muted-foreground">Technical stages</summary>
+      <div className="mt-3"><ProgressPipelineStatus stages={progress.stages} /></div>
+    </details>
+  </div>;
+}
+
 export function ProgressPipelineStatus({ stages }: { stages: ResearchRunProgressResponse["stages"] }) {
   return (
     <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">

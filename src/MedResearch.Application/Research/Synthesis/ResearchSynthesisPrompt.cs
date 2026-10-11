@@ -7,9 +7,18 @@ namespace MedResearch.Application.Research.Synthesis;
 
 public static class ResearchSynthesisPrompt
 {
-    public const string Version = "research-synthesizer-v3-structured-claims";
+    public const string Version = "research-synthesizer-v4-bounded-claims";
+    public const string PreviousStructuredVersion = "research-synthesizer-v3-structured-claims";
 
-    public static StructuredOutputSchema OutputSchema { get; } = new(
+    public static bool IsStructuredVersion(string version) => version is Version or PreviousStructuredVersion;
+
+    public static StructuredOutputSchema OutputSchema { get; } = CreateOutputSchema(SynthesisOptions.DefaultMaxClaims);
+
+    public static StructuredOutputSchema CreateOutputSchema(int maximumClaims)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumClaims, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maximumClaims, SynthesisOptions.MaximumMaxClaims);
+        return new(
         "research_report",
         JsonSerializer.Serialize(new
         {
@@ -30,7 +39,7 @@ public static class ResearchSynthesisPrompt
                 claims = new
                 {
                     type = "array",
-                    maxItems = 25,
+                    maxItems = maximumClaims,
                     items = new
                     {
                         type = "object",
@@ -55,14 +64,18 @@ public static class ResearchSynthesisPrompt
                 }
             }
         }));
+    }
 
-    public static ResearchSynthesisPromptText Create(SynthesisContext context)
+    public static ResearchSynthesisPromptText Create(SynthesisContext context, int maximumClaims = SynthesisOptions.DefaultMaxClaims)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(context.ResearchQuestion);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumClaims, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maximumClaims, SynthesisOptions.MaximumMaxClaims);
 
         return new ResearchSynthesisPromptText(
-            """
+            $"""
             You are a structured evidence synthesis component for MedResearch.
+            Generate no more than {maximumClaims} scientific claims. The maximum is a ceiling, not a target; never invent claims to fill it. Prefer relevant, well-supported, non-redundant claims while preserving scientifically material contradictory and uncertainty evidence. Do not select a convenient positive conclusion.
             Propose structured claim semantics only. Never return claim text, numeric values, or free report sections. MedResearch validates references and renders all authoritative sentences/numbers deterministically.
             Copy each outcome/population/intervention/comparator/timepoint exactly from all cited Evidence; null is missing context, not a wildcard. No paraphrase or generalization.
             QualitativeEffect requires every cited direction to agree. MixedEvidence is required for differing directions, including Positive plus NoClearEffect. Use exact cited subsets, never corpus-wide efficacy wording.
@@ -81,6 +94,7 @@ public static class ResearchSynthesisPrompt
             $"""
             Prompt version: {Version}
             researchRunId: {context.ResearchRunId}
+            Maximum scientific claims: {maximumClaims}
 
             Research question:
             {context.ResearchQuestion}

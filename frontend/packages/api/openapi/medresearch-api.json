@@ -2670,6 +2670,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "failureCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "failureReason": {
             "type": [
               "null",
@@ -2732,7 +2738,8 @@
           "refreshedAt",
           "processing",
           "metrics",
-          "stages"
+          "stages",
+          "failureCategory"
         ],
         "type": "object"
       },

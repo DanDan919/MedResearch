@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink, FileText, Printer, ShieldCheck } from "lucide-
 import { MedResearchApiError } from "@medresearch/api";
 import type { ResearchReportResponse } from "@medresearch/api";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@medresearch/ui";
-import { useResearchQuantitative, useResearchReport } from "../../lib/api";
+import { useResearchProgress, useResearchQuantitative, useResearchReport } from "../../lib/api";
 import { ErrorPanel, LoadingPanel } from "../state-panel";
 
 type Citation = ResearchReportResponse["claims"][number]["citations"][number];
@@ -15,7 +15,7 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
   const quantitativeQuery = useResearchQuantitative(researchRunId, query.isSuccess);
 
   if (query.isLoading) return <LoadingPanel title="Loading report" />;
-  if (query.isError || !query.data) return <ReportError error={query.error} />;
+  if (query.isError || !query.data) return <ReportError error={query.error} researchRunId={researchRunId} />;
 
   const report = query.data;
 
@@ -116,9 +116,19 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
   );
 }
 
-function ReportError({ error }: { error: unknown }) {
-  if (error instanceof MedResearchApiError && error.kind === "conflict") {
-    return <Card className="border-warning/50"><CardContent className="flex items-start gap-3 py-6"><FileText className="mt-0.5 h-4 w-4 text-warning" /><div><div className="text-sm font-medium">Report not ready</div><p className="mt-1 text-sm text-muted-foreground">This research run is known, but its persisted report is not available yet. Check back after synthesis completes.</p></div></CardContent></Card>;
+function ReportError({ error, researchRunId }: { error: unknown; researchRunId: string }) {
+  const knownWithoutReport = error instanceof MedResearchApiError && error.kind === "conflict";
+  const progress = useResearchProgress(researchRunId, knownWithoutReport);
+  if (knownWithoutReport && (progress.data?.status === "Failed" || progress.data?.status === "Cancelled")) {
+    return <section className="space-y-3">
+      <ErrorPanel title="Report unavailable" message={progress.data.failureReason ?? "Processing stopped without a persisted report."} />
+      {progress.data.metrics.evidenceFindingCount > 0 ? <p className="text-sm text-muted-foreground">Previously processed evidence is still available. No report was generated.</p> : null}
+      <Link className="text-sm text-primary underline" href={`/research/${researchRunId}/evidence`}>Evidence and source provenance</Link>
+    </section>;
+  }
+  if (knownWithoutReport) {
+    const active = progress.data && progress.data.status !== "Completed";
+    return <Card className="border-warning/50"><CardContent className="flex items-start gap-3 py-6"><FileText className="mt-0.5 h-4 w-4 text-warning" /><div><div className="text-sm font-medium">Report not ready</div><p className="mt-1 text-sm text-muted-foreground">{active ? "This research run is still processing. Check back after synthesis completes." : "No persisted report is available. Open the research run to check its current status."}</p><Link className="mt-2 block text-sm text-primary underline" href={`/research/${researchRunId}`}>Research run</Link></div></CardContent></Card>;
   }
   if (error instanceof MedResearchApiError && error.kind === "not-found") return <ErrorPanel title="Research run not found" message="The API could not find this research run." />;
   if (error instanceof MedResearchApiError && error.kind === "unauthorized") return <ErrorPanel title="Authentication required" message="Sign in to view this research report." />;

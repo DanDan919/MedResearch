@@ -45,7 +45,10 @@ public sealed record ResearchRunProgress(
     DateTimeOffset RefreshedAt,
     ResearchRunProcessingProgress Processing,
     ResearchRunProgressMetrics Metrics,
-    IReadOnlyCollection<ResearchRunStageProgress> Stages);
+    IReadOnlyCollection<ResearchRunStageProgress> Stages)
+{
+    public string? FailureCategory => global::MedResearch.Application.Research.Processing.ResearchProcessingFailures.Category(Status, FailureReason);
+}
 
 public sealed record ResearchRunProcessingProgress(
     string LeaseState,

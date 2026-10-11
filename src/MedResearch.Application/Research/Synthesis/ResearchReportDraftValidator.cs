@@ -15,6 +15,8 @@ public sealed class ResearchReportDraftValidator
         _options = options;
     }
 
+    public int MaximumClaims => _options.BoundedMaxClaims;
+
     public ResearchSynthesisResult Validate(
         SynthesisContext context,
         ResearchReportDraft draft,
@@ -98,9 +100,12 @@ public sealed class ResearchReportDraftValidator
         ResearchReportStatus status)
     {
         var drafts = draftClaims?.ToArray() ?? [];
-        if (drafts.Length > _options.BoundedMaxClaims)
+        if (drafts.Length > MaximumClaims)
         {
-            throw new ResearchSynthesisValidationException($"Research report claim count exceeds {_options.BoundedMaxClaims}.");
+            throw new ResearchSynthesisValidationException($"Research report claim count exceeds {MaximumClaims}.",
+                new ValidationIssue(ValidationIssueCodes.SynthesisClaimCountExceeded, "claims",
+                    $"Actual count: {drafts.Length}. Maximum allowed: {MaximumClaims}. The next output must contain at most {MaximumClaims} claims. Return a complete valid replacement document, not an array patch or blind truncation. Select supported non-redundant claims, preserve material contradictions and uncertainty, and satisfy all existing scope, evidence and numeric validation rules.",
+                    ValidationIssueDisposition.Repairable));
         }
 
         if (status == ResearchReportStatus.Completed && drafts.Length == 0)

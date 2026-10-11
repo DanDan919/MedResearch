@@ -1,5 +1,23 @@
 # Current State
 
+## SCI-HF01 Synthesis Contract Hotfix (2026-10-11)
+
+Previous dirty retrieval/planning/evaluation repairs were preserved in separate
+authorized commit `16898f9738444b42fa93ccd6727f106254f8799b`; S0 audit is unchanged.
+The new synthesis v4 contract derives schema, prompt, validator and typed repair
+feedback from the same effective MaxClaims (default12, existing configured1..25).
+Historical structured v3 reports retain authority and resume idempotency.
+New overflow failures expose a safe nullable progress category; partial owner-
+authorized Evidence remains readable. Three visible UI phases retain optional
+technical details. Failed/cancelled report routes no longer promise completion.
+Targeted synthesis-only retry is **NOT IMPLEMENTED**: Failed is terminal and lacks
+durable failed-stage/retry/idempotency metadata; lease fencing is not bypassed.
+Local634 backend cases passed/137 Docker skips; SDK45/Web141 and18 Chrome/17
+synthetic production-OIDC cases passed. Required PostgreSQL verification still
+depends on actually successful strict CI, not local skips. No new live scientific
+or LLM calls, migration or scientific algorithm changes. Details and evaluation
+cost audit: `sci-hf01-synthesis-contract-recovery-ru.md`.
+
 ## Real Pipeline Repair Follow-Up (2026-10-11)
 
 Continues the uncommitted three-source change set at actual HEAD

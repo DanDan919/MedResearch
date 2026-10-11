@@ -42,7 +42,8 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
             return _validator.CreateInsufficientEvidenceResult(context);
         }
 
-        var prompt = ResearchSynthesisPrompt.Create(context);
+        var maximumClaims = _validator.MaximumClaims;
+        var prompt = ResearchSynthesisPrompt.Create(context, maximumClaims);
         var startedAt = DateTimeOffset.UtcNow;
 
         _logger.LogInformation(
@@ -60,7 +61,7 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
                     ResearchSynthesisPrompt.Version,
                     prompt.SystemPrompt,
                     prompt.UserPrompt,
-                    ResearchSynthesisPrompt.OutputSchema),
+                    ResearchSynthesisPrompt.CreateOutputSchema(maximumClaims)),
                 (draft, metadata) => _validator.Validate(
                     context,
                     draft,

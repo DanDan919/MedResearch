@@ -29,6 +29,7 @@ public static class ValidationIssueCodes
     public const string InvalidDirection = "InvalidDirection";
     public const string ModelSuppliedCitationMetadata = "ModelSuppliedCitationMetadata";
     public const string SynthesisContractViolation = "SynthesisContractViolation";
+    public const string SynthesisClaimCountExceeded = "SynthesisClaimCountExceeded";
     public const string EvidenceCorpusInvariant = "EvidenceCorpusInvariant";
     public const string ClaimOutcomeMismatch = "ClaimOutcomeMismatch";
     public const string ClaimPopulationMismatch = "ClaimPopulationMismatch";

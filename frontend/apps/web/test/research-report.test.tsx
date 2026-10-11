@@ -96,6 +96,25 @@ describe("ResearchReport", () => {
     expect(await screen.findByText("Research run not found")).toBeInTheDocument();
   });
 
+  it.each(["Failed", "Cancelled"])("does not promise a future report for a confirmed %s run", async (status) => {
+    fetchMock.mockImplementation(async (input) => String(input).endsWith("/progress")
+      ? jsonResponse({ researchRunId: runId, question: "Does sleep improve recall?", status,
+        createdAt: "2026-09-28T12:00:00Z", startedAt: null, completedAt: "2026-09-28T12:05:00Z",
+        failureReason: null, failureCategory: status === "Failed" ? "ProcessingFailed" : null, refreshedAt: "2026-09-28T12:05:00Z",
+        processing: { leaseState: "Terminal", leaseExpiresAt: null, lastHeartbeatAt: null, leaseVersion: 1 },
+        metrics: Object.fromEntries(["researchPlanCount", "plannedSearchQueryCount", "literatureSearchCount", "literatureSearchSourceCount",
+          "literatureSearchResultCount", "discoveryPathCount", "distinctDiscoveredStudyCount", "currentSourceMaterialCount",
+          "structuredFullTextMaterialCount", "abstractMaterialCount", "evidenceExtractionCount", "completedEvidenceExtractionCount",
+          "skippedEvidenceExtractionCount", "evidenceFindingCount", "evidenceEvaluationCount", "completedEvidenceEvaluationCount",
+          "skippedEvidenceEvaluationCount", "researchReportCount", "researchReportClaimCount"].map(key => [key, key === "evidenceFindingCount" ? 29 : 0])),
+        stages: [] }) : problemResponse(409, "Report is not ready."));
+    renderWithClient(<ResearchReport researchRunId={runId} />);
+    expect(await screen.findByText("Processing stopped without a persisted report.")).toBeInTheDocument();
+    expect(screen.queryByText(/Check back after synthesis/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Evidence and source provenance" })).toHaveAttribute("href", `/research/${runId}/evidence`);
+    expect(screen.getByText("Previously processed evidence is still available. No report was generated.")).toBeInTheDocument();
+  });
+
   it("does not invent identifiers or scientific fields when the API has missing data", async () => {
     fetchMock.mockResolvedValue(jsonResponse(reportResponse({ missingStudyData: true })));
 

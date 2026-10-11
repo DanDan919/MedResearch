@@ -45,13 +45,13 @@ export function useResearchRun(researchRunId: string) {
   });
 }
 
-export function useResearchProgress(researchRunId: string) {
+export function useResearchProgress(researchRunId: string, enabled = true) {
   const client = useApiClient();
 
   return useQuery({
     queryKey: queryKeys.research.progress(researchRunId),
     queryFn: ({ signal }) => client.getResearchProgress(researchRunId, signal),
-    enabled: researchRunId.length > 0,
+    enabled: enabled && researchRunId.length > 0,
     refetchInterval: (query) => (shouldPollResearchStatus(query.state.data?.status) ? 5_000 : false)
   });
 }

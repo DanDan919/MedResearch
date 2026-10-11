@@ -1,5 +1,21 @@
 # Architecture
 
+## SCI-HF01 Report Generation Contract
+
+ResearchSynthesizer obtains the effective claim maximum from its validator's
+SynthesisOptions. Runtime schema.maxItems, system/user prompts and typed bounded
+repair feedback agree with that validator (default12; existing configured1..25).
+Overflow replacements are validated in full; no array truncation or relaxed
+scientific support checks are used. v4 writes preserve literal v3 structured
+report read authority and resume idempotency, without trusting arbitrary prefixes.
+Progress adds a nullable safe failureCategory derived only from known persisted
+failure reasons, never inferred from artifact counts. Failed partial provenance
+remains owner-filtered. Three presentation phases do not change domain stages;
+optional technical metrics remain available. Failed-run synthesis retry is not
+implemented because terminal-state eligibility and a durable bounded retry ledger
+are absent; active-stage crash reclaim/fencing semantics remain unchanged.
+
+
 ## F18 Web Release Verification Boundary
 
 The web release harness runs the production Next standalone server/BFF, a

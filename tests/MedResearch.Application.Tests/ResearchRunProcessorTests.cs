@@ -2,6 +2,7 @@ using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Validation;
+using MedResearch.Application.Research.Synthesis;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -9,6 +10,24 @@ namespace MedResearch.Application.Tests;
 
 public sealed class ResearchRunProcessorTests
 {
+    [Theory]
+    [InlineData(ResearchRunStatus.Synthesizing, true)]
+    [InlineData(ResearchRunStatus.Extracting, false)]
+    public async Task ClaimOverflowFailure_IsSafeAndStageSpecific(ResearchRunStatus stage, bool reportFailure)
+    {
+        var run = CreateClaimedRun();
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "question"));
+        var exception = new ResearchSynthesisValidationException("Untrusted secret payload",
+            new ValidationIssue(ValidationIssueCodes.SynthesisClaimCountExceeded, "claims", "bounded instruction", ValidationIssueDisposition.Repairable));
+        await new ResearchRunProcessor(queue, new RecordingStageExecutor(stage, exception), NullLogger<ResearchRunProcessor>.Instance)
+            .ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
+        Assert.Equal(reportFailure
+            ? "The report could not be generated because the response exceeded the allowed claim limit. Previously processed sources remain available."
+            : "Research processing failed.", run.FailureReason);
+        Assert.Null(run.ProcessingLeaseOwner);
+        Assert.DoesNotContain("Untrusted", run.FailureReason);
+    }
+
     [Fact]
     public async Task ProcessNextQueuedRunAsync_AdvancesClaimedRunThroughLifecycle()
     {

@@ -1,6 +1,11 @@
 using MedResearch.Application.Research.Extraction;
 using MedResearch.Application.Research.Provenance;
 using MedResearch.Application.Research.Synthesis;
+using MedResearch.Application.Research.Ai;
+using MedResearch.Application.Research.Processing;
+using MedResearch.Application.Research;
+using MedResearch.Infrastructure.Research.Processing;
+using Microsoft.Extensions.Logging.Abstractions;
 using MedResearch.Domain;
 using MedResearch.Infrastructure.Research;
 using MedResearch.Infrastructure.Synthesis.Persistence;
@@ -11,6 +16,130 @@ namespace MedResearch.IntegrationTests;
 [Collection(PostgreSqlCollection.Name)]
 public sealed class ResearchReportStoreTests
 {
+    [SkippableFact]
+    public async Task SynthesisHotfix_TenStudies29Evidence10InsufficientEvaluations_PersistsFencedReport()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedTenStudyRunAsync();
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var run = await db.ResearchRuns.SingleAsync(x => x.Id == seed);
+            var now = DateTimeOffset.UtcNow;
+            run.StartPlanning(now);
+            run.StartSearching(now);
+            run.StartExtraction(now);
+            run.StartEvaluation(now);
+            run.StartSynthesis(now);
+            run.AssignLease("sci-hf01", now, now.AddMinutes(5), 1);
+            await db.SaveChangesAsync();
+            var fence = new PostgreSqlResearchRunWriteFence(db);
+            fence.Attach(new ClaimedResearchRun(run, "Does sleep improve recall?", "sci-hf01", 1, now.AddMinutes(5), false));
+            var store = new EfResearchSynthesisStore(db, fence);
+            var corpus = await new SynthesisContextBuilder(store, new(), NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(seed, CancellationToken.None);
+            Assert.Equal(10, corpus.Studies.Count);
+            Assert.Equal(29, corpus.Statistics.IncludedEvidenceFindingCount);
+            Assert.Equal(10, corpus.Statistics.EvaluatedStudyCount);
+            Assert.All(corpus.Studies, study => Assert.Equal(MethodologicalConfidence.InsufficientInformation, study.Evaluation!.OverallConfidence));
+            var draft = new ResearchReportDraft("Completed", null, null, null, null, null, null, "VeryLimited",
+                corpus.Studies.SelectMany(study => study.Evidence).Take(12).Select((item, index) =>
+                    new ResearchReportClaimDraft(index == 0 ? "Conclusion" : "Finding", "Positive", null, [item.EvidenceId.ToString()],
+                        Kind: "QualitativeEffect", Outcome: item.Outcome, Population: item.Population,
+                        ExposureOrIntervention: item.ExposureOrIntervention, Comparator: item.Comparator, Timepoint: item.Timepoint)).ToArray());
+            var fake = new HotfixSynthesisClient(draft);
+            var result = await new ResearchSynthesizer(fake, new ResearchReportDraftValidator(new()), NullLogger<ResearchSynthesizer>.Instance)
+                .SynthesizeAsync(corpus, CancellationToken.None);
+            await store.PersistReportAsync(result, CancellationToken.None);
+            await store.PersistReportAsync(result, CancellationToken.None);
+            Assert.Equal(1, fake.CallCount);
+        }
+        await using var fresh = _fixture.CreateDbContext();
+        var report = await new EfResearchSynthesisStore(fresh).FindReportAsync(seed, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        Assert.Equal(12, report!.Claims.Count);
+        Assert.All(report.Claims, claim => Assert.Equal(ResearchClaimGroundingStatus.StructuredValidated, claim.GroundingStatus));
+        Assert.Equal(29, await fresh.Evidence.CountAsync(x => x.ResearchRunId == seed));
+        Assert.Equal(10, await fresh.EvidenceExtractions.CountAsync(x => x.ResearchRunId == seed));
+        Assert.Equal(10, await fresh.EvidenceEvaluations.CountAsync(x => x.ResearchRunId == seed && x.OverallConfidence == MethodologicalConfidence.InsufficientInformation));
+        Assert.Equal(1, await fresh.ResearchReports.CountAsync(x => x.ResearchRunId == seed));
+    }
+
+    [SkippableFact]
+    public async Task SynthesisHotfix_FailedRunRetainsPartialEvidenceAndOwnerIsolation()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedTenStudyRunAsync();
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var run = await db.ResearchRuns.SingleAsync(x => x.Id == seed);
+            run.Fail(ResearchProcessingFailures.ReportClaimLimitMessage, DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
+        await using var fresh = _fixture.CreateDbContext();
+        var store = new EfResearchProvenanceStore(fresh);
+        var partial = await store.FindAsync(seed, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None);
+        Assert.Equal(29, partial!.Studies.Sum(study => study.Evidence.Count));
+        Assert.Equal(10, partial.Studies.Sum(study => study.Evaluations.Count));
+        Assert.Empty(partial.ReportClaims);
+        Assert.Null(await store.FindAsync(seed, "another-owner", CancellationToken.None));
+        var progress = new EfResearchProgressStore(fresh);
+        Assert.Null(await progress.FindResearchRunProgressSnapshotAsync(seed, "another-owner", CancellationToken.None));
+        Assert.Equal(29, (await progress.FindResearchRunProgressSnapshotAsync(seed, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None))!.Metrics.EvidenceFindingCount);
+        Assert.Null(await new EfResearchSynthesisStore(fresh).FindReportAsync(seed, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None));
+    }
+
+    [SkippableFact]
+    public async Task SynthesisHotfix_PreviousStructuredReportRemainsAnIdempotencyBarrier()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var seed = await SeedRunWithEvidenceAsync(1);
+        await using var db = _fixture.CreateDbContext();
+        await new EfResearchSynthesisStore(db).PersistReportAsync(await CreateStructuredResultAsync(db, seed.RunId), CancellationToken.None);
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE research_reports SET prompt_version = {ResearchSynthesisPrompt.PreviousStructuredVersion} WHERE research_run_id = {seed.RunId}");
+        await using var fresh = _fixture.CreateDbContext();
+        Assert.True(await new EfResearchSynthesisStore(fresh).HasReportAsync(seed.RunId, ResearchSynthesisPrompt.Version, CancellationToken.None));
+        Assert.Equal(ResearchSynthesisPrompt.PreviousStructuredVersion,
+            (await new EfResearchSynthesisStore(fresh).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None))!.PromptVersion);
+    }
+
+    private async Task<Guid> SeedTenStudyRunAsync()
+    {
+        var seed = await SeedRunWithEvidenceAsync(2, discoveredStudyCount: 10);
+        await using var db = _fixture.CreateDbContext();
+        var searchId = await db.LiteratureSearches.Where(x => x.ResearchRunId == seed.RunId).Select(x => x.Id).SingleAsync();
+        for (var index = 0; index < 9; index++)
+        {
+            var study = new Study(Guid.NewGuid(), $"Synthetic hotfix study {index}", "A trial reported improved recall in 120 adults.", $"10.4242/{Guid.NewGuid():N}", null, "Journal", null, "PubMed");
+            var source = SourceMaterial.Create(study.Id, SourceMaterialType.Abstract, "PubMed", study.Doi, "SearchMetadataAbstract", study.Abstract!, 1,
+                DateTimeOffset.UtcNow, null, null, null, SourceMaterialAccessStatus.Unknown, false, ["Abstract"]);
+            var extraction = new EvidenceExtraction(Guid.NewGuid(), seed.RunId, study.Id, source.Id, EvidenceExtractionStatus.Completed, null,
+                EvidenceSourceScope.Abstract, "FakeLLM", "fake-model", EvidenceExtractionPrompt.Version, DateTimeOffset.UtcNow, 3, true);
+            var findings = Enumerable.Range(0, 3).Select(_ => new Evidence(Guid.NewGuid(), seed.RunId, study.Id, extraction.Id, "recall", "Recall improved after sleep.",
+                "reported improved recall in 120 adults", EvidenceDirection.Positive, EvidenceSourceScope.Abstract, DateTimeOffset.UtcNow, true,
+                "adults", "sleep", "wakefulness", "controlled trial", 120, null, null, null, null, null)).ToArray();
+            db.Studies.Add(study);
+            db.ResearchStudyDiscoveries.Add(new ResearchStudyDiscovery(Guid.NewGuid(), seed.RunId, searchId, study.Id, "PubMed", study.Doi, DateTimeOffset.UtcNow));
+            db.SourceMaterials.Add(source);
+            db.EvidenceExtractions.Add(extraction);
+            db.Evidence.AddRange(findings);
+            db.EvidenceEvaluations.Add(CreateEvaluation(seed.RunId, study.Id, findings.Select(x => x.Id).ToArray()));
+        }
+        await db.SaveChangesAsync();
+        return seed.RunId;
+    }
+
+    private sealed class HotfixSynthesisClient(ResearchReportDraft draft) : IStructuredLlmClient
+    {
+        public int CallCount { get; private set; }
+        public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(StructuredLlmRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(typeof(ResearchReportDraft), typeof(T));
+            using var schema = System.Text.Json.JsonDocument.Parse(request.OutputSchema.JsonSchema);
+            Assert.Equal(12, schema.RootElement.GetProperty("properties").GetProperty("claims").GetProperty("maxItems").GetInt32());
+            CallCount++;
+            return Task.FromResult(new StructuredGenerationResult<T>((T)(object)draft, new("FakeLLM", "deterministic", null, DateTimeOffset.UtcNow)));
+        }
+    }
+
     private const string LegacyPromptVersion = "research-synthesizer-v2-trusted-evidence";
     private readonly PostgreSqlFixture _fixture;
 
@@ -494,13 +623,13 @@ public sealed class ResearchReportStoreTests
         return new ResearchReportDraftValidator(new()).Validate(context, new("Completed", null, null, null, null, null, null, "Limited", [proposal]), "fake", "fake", DateTimeOffset.UtcNow);
     }
 
-    private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount)
+    private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount, int discoveredStudyCount = 1)
     {
         await using var context = _fixture.CreateDbContext();
         var question = new ResearchQuestion("Does sleep improve recall?", DateTimeOffset.UtcNow);
         var run = new ResearchRun(question.Id, question.CreatedAt);
         var plan = new ResearchPlan(Guid.NewGuid(), run.Id, question.Id, question.Text, "adults", "sleep", "wakefulness", ["recall"], ["controlled trial"], ["sleep recall"], [], "FakeLLM", "fake-model", "research-planner-v1", DateTimeOffset.UtcNow);
-        var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, 1, 1, 0, plan.Id);
+        var search = new LiteratureSearch(Guid.NewGuid(), run.Id, "PubMed", "sleep recall", DateTimeOffset.UtcNow, discoveredStudyCount, discoveredStudyCount, 0, plan.Id);
         var doi = $"10.4242/{Guid.NewGuid():N}";
         var pmid = RandomPmid();
         var study = new Study(Guid.NewGuid(), "Sleep and recall report", "A trial reported improved recall in 120 adults.", doi, pmid, "Journal", new DateOnly(2026, 1, 1), "PubMed");

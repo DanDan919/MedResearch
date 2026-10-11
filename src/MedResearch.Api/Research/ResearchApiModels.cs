@@ -43,7 +43,8 @@ public sealed record ResearchRunProgressResponse(
     DateTimeOffset RefreshedAt,
     ResearchRunProcessingProgressResponse Processing,
     ResearchRunProgressMetricsResponse Metrics,
-    IReadOnlyCollection<ResearchRunStageProgressResponse> Stages);
+    IReadOnlyCollection<ResearchRunStageProgressResponse> Stages,
+    string? FailureCategory = null);
 
 public sealed record ResearchRunProcessingProgressResponse(
     string LeaseState,
@@ -97,7 +98,7 @@ public sealed record ResearchReportResponse(
     IReadOnlyCollection<string> DeterministicLimitations,
     IReadOnlyCollection<ResearchReportClaimResponse> Claims)
 {
-    public string NarrativeAuthority => PromptVersion == MedResearch.Application.Research.Synthesis.ResearchSynthesisPrompt.Version
+    public string NarrativeAuthority => MedResearch.Application.Research.Synthesis.ResearchSynthesisPrompt.IsStructuredVersion(PromptVersion)
         ? "StructuredClaims" : "LegacyUnverified";
 }
 

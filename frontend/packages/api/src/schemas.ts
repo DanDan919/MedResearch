@@ -65,6 +65,7 @@ export const researchRunProgressResponseSchema = z.object({
   startedAt: z.string().nullable(),
   completedAt: z.string().nullable(),
   failureReason: z.string().nullable(),
+  failureCategory: z.enum(["ReportClaimLimitExceeded", "ProcessingFailed"]).nullable(),
   refreshedAt: z.string(),
   processing: z.object({
     leaseState: z.enum(["None", "Active", "Expired", "Terminal"]),

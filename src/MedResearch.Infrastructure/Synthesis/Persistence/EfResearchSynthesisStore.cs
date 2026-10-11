@@ -232,7 +232,9 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
 
         return await _dbContext.ResearchReports
             .AsNoTracking()
-            .AnyAsync(report => report.ResearchRunId == researchRunId && report.PromptVersion == promptVersion, cancellationToken);
+            .AnyAsync(report => report.ResearchRunId == researchRunId &&
+                (report.PromptVersion == promptVersion ||
+                    (promptVersion == ResearchSynthesisPrompt.Version && report.PromptVersion == ResearchSynthesisPrompt.PreviousStructuredVersion)), cancellationToken);
     }
 
     public async Task PersistReportAsync(ResearchSynthesisResult result, CancellationToken cancellationToken)
