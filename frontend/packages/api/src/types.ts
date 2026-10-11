@@ -1,5 +1,5 @@
 import type { components } from "./generated/medresearch-api";
-import { researchProvenanceResponseSchema, researchReportResponseSchema, researchRunProgressResponseSchema } from "./schemas";
+import { researchProvenanceResponseSchema, researchReportResponseSchema, researchRunProgressResponseSchema, synthesisRetryStateSchema } from "./schemas";
 import type { z } from "zod";
 
 export type CreateResearchRequest = components["schemas"]["CreateResearchRequest"];
@@ -13,6 +13,7 @@ export type ResearchReportResponse = z.infer<typeof researchReportResponseSchema
 export type QuantitativeSynthesisArtifactResponse = components["schemas"]["QuantitativeSynthesisArtifactResponse"];
 export type ResearchProvenanceResponse = z.infer<typeof researchProvenanceResponseSchema>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
+export type SynthesisRetryState = z.infer<typeof synthesisRetryStateSchema>;
 
 export type HealthState = "connected" | "unavailable";
 

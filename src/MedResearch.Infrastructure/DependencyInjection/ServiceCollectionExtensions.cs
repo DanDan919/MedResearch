@@ -29,6 +29,7 @@ using MedResearch.Application.Research.Provenance;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -73,6 +74,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISynthesisCorpusStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
         services.AddScoped<IResearchReportStore>(provider => provider.GetRequiredService<EfResearchSynthesisStore>());
         services.AddScoped<IQuantitativeSynthesisArtifactStore, EfQuantitativeSynthesisArtifactStore>();
+        services.AddScoped<SynthesisRetryInputs>();
+        services.TryAddScoped<IQuantitativeStatisticalSynthesizer, FixedEffectQuantitativeStatisticalSynthesizer>();
+        services.AddScoped<EfSynthesisRetryStore>();
+        services.AddScoped<ISynthesisRetryStore>(provider => provider.GetRequiredService<EfSynthesisRetryStore>());
+        services.AddScoped<ISynthesisRetryGenerationBudget>(provider => provider.GetRequiredService<EfSynthesisRetryStore>());
 
         var openAIOptions = CreateOpenAIOptions(configuration);
         if (string.Equals(openAIOptions.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))

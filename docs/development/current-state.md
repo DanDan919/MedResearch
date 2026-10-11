@@ -1,5 +1,17 @@
 # Current State
 
+## SCI-R01 Synthesis-Only Recovery (2026-10-11)
+
+Adds owner-authenticated GET/POST retry-synthesis, durable failed-stage provenance,
+one unique retry per run, input fingerprint verification and per-generation fenced
+reservations (default2/max3). Existing worker claims queued retry intent straight
+into Synthesizing, not Planning. Pending/uncertain calls stop as OutcomeUnknown;
+prior stages and scientific/quantitative validators remain unchanged. Legacy
+generic failures remain unavailable, without backfill or operator override.
+Local655 backend passed/160 Docker skips; strict PostgreSQL CI verification is
+required before claiming deterministic completion. No live research/provider calls
+or user database changes. See `sci-r01-synthesis-only-retry-ru.md` and ADR-035.
+
 ## SCI-HF01 Synthesis Contract Hotfix (2026-10-11)
 
 Previous dirty retrieval/planning/evaluation repairs were preserved in separate

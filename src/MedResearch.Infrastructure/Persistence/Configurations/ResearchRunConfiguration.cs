@@ -43,6 +43,9 @@ internal sealed class ResearchRunConfiguration : IEntityTypeConfiguration<Resear
             .HasColumnName("failure_reason")
             .HasMaxLength(2_000);
 
+        builder.Property(run => run.FailedStage).HasColumnName("failed_stage").HasConversion<string>().HasMaxLength(32);
+        builder.Property(run => run.FailureCategory).HasColumnName("failure_category").HasMaxLength(64);
+
         builder.Property(run => run.ProcessingLeaseOwner)
             .HasColumnName("processing_lease_owner")
             .HasMaxLength(128);

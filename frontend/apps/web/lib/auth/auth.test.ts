@@ -20,6 +20,39 @@ function request(path = "/api/backend/api/research", method = "GET", headers: Re
 const dependencies = () => ({ config, readSession: vi.fn(async () => data), verifyToken: vi.fn(async () => ({ subject: data.subject, expiresAt: data.expiresAt })),
   fetch: vi.fn<typeof fetch>(async () => Response.json({ items: [] })) });
 
+describe("synthesis retry BFF", () => {
+  const path = "/api/backend/api/research/11111111-1111-4111-8111-111111111111/retry-synthesis";
+  const headers = { origin: config.webOrigin, "content-type": "application/json", "idempotency-key": "22222222-2222-4222-8222-222222222222" };
+  it("allows only exact scoped GET/POST retry paths", () => {
+    expect(allowedUpstreamPath(new URL(config.webOrigin + path), "POST")).toBe(path.replace("/api/backend", ""));
+    for (const [url, method] of [[path + "?owner=UserB", "GET"], [path + "/extra", "POST"], [path, "PUT"], [path.replace("retry-synthesis", "report"), "POST"]])
+      expect(allowedUpstreamPath(new URL(config.webOrigin + url), method)).toBeNull();
+  });
+  it("forwards only private bearer, validated key and empty body", async () => {
+    const deps = dependencies();
+    const result = await forwardBackend(request(path, "POST", { ...headers, authorization: "Bearer browser-forgery", "x-owner": "UserB" }, "{}"), deps);
+    expect(result.status).toBe(200);
+    const init = deps.fetch.mock.calls[0][1]!;
+    expect(init.body).toBe("{}");
+    expect(init.headers).toEqual(expect.objectContaining({ Authorization: `Bearer ${data.accessToken}`, "Idempotency-Key": headers["idempotency-key"] }));
+    expect(JSON.stringify(init.headers)).not.toContain("browser-forgery");
+    expect(JSON.stringify(init.headers)).not.toContain("UserB");
+    expect(result.headers.get("cache-control")).toContain("no-store");
+  });
+  it.each(["{\"owner\":\"UserB\"}", "{\"question\":\"new research\"}", "[]", "null"])("rejects extra retry payload %s before API", async body => {
+    const deps = dependencies();
+    expect((await forwardBackend(request(path, "POST", headers, body), deps)).status).toBe(400);
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+  it("rejects cross-origin and anonymous mutations", async () => {
+    const deps = dependencies();
+    expect((await forwardBackend(request(path, "POST", { ...headers, origin: "https://evil.example" }, "{}"), deps)).status).toBe(403);
+    deps.readSession.mockResolvedValue(null as unknown as PrivateSession);
+    expect((await forwardBackend(request(path, "POST", headers, "{}"), deps)).status).toBe(401);
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("web authentication configuration", () => {
   it("preserves exact issuer and distinct API audience", () => { expect(config.mode).toBe("oidc"); expect(config.issuer).toBe(env.OIDC_ISSUER); });
   it.each(["OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_API_AUDIENCE", "OIDC_ISSUER", "OIDC_SCOPE", "WEB_SESSION_SECRET", "WEB_AUTH_ORIGIN", "MEDRESEARCH_API_INTERNAL_URL"])("fails closed without %s", key => {

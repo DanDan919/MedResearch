@@ -19,7 +19,9 @@ public sealed class ResearchRun
         DateTimeOffset? processingLeaseAcquiredAt = null,
         DateTimeOffset? processingLeaseExpiresAt = null,
         DateTimeOffset? lastHeartbeatAt = null,
-        long processingLeaseVersion = 0)
+        long processingLeaseVersion = 0,
+        ResearchRunStatus? failedStage = null,
+        string? failureCategory = null)
     {
         if (id == Guid.Empty)
         {
@@ -48,6 +50,8 @@ public sealed class ResearchRun
         ProcessingLeaseExpiresAt = processingLeaseExpiresAt;
         LastHeartbeatAt = lastHeartbeatAt;
         ProcessingLeaseVersion = processingLeaseVersion;
+        FailedStage = failedStage;
+        FailureCategory = failureCategory;
     }
 
     public Guid Id { get; }
@@ -63,6 +67,10 @@ public sealed class ResearchRun
     public DateTimeOffset? CompletedAt { get; private set; }
 
     public string? FailureReason { get; private set; }
+
+    public ResearchRunStatus? FailedStage { get; private set; }
+
+    public string? FailureCategory { get; private set; }
 
     public string? ProcessingLeaseOwner { get; private set; }
 
@@ -100,6 +108,8 @@ public sealed class ResearchRun
         }
 
         EnsureNotTerminal(ResearchRunStatus.Failed);
+        FailedStage = Status;
+        FailureCategory = "ProcessingFailed";
         Status = ResearchRunStatus.Failed;
         FailureReason = failureReason.Trim();
         CompletedAt = failedAt;

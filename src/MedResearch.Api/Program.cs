@@ -55,6 +55,8 @@ app.UseExceptionHandler(errorApp =>
 
         var (statusCode, title) = exception switch
         {
+            BadHttpRequestException => (StatusCodes.Status400BadRequest, "Invalid request"),
+            SynthesisRetryConflictException => (StatusCodes.Status409Conflict, "Report retry is not available for this run"),
             ResearchAdmissionException admission => (ResearchAdmissionProblems.Describe(admission.Failure).Status, ResearchAdmissionProblems.Describe(admission.Failure).Title),
             DbException { IsTransient: true } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
             Exception { InnerException: DbException { IsTransient: true } } => (StatusCodes.Status503ServiceUnavailable, "The research database is temporarily unavailable"),
@@ -85,8 +87,10 @@ app.UseExceptionHandler(errorApp =>
             statusCode: statusCode,
             extensions: exception is ResearchAdmissionException rejection
                 ? new Dictionary<string, object?> { ["code"] = ResearchAdmissionProblems.Describe(rejection.Failure).Code }
+                : exception is SynthesisRetryConflictException
+                ? new Dictionary<string, object?> { ["code"] = "synthesis-retry-unavailable" }
                 : statusCode == StatusCodes.Status400BadRequest
-                ? new Dictionary<string, object?> { ["error"] = exception?.Message }
+                ? new Dictionary<string, object?> { ["error"] = exception is BadHttpRequestException ? "Invalid request body." : exception?.Message }
                 : null)
             .ExecuteAsync(context);
         });
@@ -116,6 +120,17 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 var research = app.MapGroup("/api/research")
     .WithTags("Research")
     .RequireAuthorization(AuthenticationConfiguration.PolicyName);
+
+research.MapGet("/{researchRunId:guid}/retry-synthesis", async (Guid researchRunId, SynthesisRetryUseCase useCase, CancellationToken token) =>
+    await useCase.GetAsync(researchRunId, token) is { } state ? Results.Ok(state) : Results.NotFound())
+    .WithName("GetSynthesisRetry").Produces<SynthesisRetryState>().Produces(StatusCodes.Status404NotFound);
+
+research.MapPost("/{researchRunId:guid}/retry-synthesis", async (Guid researchRunId,
+        [FromBody] SynthesisRetryRequest request, [FromHeader(Name = "Idempotency-Key")] string? key, SynthesisRetryUseCase useCase, CancellationToken token) =>
+    await useCase.RequestAsync(researchRunId, key, token) is { } state
+        ? Results.Accepted($"/api/research/{researchRunId}/retry-synthesis", state) : Results.NotFound())
+    .WithName("RetrySynthesis").Produces<SynthesisRetryState>(StatusCodes.Status202Accepted)
+    .Produces(StatusCodes.Status404NotFound).Produces<ProblemDetails>(StatusCodes.Status400BadRequest).Produces<ProblemDetails>(StatusCodes.Status409Conflict);
 
 research.MapPost("/", async (
         CreateResearchRequest request,

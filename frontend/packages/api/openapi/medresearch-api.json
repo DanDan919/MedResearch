@@ -3137,6 +3137,60 @@
           "evaluations"
         ],
         "type": "object"
+      },
+      "SynthesisRetryRequest": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "SynthesisRetryState": {
+        "properties": {
+          "attemptStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "availability": {
+            "type": "string"
+          },
+          "failureCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "generationBudget": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "generationCallsReserved": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "researchRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "retryAttemptId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "researchRunId",
+          "availability",
+          "retryAttemptId",
+          "attemptStatus",
+          "generationBudget",
+          "generationCallsReserved",
+          "failureCategory"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -3237,7 +3291,7 @@
         "operationId": "CreateResearch",
         "parameters": [
           {
-            "description": "Owner-scoped submission UUID. Reuse for retries of the same canonical question.",
+            "description": "Owner-scoped idempotency UUID. Reuse for the same deliberate operation.",
             "in": "header",
             "name": "Idempotency-Key",
             "required": true,
@@ -3660,6 +3714,142 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/research/{researchRunId}/retry-synthesis": {
+      "get": {
+        "operationId": "GetSynthesisRetry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynthesisRetryState"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Research"
+        ]
+      },
+      "post": {
+        "operationId": "RetrySynthesis",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "researchRunId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Owner-scoped idempotency UUID. Reuse for the same deliberate operation.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "maxLength": 36,
+              "minLength": 36,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SynthesisRetryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynthesisRetryState"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "503": {
             "description": "Research database temporarily unavailable"

@@ -67,6 +67,9 @@ public sealed class ResearchRunProcessor
         var run = claimedRun.Run;
         _writeFence?.Attach(claimedRun);
 
+        if (claimedRun.SynthesisRetryId is { } retryId)
+            _logger.LogInformation("SynthesisRetryClaimed. ResearchRunId: {ResearchRunId}; RetryAttemptId: {RetryAttemptId}; WorkerId: {WorkerId}; LeaseVersion: {LeaseVersion}", run.Id, retryId, workerInstanceId, claimedRun.LeaseVersion);
+
         _logger.LogInformation(
             claimedRun.WasReclaimed
                 ? "ResearchRunReclaimed. ResearchRunId: {ResearchRunId}; Stage: {Stage}; WorkerId: {WorkerId}; LeaseVersion: {LeaseVersion}; LeaseExpiresAt: {LeaseExpiresAt}"
@@ -134,6 +137,8 @@ public sealed class ResearchRunProcessor
 
             var failureReason = (run.Status, exception) switch
             {
+                (ResearchRunStatus.Synthesizing, SynthesisRetryBudgetException budget) => budget.Message,
+                (ResearchRunStatus.Synthesizing, SynthesisRetryConflictException) => "Report retry inputs are unavailable or inconsistent. Previously processed sources remain available.",
                 (ResearchRunStatus.Synthesizing, ResearchSynthesisValidationException synthesis)
                     when synthesis.Issues.Any(issue => issue.Code == ValidationIssueCodes.SynthesisClaimCountExceeded) =>
                     ResearchProcessingFailures.ReportClaimLimitMessage,

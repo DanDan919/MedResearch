@@ -1,5 +1,17 @@
 # Architecture
 
+## SCI-R01 Synthesis-Only Recovery
+
+FailedStage/FailureCategory are durably recorded with fenced failure. A separate
+owner-scoped retry use case serializes admission on the run row, validates the
+scientific graph and records one lifetime retry intent. Existing SKIP LOCKED claim
+starts it directly in Synthesizing with a new lease version. Durable generation
+reservations cover every semantic repair; unknown pending outcomes stop automatic
+replay. Current-run fingerprint/structured report validation and existing stage
+write fences stay authoritative. Legacy null failure markers remain unavailable.
+This is not a generic retry scheduler, exactly-once provider execution or monetary
+budget. ADR-035 describes policy and limitations.
+
 ## SCI-HF01 Report Generation Contract
 
 ResearchSynthesizer obtains the effective claim maximum from its validator's

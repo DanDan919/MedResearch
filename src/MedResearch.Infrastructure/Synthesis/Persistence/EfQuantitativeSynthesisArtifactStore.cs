@@ -70,6 +70,8 @@ public sealed class EfQuantitativeSynthesisArtifactStore : IQuantitativeSynthesi
                     continue;
                 }
 
+                if (_writeFence?.CurrentClaim?.SynthesisRetryId is not null)
+                    throw new MedResearch.Application.Research.Synthesis.SynthesisRetryConflictException();
                 var artifact = new QuantitativeSynthesisArtifactEntity
                 {
                     Id = Guid.NewGuid(),

@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+export const synthesisRetryStateSchema = z.object({
+  researchRunId: z.string().uuid(), availability: z.enum(["Available", "Unavailable", "Active", "Exhausted"]),
+  retryAttemptId: z.string().uuid().nullable(), attemptStatus: z.enum(["Queued", "Running", "Succeeded", "Failed", "OutcomeUnknown"]).nullable(),
+  generationBudget: z.number().int().min(1).max(3), generationCallsReserved: z.number().int().min(0).max(3), failureCategory: z.string().nullable()
+}).refine(value => value.generationCallsReserved <= value.generationBudget &&
+  ((value.availability === "Available" || value.availability === "Unavailable")
+    ? value.retryAttemptId === null && value.attemptStatus === null && value.generationCallsReserved === 0
+    : value.retryAttemptId !== null && value.attemptStatus !== null &&
+      (value.availability === "Active" ? ["Queued", "Running"].includes(value.attemptStatus) : ["Succeeded", "Failed", "OutcomeUnknown"].includes(value.attemptStatus))),
+  "Inconsistent synthesis retry state");
+
 export const researchRunStatusSchema = z.enum([
   "Queued",
   "Planning",

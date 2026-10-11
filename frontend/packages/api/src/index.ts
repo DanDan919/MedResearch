@@ -23,5 +23,6 @@ export type {
   ResearchProvenanceResponse,
   ResearchRunResponse,
   ResearchRunSummaryResponse,
-  ResearchRunStatus
+  ResearchRunStatus,
+  SynthesisRetryState
 } from "./types";

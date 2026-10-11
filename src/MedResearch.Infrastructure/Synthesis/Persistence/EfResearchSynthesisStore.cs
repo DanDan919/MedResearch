@@ -15,12 +15,14 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
     private readonly MedResearchDbContext _dbContext;
     private readonly IResearchRunWriteFence? _writeFence;
     private readonly SynthesisOptions _options;
+    private readonly SynthesisRetryInputs? _retryInputs;
 
-    public EfResearchSynthesisStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null, SynthesisOptions? options = null)
+    public EfResearchSynthesisStore(MedResearchDbContext dbContext, IResearchRunWriteFence? writeFence = null, SynthesisOptions? options = null, SynthesisRetryInputs? retryInputs = null)
     {
         _dbContext = dbContext;
         _writeFence = writeFence;
         _options = options ?? new SynthesisOptions();
+        _retryInputs = retryInputs;
     }
 
     public async Task<SynthesisCorpusSnapshot> LoadCorpusAsync(Guid researchRunId, CancellationToken cancellationToken)
@@ -243,6 +245,15 @@ public sealed class EfResearchSynthesisStore : ISynthesisCorpusStore, IResearchR
         if (_writeFence is not null)
         {
             await _writeFence.AssertOwnedAsync(result.ResearchRunId, cancellationToken);
+        }
+
+        if (_writeFence?.CurrentClaim?.SynthesisRetryId is { } retryId)
+        {
+            var retry = await _dbContext.SynthesisRetryAttempts.AsNoTracking().SingleAsync(x => x.Id == retryId, cancellationToken);
+            if (_retryInputs is null || retry.Status != "Running" || retry.GenerationPending
+                || retry.LeaseVersion != _writeFence.CurrentClaim.LeaseVersion
+                || retry.InputFingerprint != await _retryInputs.ValidateAndFingerprintAsync(result.ResearchRunId, retry.RequestedByOwner, cancellationToken))
+                throw new SynthesisRetryConflictException();
         }
 
         var existingReport = await _dbContext.ResearchReports

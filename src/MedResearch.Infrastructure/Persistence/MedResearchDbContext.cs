@@ -16,6 +16,8 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<ResearchAdmissionEntity> ResearchAdmissions => Set<ResearchAdmissionEntity>();
 
+    public DbSet<SynthesisRetryAttemptEntity> SynthesisRetryAttempts => Set<SynthesisRetryAttemptEntity>();
+
     public DbSet<ResearchPlan> ResearchPlans => Set<ResearchPlan>();
 
     public DbSet<Study> Studies => Set<Study>();

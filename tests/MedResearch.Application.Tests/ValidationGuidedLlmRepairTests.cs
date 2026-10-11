@@ -5,6 +5,37 @@ namespace MedResearch.Application.Tests;
 
 public sealed class ValidationGuidedLlmRepairTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task GenerationHooks_ReserveBeforeEveryDispatch_AcknowledgeBeforeValidation(int repairs)
+    {
+        var client = new SequenceClient("invalid", "invalid", "invalid");
+        var reserved = 0;
+        var acknowledged = 0;
+        var service = new ValidationGuidedLlmRepairService(client, new() { MaxSemanticRepairAttempts = repairs });
+        await Assert.ThrowsAsync<TestValidationException>(() => service.GenerateAndValidateAsync<string, string>(CreateRequest(),
+            (_, _) => { Assert.Equal(client.Requests.Count, acknowledged); throw new TestValidationException(); },
+            "research synthesis", CancellationToken.None,
+            _ => { Assert.Equal(client.Requests.Count, reserved); reserved++; return Task.CompletedTask; },
+            _ => { acknowledged++; Assert.Equal(reserved, client.Requests.Count); return Task.CompletedTask; }));
+        Assert.Equal(1 + repairs, reserved);
+        Assert.Equal(reserved, acknowledged);
+        Assert.Equal(reserved, client.Requests.Count);
+    }
+
+    [Fact]
+    public async Task RejectedReservation_PreventsExternalDispatch()
+    {
+        var client = new SequenceClient("valid");
+        var service = new ValidationGuidedLlmRepairService(client);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GenerateAndValidateAsync<string, string>(CreateRequest(),
+            (value, _) => value, "research synthesis", CancellationToken.None,
+            _ => throw new InvalidOperationException("No generation budget")));
+        Assert.Empty(client.Requests);
+    }
+
     [Fact]
     public void ValidationGuidedRepairOptions_RejectsUnboundedBudget()
     {

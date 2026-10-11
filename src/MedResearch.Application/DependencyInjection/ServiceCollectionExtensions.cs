@@ -47,6 +47,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ResearchReportDraftValidator>();
         services.AddScoped<IResearchSynthesizer, ResearchSynthesizer>();
         services.AddScoped<GetResearchReportUseCase>();
+        services.AddScoped<SynthesisRetryUseCase>();
         services.AddScoped<ResearchRunProcessor>();
         services.AddScoped<IResearchStageExecutor, ScientificResearchStageExecutor>();
 

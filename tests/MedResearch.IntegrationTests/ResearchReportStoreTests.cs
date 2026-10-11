@@ -100,7 +100,7 @@ public sealed class ResearchReportStoreTests
             (await new EfResearchSynthesisStore(fresh).FindReportAsync(seed.RunId, ResearchOwnership.LegacyUnownedSubjectId, CancellationToken.None))!.PromptVersion);
     }
 
-    private async Task<Guid> SeedTenStudyRunAsync()
+    internal async Task<Guid> SeedTenStudyRunAsync()
     {
         var seed = await SeedRunWithEvidenceAsync(2, discoveredStudyCount: 10);
         await using var db = _fixture.CreateDbContext();
@@ -614,7 +614,7 @@ public sealed class ResearchReportStoreTests
         Assert.False(await read.ResearchReports.AnyAsync(x => x.ResearchRunId == seed.RunId));
     }
 
-    private static async Task<ResearchSynthesisResult> CreateStructuredResultAsync(MedResearch.Infrastructure.Persistence.MedResearchDbContext db, Guid runId)
+    internal static async Task<ResearchSynthesisResult> CreateStructuredResultAsync(MedResearch.Infrastructure.Persistence.MedResearchDbContext db, Guid runId)
     {
         var context = await new SynthesisContextBuilder(new EfResearchSynthesisStore(db), new(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SynthesisContextBuilder>.Instance).BuildAsync(runId, CancellationToken.None);
         var item = Assert.Single(context.Studies.SelectMany(x => x.Evidence));
@@ -623,7 +623,7 @@ public sealed class ResearchReportStoreTests
         return new ResearchReportDraftValidator(new()).Validate(context, new("Completed", null, null, null, null, null, null, "Limited", [proposal]), "fake", "fake", DateTimeOffset.UtcNow);
     }
 
-    private async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount, int discoveredStudyCount = 1)
+    internal async Task<SeededRun> SeedRunWithEvidenceAsync(int evidenceCount, int discoveredStudyCount = 1)
     {
         await using var context = _fixture.CreateDbContext();
         var question = new ResearchQuestion("Does sleep improve recall?", DateTimeOffset.UtcNow);
@@ -723,5 +723,5 @@ public sealed class ResearchReportStoreTests
         }
     }
 
-    private sealed record SeededRun(Guid RunId, Guid StudyId, Guid[] EvidenceIds, string? Pmid, string? Doi);
+    internal sealed record SeededRun(Guid RunId, Guid StudyId, Guid[] EvidenceIds, string? Pmid, string? Doi);
 }

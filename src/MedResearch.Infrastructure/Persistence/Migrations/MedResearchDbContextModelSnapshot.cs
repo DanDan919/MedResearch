@@ -947,6 +947,16 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("FailedStage")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("failed_stage");
+
+                    b.Property<string>("FailureCategory")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_category");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -1417,6 +1427,86 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                     b.ToTable("research_admissions", (string)null);
                 });
 
+            modelBuilder.Entity("MedResearch.Infrastructure.Persistence.SynthesisRetryAttemptEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("FailureCategory")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_category");
+
+                    b.Property<int>("GenerationBudget")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation_budget");
+
+                    b.Property<int>("GenerationCallsReserved")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation_calls_reserved");
+
+                    b.Property<bool>("GenerationPending")
+                        .HasColumnType("boolean")
+                        .HasColumnName("generation_pending");
+
+                    b.Property<string>("IdempotencyKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("idempotency_key_hash");
+
+                    b.Property<string>("InputFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_fingerprint");
+
+                    b.Property<long?>("LeaseVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lease_version");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequestedByOwner")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("requested_by_owner");
+
+                    b.Property<Guid>("ResearchRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("research_run_id");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResearchRunId")
+                        .IsUnique();
+
+                    b.ToTable("synthesis_retry_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_synthesis_retry_budget", "generation_budget BETWEEN 1 AND 3 AND generation_calls_reserved BETWEEN 0 AND generation_budget AND (NOT generation_pending OR generation_calls_reserved > 0)");
+
+                            t.HasCheckConstraint("ck_synthesis_retry_status", "status IN ('Queued','Running','Succeeded','Failed','OutcomeUnknown')");
+                        });
+                });
+
             modelBuilder.Entity("MedResearch.Domain.Evidence", b =>
                 {
                     b.HasOne("MedResearch.Domain.EvidenceExtraction", null)
@@ -1651,6 +1741,15 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                     b.HasOne("MedResearch.Domain.ResearchRun", null)
                         .WithOne()
                         .HasForeignKey("MedResearch.Infrastructure.Persistence.ResearchAdmissionEntity", "ResearchRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MedResearch.Infrastructure.Persistence.SynthesisRetryAttemptEntity", b =>
+                {
+                    b.HasOne("MedResearch.Domain.ResearchRun", null)
+                        .WithOne()
+                        .HasForeignKey("MedResearch.Infrastructure.Persistence.SynthesisRetryAttemptEntity", "ResearchRunId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

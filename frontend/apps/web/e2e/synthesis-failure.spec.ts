@@ -27,6 +27,47 @@ const progress = {
 };
 
 for (const width of [1280, 390]) {
+  test(`bounded report recovery preserves an ambiguous submission key at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const keys: string[] = [];
+    let state = { researchRunId: runId, availability: "Available", retryAttemptId: null as string | null, attemptStatus: null as string | null, generationBudget: 2, generationCallsReserved: 0, failureCategory: null };
+    await page.route("**/api/backend/**", async route => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/progress")) return route.fulfill({ json: progress });
+      if (url.pathname.endsWith("/health/ready")) return route.fulfill({ body: "Healthy" });
+      if (url.pathname.endsWith("/retry-synthesis")) {
+        if (route.request().method() === "POST") {
+          keys.push(route.request().headers()["idempotency-key"]);
+          expect(route.request().postDataJSON()).toEqual({});
+          if (keys.length === 1) return route.fulfill({ status: 503, json: { title: "Ambiguous test response" } });
+          state = { ...state, availability: "Active", retryAttemptId: runId, attemptStatus: "Queued" };
+          return route.fulfill({ status: 202, json: state });
+        }
+        return route.fulfill({ json: state });
+      }
+      throw new Error(`Unexpected test request: ${url.pathname}`);
+    });
+    await page.goto(`/research/${runId}`);
+    const action = page.getByRole("button", { name: "Retry report generation" });
+    await expect(action).toBeVisible();
+    await action.click();
+    await expect(page.getByRole("region", { name: "Report recovery" }).getByRole("alert")).toBeVisible();
+    await action.click();
+    await expect(page.getByText("Report retry queued", { exact: true })).toBeVisible();
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    await expect(action).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("Report retry queued", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Evidence.*Provenance/ })).toBeVisible();
+    expect(keys).toHaveLength(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`recovery-${width}.png`), fullPage: true });
+  });
+
   test(`failed synthesis retains partial navigation without hydration errors at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
@@ -35,6 +76,7 @@ for (const width of [1280, 390]) {
     await page.route("**/api/backend/**", async route => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith("/progress")) return route.fulfill({ json: progress });
+      if (url.pathname.endsWith("/retry-synthesis")) return route.fulfill({ json: { researchRunId: runId, availability: "Unavailable", retryAttemptId: null, attemptStatus: null, generationBudget: 2, generationCallsReserved: 0, failureCategory: null } });
       if (url.pathname.endsWith("/report")) return route.fulfill({ status: 409, json: { title: "Report not ready", status: 409 } });
       if (url.pathname.endsWith("/health/ready")) return route.fulfill({ body: "Healthy" });
       throw new Error(`Unexpected test request: ${url.pathname}`);

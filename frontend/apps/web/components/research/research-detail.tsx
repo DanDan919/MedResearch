@@ -10,6 +10,7 @@ import { useResearchProgress } from "../../lib/api";
 import { ErrorPanel, LoadingPanel } from "../state-panel";
 import { ResearchPhases } from "./pipeline-status";
 import { ResearchStatusPill } from "./research-status-pill";
+import { SynthesisRetry } from "./synthesis-retry";
 
 export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
   const query = useResearchProgress(researchRunId);
@@ -40,6 +41,8 @@ export function ResearchDetail({ researchRunId }: { researchRunId: string }) {
       </div>
 
       <ResearchPhases progress={progress} />
+
+      {progress.status === "Failed" || progress.status === "Synthesizing" ? <SynthesisRetry key={researchRunId} researchRunId={researchRunId} /> : null}
 
       {progress.failureReason ? (
         <Card className="border-destructive">

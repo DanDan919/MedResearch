@@ -7,10 +7,12 @@ import { requestCookie } from "./routes";
 import { clearSession, readPrivateSession, sessionOptions, type PrivateSession } from "./session";
 
 const id = "[a-f\\d]{8}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{12}";
-const researchPath = new RegExp(`^/api/research(?:/${id}(?:/(?:progress|report|quantitative|provenance))?)?$`, "i");
+const researchPath = new RegExp(`^/api/research(?:/${id}(?:/(?:progress|report|quantitative|provenance|retry-synthesis))?)?$`, "i");
+const synthesisRetryPath = new RegExp(`^/api/research/${id}/retry-synthesis$`, "i");
 const statuses = new Set(["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]);
 const submissionKey = new RegExp(`^${id}$`, "i");
 const admissionProblems: Record<string, { status: number; title: string }> = {
+  "synthesis-retry-unavailable": { status: 409, title: "Report retry is not available for this run." },
   "admission-invalid-key": { status: 400, title: "A valid submission key is required" },
   "admission-idempotency-conflict": { status: 409, title: "This submission key was already used for a different question" },
   "admission-owner-outstanding": { status: 429, title: "Your outstanding research limit has been reached. Wait for your active research to finish." },
@@ -24,7 +26,7 @@ export function allowedUpstreamPath(url: URL, method: string): string | null {
   if (!url.pathname.startsWith("/api/backend/")) return null;
   const path = url.pathname.slice("/api/backend".length);
   if (path === "/health/ready" && method === "GET" && !url.search) return path;
-  if (!researchPath.test(path) || (method !== "GET" && !(method === "POST" && path === "/api/research"))) return null;
+  if (!researchPath.test(path) || (method !== "GET" && !(method === "POST" && (path === "/api/research" || synthesisRetryPath.test(path))))) return null;
   if (url.search && (path !== "/api/research" || method !== "GET")) return null;
   const seen = new Set<string>();
   for (const [key, value] of url.searchParams) {
@@ -69,9 +71,11 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") return problem(415, "JSON is required", "unsupported-media-type");
     try {
       const incoming = JSON.parse(new TextDecoder().decode(await readBoundedBody(request, 16_384, signal))) as Record<string, unknown>;
-      if (!incoming || Array.isArray(incoming) || typeof incoming.question !== "string" || Object.keys(incoming).some(key => key !== "question"))
+      const retry = synthesisRetryPath.test(upstreamPath);
+      if (!incoming || Array.isArray(incoming) || typeof incoming !== "object" || (retry ? Object.keys(incoming).length !== 0 :
+        typeof incoming.question !== "string" || Object.keys(incoming).some(key => key !== "question")))
         return problem(400, "Invalid research request", "invalid-request");
-      body = JSON.stringify({ question: incoming.question });
+      body = retry ? "{}" : JSON.stringify({ question: incoming.question });
       headers["Content-Type"] = "application/json";
     } catch (error) { return problem(error instanceof BodyLimitExceeded ? 413 : 400, "Invalid research request", "invalid-request"); }
     const key = request.headers.get("idempotency-key");

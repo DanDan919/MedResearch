@@ -13,6 +13,8 @@ public sealed class PostgreSqlResearchRunWriteFence : IResearchRunWriteFence
     private readonly MedResearchDbContext _dbContext;
     private ClaimedResearchRun? _claimedRun;
 
+    public ClaimedResearchRun? CurrentClaim => _claimedRun;
+
     public PostgreSqlResearchRunWriteFence(MedResearchDbContext dbContext)
     {
         _dbContext = dbContext;

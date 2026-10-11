@@ -5,6 +5,8 @@ namespace MedResearch.Application.Research.Processing;
 /// </summary>
 public interface IResearchRunWriteFence
 {
+    ClaimedResearchRun? CurrentClaim => null;
+
     void Attach(ClaimedResearchRun claimedRun);
 
     void Clear();

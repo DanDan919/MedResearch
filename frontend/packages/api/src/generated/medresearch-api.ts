@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research/{researchRunId}/retry-synthesis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSynthesisRetry"];
+        put?: never;
+        post: operations["RetrySynthesis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -877,6 +893,20 @@ export interface components {
             studyId: string;
             title: string;
         };
+        SynthesisRetryRequest: Record<string, never>;
+        SynthesisRetryState: {
+            attemptStatus: null | string;
+            availability: string;
+            failureCategory: null | string;
+            /** Format: int32 */
+            generationBudget: number;
+            /** Format: int32 */
+            generationCallsReserved: number;
+            /** Format: uuid */
+            researchRunId: string;
+            /** Format: uuid */
+            retryAttemptId: null | string;
+        };
     };
     responses: never;
     parameters: never;
@@ -953,7 +983,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Owner-scoped submission UUID. Reuse for retries of the same canonical question. */
+                /** @description Owner-scoped idempotency UUID. Reuse for the same deliberate operation. */
                 "Idempotency-Key": string;
             };
             path?: never;
@@ -1333,6 +1363,131 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Research database temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSynthesisRetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisRetryState"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Research database temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RetrySynthesis: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Owner-scoped idempotency UUID. Reuse for the same deliberate operation. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                researchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynthesisRetryRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisRetryState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -30,7 +30,9 @@ public sealed class ValidationGuidedLlmRepairService
         StructuredLlmRequest initialRequest,
         Func<TDraft, StructuredLlmProviderMetadata, TResult> validate,
         string stage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task>? beforeGeneration = null,
+        Func<CancellationToken, Task>? afterResponse = null)
     {
         ArgumentNullException.ThrowIfNull(validate);
         ArgumentException.ThrowIfNullOrWhiteSpace(stage);
@@ -41,7 +43,9 @@ public sealed class ValidationGuidedLlmRepairService
         for (var attempt = 1; ; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (beforeGeneration is not null) await beforeGeneration(cancellationToken);
             var generation = await _structuredLlmClient.GenerateStructuredAsync<TDraft>(request, cancellationToken);
+            if (afterResponse is not null) await afterResponse(cancellationToken);
 
             try
             {

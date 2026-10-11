@@ -108,10 +108,12 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         return UseContextAsync(context => ExecuteLeaseUpdateAsync(
             context,
             """
-            UPDATE research_runs
+            WITH failed AS (UPDATE research_runs
             SET status = @failed_status,
                 completed_at = @failed_at,
                 failure_reason = @failure_reason,
+                failed_stage = status,
+                failure_category = @failure_category,
                 processing_lease_owner = NULL,
                 processing_lease_acquired_at = NULL,
                 processing_lease_expires_at = NULL,
@@ -120,13 +122,24 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             AND processing_lease_owner = @worker_id
             AND processing_lease_version = @lease_version
             AND status = ANY(@active_statuses)
-            RETURNING 1;
+            RETURNING id),
+            retry_failed AS (
+                UPDATE synthesis_retry_attempts retry
+                SET status = CASE WHEN retry.generation_pending THEN 'OutcomeUnknown' ELSE 'Failed' END,
+                    failure_category = CASE WHEN retry.generation_pending THEN 'ProviderOutcomeUnknown' ELSE @failure_category END,
+                    completed_at = @failed_at
+                FROM failed WHERE retry.research_run_id = failed.id AND retry.status = 'Running' AND retry.lease_version = @lease_version
+                RETURNING retry.id
+            ) SELECT 1 FROM failed;
             """,
             command =>
             {
                 AddParameter(command, "failed_status", ResearchRunStatus.Failed.ToString());
                 AddParameter(command, "failed_at", failedAt);
                 AddParameter(command, "failure_reason", safeFailureReason);
+                AddParameter(command, "failure_category", safeFailureReason == ResearchProcessingFailures.ReportClaimLimitMessage
+                    ? ResearchProcessingFailures.ReportClaimLimitExceeded : safeFailureReason == "The report generation attempt budget is exhausted."
+                        ? "RetryBudgetExhausted" : "ProcessingFailed");
                 AddLeaseParameters(command, claimedRun);
                 AddParameter(command, "active_statuses", RecoverableStatuses);
             },
@@ -183,6 +196,8 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
                 SELECT id, status
                 FROM research_runs
                 WHERE status = @queued_status
+                   OR (status = 'Failed' AND EXISTS (
+                       SELECT 1 FROM synthesis_retry_attempts retry WHERE retry.research_run_id = research_runs.id AND retry.status = 'Queued'))
                    OR (
                         status = ANY(@recoverable_statuses)
                         AND (
@@ -196,7 +211,9 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
                 LIMIT 1
             )
             UPDATE research_runs AS run
-            SET status = CASE WHEN run.status = @queued_status THEN @planning_status ELSE run.status END,
+            SET status = CASE WHEN run.status = @queued_status THEN @planning_status WHEN run.status = 'Failed' THEN 'Synthesizing' ELSE run.status END,
+                completed_at = CASE WHEN run.status = 'Failed' THEN NULL ELSE run.completed_at END,
+                failure_reason = CASE WHEN run.status = 'Failed' THEN NULL ELSE run.failure_reason END,
                 started_at = COALESCE(run.started_at, @claimed_at),
                 processing_lease_owner = @worker_id,
                 processing_lease_acquired_at = @claimed_at,
@@ -219,7 +236,9 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
                 run.last_heartbeat_at,
                 run.processing_lease_version,
                 question.text,
-                candidate.status <> @queued_status;
+                candidate.status NOT IN ('Queued','Failed'),
+                (SELECT retry.id FROM synthesis_retry_attempts retry WHERE retry.research_run_id = run.id AND retry.status IN ('Queued','Running')),
+                run.failed_stage, run.failure_category;
             """;
 
         AddParameter(command, "queued_status", ResearchRunStatus.Queued.ToString());
@@ -241,6 +260,13 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         var claimedRun = ReadClaimedResearchRun(reader, workerInstanceId);
 
         await reader.DisposeAsync();
+        if (claimedRun.SynthesisRetryId is { } retryId)
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE synthesis_retry_attempts SET status = 'Running', started_at = COALESCE(started_at, {claimedAt}), lease_version = {claimedRun.LeaseVersion}
+                WHERE id = {retryId} AND status IN ('Queued','Running')
+                """, cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
 
         return claimedRun;
@@ -259,7 +285,7 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
         return await ExecuteLeaseUpdateAsync(
             dbContext,
             """
-            UPDATE research_runs
+            WITH saved AS (UPDATE research_runs
             SET status = @status,
                 started_at = @started_at,
                 completed_at = @completed_at,
@@ -271,11 +297,21 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             WHERE id = @id
             AND processing_lease_owner = @worker_id
             AND processing_lease_version = @lease_version
-            RETURNING 1;
+            AND (@retry_id IS NULL OR @status <> 'Completed' OR EXISTS (SELECT 1 FROM research_reports WHERE research_run_id = @id))
+            RETURNING id),
+            retry_completed AS (
+                UPDATE synthesis_retry_attempts retry
+                SET status = CASE WHEN @status = 'Completed' THEN 'Succeeded' ELSE 'Failed' END,
+                    completed_at = @saved_at
+                FROM saved WHERE retry.research_run_id = saved.id AND retry.id = @retry_id
+                  AND retry.lease_version = @lease_version AND retry.status = 'Running' AND @is_terminal
+                RETURNING retry.id
+            ) SELECT 1 FROM saved;
             """,
             command =>
             {
                 AddParameter(command, "status", run.Status.ToString());
+                AddParameter(command, "retry_id", claimedRun.SynthesisRetryId, DbType.Guid);
                 AddParameter(command, "started_at", run.StartedAt, DbType.DateTimeOffset);
                 AddParameter(command, "completed_at", run.CompletedAt, DbType.DateTimeOffset);
                 AddParameter(command, "failure_reason", run.FailureReason, DbType.String);
@@ -337,7 +373,9 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             reader.IsDBNull(8) ? null : ReadDateTimeOffset(reader, 8),
             reader.IsDBNull(9) ? null : ReadDateTimeOffset(reader, 9),
             reader.IsDBNull(10) ? null : ReadDateTimeOffset(reader, 10),
-            reader.GetInt64(11));
+            reader.GetInt64(11),
+            reader.IsDBNull(15) ? null : Enum.Parse<ResearchRunStatus>(reader.GetString(15)),
+            reader.IsDBNull(16) ? null : reader.GetString(16));
         var question = reader.GetString(12);
         var wasReclaimed = reader.GetBoolean(13);
 
@@ -347,7 +385,8 @@ public sealed class PostgreSqlResearchRunQueue : IResearchRunQueue
             workerInstanceId,
             run.ProcessingLeaseVersion,
             run.ProcessingLeaseExpiresAt ?? throw new InvalidOperationException("Claimed research run did not include a lease expiry."),
-            wasReclaimed);
+            wasReclaimed,
+            reader.IsDBNull(14) ? null : reader.GetGuid(14));
     }
 
     private static void AddLeaseParameters(DbCommand command, ClaimedResearchRun claimedRun)

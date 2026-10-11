@@ -10,17 +10,20 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
     private readonly ResearchReportDraftValidator _validator;
     private readonly ILogger<ResearchSynthesizer> _logger;
     private readonly ValidationGuidedLlmRepairService _repairService;
+    private readonly ISynthesisRetryGenerationBudget? _retryBudget;
 
     public ResearchSynthesizer(
         IStructuredLlmClient structuredLlmClient,
         ResearchReportDraftValidator validator,
         ILogger<ResearchSynthesizer> logger,
-        ValidationGuidedLlmRepairService? repairService = null)
+        ValidationGuidedLlmRepairService? repairService = null,
+        ISynthesisRetryGenerationBudget? retryBudget = null)
     {
         _structuredLlmClient = structuredLlmClient;
         _validator = validator;
         _logger = logger;
         _repairService = repairService ?? new ValidationGuidedLlmRepairService(structuredLlmClient);
+        _retryBudget = retryBudget;
     }
 
     public async Task<ResearchSynthesisResult> SynthesizeAsync(
@@ -69,7 +72,9 @@ public sealed class ResearchSynthesizer : IResearchSynthesizer
                     metadata.Model,
                     metadata.GeneratedAt),
                 "research synthesis",
-                cancellationToken);
+                cancellationToken,
+                _retryBudget is null ? null : token => _retryBudget.ReserveAsync(context.ResearchRunId, token),
+                _retryBudget is null ? null : token => _retryBudget.RecordResponseAsync(context.ResearchRunId, token));
 
             var result = validatedGeneration.Value;
 

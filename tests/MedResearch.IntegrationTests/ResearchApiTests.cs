@@ -22,6 +22,76 @@ namespace MedResearch.IntegrationTests;
 
 public sealed class ResearchApiTests
 {
+    [Fact]
+    public async Task SynthesisRetry_UsesAuthenticatedOwner_ReturnsAcceptedAndDurableStatus()
+    {
+        using var factory = new ResearchApiFactory();
+        var id = Guid.NewGuid();
+        factory.RetryStore.State = new(id, "Available", null, null, 2, 0, null);
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/research/{id}/retry-synthesis") { Content = JsonContent.Create(new { }) };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal("UserA", factory.RetryStore.Owner);
+        Assert.Equal($"/api/research/{id}/retry-synthesis", response.Headers.Location!.OriginalString);
+        var state = await client.GetFromJsonAsync<SynthesisRetryState>($"/api/research/{id}/retry-synthesis");
+        Assert.Equal("Queued", state!.AttemptStatus);
+        using var outsider = factory.CreateClientFor("UserB");
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/research/{id}/retry-synthesis")).StatusCode);
+        using var outsiderRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/research/{id}/retry-synthesis") { Content = JsonContent.Create(new { }) };
+        outsiderRequest.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.SendAsync(outsiderRequest)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("invalid")]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public async Task SynthesisRetry_InvalidKey_IsRejectedWithoutAdmission(string? key)
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/research/{Guid.NewGuid()}/retry-synthesis") { Content = JsonContent.Create(new { }) };
+        if (key is not null) request.Headers.Add("Idempotency-Key", key);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(request)).StatusCode);
+        Assert.Null(factory.RetryStore.Owner);
+    }
+
+    [Fact]
+    public async Task SynthesisRetry_BrowserOwnerFieldsAreRejected()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/research/{Guid.NewGuid()}/retry-synthesis") { Content = JsonContent.Create(new { owner = "UserB" }) };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(request)).StatusCode);
+        Assert.Null(factory.RetryStore.Owner);
+    }
+
+    private sealed class FakeSynthesisRetryStore : ISynthesisRetryStore
+    {
+        public SynthesisRetryState? State;
+        public string? Owner;
+        public Task<SynthesisRetryState?> GetAsync(Guid id, string owner, CancellationToken token) => Task.FromResult(owner == "UserA" && State?.ResearchRunId == id ? State : null);
+        public Task<SynthesisRetryState?> AdmitAsync(Guid id, string owner, Guid key, CancellationToken token)
+        {
+            Owner = owner;
+            if (owner != "UserA" || State?.ResearchRunId != id) return Task.FromResult<SynthesisRetryState?>(null);
+            State = State with { Availability = "Active", RetryAttemptId = Guid.NewGuid(), AttemptStatus = "Queued" };
+            return Task.FromResult<SynthesisRetryState?>(State);
+        }
+    }
+
+    [Fact]
+    public async Task AnonymousSynthesisRetry_IsRejected()
+    {
+        using var factory = new ResearchApiFactory();
+        using var client = factory.CreateAnonymousClient();
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync($"/api/research/{Guid.NewGuid()}/retry-synthesis", new { })).StatusCode);
+    }
+
     [Theory]
     [InlineData(true, false, HttpStatusCode.ServiceUnavailable)]
     [InlineData(true, true, HttpStatusCode.ServiceUnavailable)]
@@ -618,6 +688,7 @@ public sealed class ResearchApiTests
     }
     private sealed class ResearchApiFactory : WebApplicationFactory<Program>
     {
+        public FakeSynthesisRetryStore RetryStore { get; } = new();
         public InMemoryResearchStore Store { get; } = new();
 
         public InMemoryResearchReportStore ReportStore { get; } = new();
@@ -666,6 +737,8 @@ public sealed class ResearchApiTests
                 services.AddSingleton<IResearchReportStore>(ReportStore);
                 services.AddSingleton<IQuantitativeSynthesisArtifactStore>(QuantitativeStore);
                 services.AddSingleton<IResearchProvenanceStore>(ProvenanceStore);
+                services.RemoveAll<ISynthesisRetryStore>();
+                services.AddSingleton<ISynthesisRetryStore>(RetryStore);
             });
         }
     }

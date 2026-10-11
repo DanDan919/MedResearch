@@ -7,7 +7,8 @@ import {
   researchReportResponseSchema,
   researchRunResponseSchema,
   quantitativeSynthesisArtifactResponseSchema,
-  researchProvenanceResponseSchema
+  researchProvenanceResponseSchema,
+  synthesisRetryStateSchema
 } from "./schemas";
 import type {
   CreateResearchRequest,
@@ -19,7 +20,8 @@ import type {
   ResearchRunProgressResponse,
   ResearchRunResponse,
   QuantitativeSynthesisArtifactResponse,
-  ResearchProvenanceResponse
+  ResearchProvenanceResponse,
+  SynthesisRetryState
 } from "./types";
 
 export interface MedResearchApiClientOptions {
@@ -120,6 +122,16 @@ export class MedResearchApiClient {
         headers: { Accept: "application/json" }
       }
     );
+  }
+
+  public getSynthesisRetry(researchRunId: string, signal?: AbortSignal): Promise<SynthesisRetryState> {
+    return this.requestJson(`/api/research/${encodeURIComponent(researchRunId)}/retry-synthesis`, synthesisRetryStateSchema.parse,
+      { method: "GET", signal, headers: { Accept: "application/json" } });
+  }
+
+  public retrySynthesis(researchRunId: string, idempotencyKey: string, signal?: AbortSignal): Promise<SynthesisRetryState> {
+    return this.requestJson(`/api/research/${encodeURIComponent(researchRunId)}/retry-synthesis`, synthesisRetryStateSchema.parse,
+      { method: "POST", signal, headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey, Accept: "application/json" }, body: "{}" });
   }
 
   public async getResearchReport(

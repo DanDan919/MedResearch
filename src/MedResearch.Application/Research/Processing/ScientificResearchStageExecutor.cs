@@ -26,6 +26,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
     private readonly IResearchSynthesizer _researchSynthesizer;
     private readonly IResearchReportStore _researchReportStore;
     private readonly ILogger<ScientificResearchStageExecutor> _logger;
+    private readonly ISynthesisRetryGenerationBudget? _retryBudget;
 
     public ScientificResearchStageExecutor(
         IResearchPlanner researchPlanner,
@@ -41,7 +42,8 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         ISynthesisContextBuilder synthesisContextBuilder,
         IResearchSynthesizer researchSynthesizer,
         IResearchReportStore researchReportStore,
-        ILogger<ScientificResearchStageExecutor> logger)
+        ILogger<ScientificResearchStageExecutor> logger,
+        ISynthesisRetryGenerationBudget? retryBudget = null)
     {
         _researchPlanner = researchPlanner;
         _researchPlanStore = researchPlanStore;
@@ -57,6 +59,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
         _researchSynthesizer = researchSynthesizer;
         _researchReportStore = researchReportStore;
         _logger = logger;
+        _retryBudget = retryBudget;
     }
 
     public async Task ExecuteAsync(ResearchStageExecutionContext context, CancellationToken cancellationToken)
@@ -262,6 +265,7 @@ public sealed class ScientificResearchStageExecutor : IResearchStageExecutor
             return;
         }
 
+        if (_retryBudget is not null) await _retryBudget.ValidateInputsAsync(context.ResearchRunId, cancellationToken);
         var synthesisContext = await _synthesisContextBuilder.BuildAsync(context.ResearchRunId, cancellationToken);
         var result = await _researchSynthesizer.SynthesizeAsync(synthesisContext, cancellationToken);
         await _researchReportStore.PersistReportAsync(result, cancellationToken);

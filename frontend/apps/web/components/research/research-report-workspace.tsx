@@ -7,6 +7,7 @@ import type { ResearchReportResponse } from "@medresearch/api";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@medresearch/ui";
 import { useResearchProgress, useResearchQuantitative, useResearchReport } from "../../lib/api";
 import { ErrorPanel, LoadingPanel } from "../state-panel";
+import { SynthesisRetry } from "./synthesis-retry";
 
 type Citation = ResearchReportResponse["claims"][number]["citations"][number];
 
@@ -124,6 +125,7 @@ function ReportError({ error, researchRunId }: { error: unknown; researchRunId: 
       <ErrorPanel title="Report unavailable" message={progress.data.failureReason ?? "Processing stopped without a persisted report."} />
       {progress.data.metrics.evidenceFindingCount > 0 ? <p className="text-sm text-muted-foreground">Previously processed evidence is still available. No report was generated.</p> : null}
       <Link className="text-sm text-primary underline" href={`/research/${researchRunId}/evidence`}>Evidence and source provenance</Link>
+      {progress.data.status === "Failed" ? <SynthesisRetry key={researchRunId} researchRunId={researchRunId} /> : null}
     </section>;
   }
   if (knownWithoutReport) {

@@ -8,4 +8,5 @@ public sealed record ClaimedResearchRun(
     string WorkerInstanceId,
     long LeaseVersion,
     DateTimeOffset LeaseExpiresAt,
-    bool WasReclaimed);
+    bool WasReclaimed,
+    Guid? SynthesisRetryId = null);

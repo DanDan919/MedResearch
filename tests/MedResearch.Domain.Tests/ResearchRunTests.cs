@@ -4,6 +4,20 @@ namespace MedResearch.Domain.Tests;
 
 public sealed class ResearchRunTests
 {
+    [Theory]
+    [InlineData(ResearchRunStatus.Planning)]
+    [InlineData(ResearchRunStatus.Searching)]
+    [InlineData(ResearchRunStatus.Extracting)]
+    [InlineData(ResearchRunStatus.Evaluating)]
+    [InlineData(ResearchRunStatus.Synthesizing)]
+    public void Failure_RetainsTrustedStage(ResearchRunStatus stage)
+    {
+        var run = CreateRunAtStatus(stage);
+        run.Fail("Safe failure", DateTimeOffset.UtcNow);
+        Assert.Equal(stage, run.FailedStage);
+        Assert.Equal("ProcessingFailed", run.FailureCategory);
+    }
+
     [Fact]
     public void ResearchRun_StartsQueued()
     {
