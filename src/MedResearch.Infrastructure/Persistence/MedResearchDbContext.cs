@@ -12,6 +12,8 @@ public sealed class MedResearchDbContext : DbContext
 
     public DbSet<ResearchQuestion> ResearchQuestions => Set<ResearchQuestion>();
 
+    public DbSet<MedResearch.Domain.QuickResearch.QuickResearchRun> QuickResearchRuns => Set<MedResearch.Domain.QuickResearch.QuickResearchRun>();
+
     public DbSet<ResearchRun> ResearchRuns => Set<ResearchRun>();
 
     public DbSet<ResearchAdmissionEntity> ResearchAdmissions => Set<ResearchAdmissionEntity>();

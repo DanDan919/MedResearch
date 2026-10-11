@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+    "/api/quick-research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListQuickResearch"];
+        put?: never;
+        post: operations["CreateQuickResearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quick-research/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetQuickResearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/research": {
         parameters: {
             query?: never;
@@ -136,6 +168,9 @@ export interface components {
         BetweenStudyVarianceEstimateStatus: number;
         BetweenStudyVarianceEstimator: number;
         BetweenStudyVarianceFailureReason: number;
+        CreateQuickResearchRequest: {
+            question: string;
+        };
         CreateResearchRequest: {
             question: null | string;
         };
@@ -484,6 +519,62 @@ export interface components {
             uniqueStudyCount: number;
         };
         QuantitativeSynthesisStatus: number;
+        QuickResearchDetails: {
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            question: string;
+            result: null | components["schemas"]["QuickResearchResult"];
+            safeError: null | string;
+            /** Format: date-time */
+            startedAt: null | string;
+            status: string;
+        };
+        QuickResearchHistory: {
+            items: components["schemas"]["QuickResearchSummary"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int32 */
+            totalCount: number;
+        };
+        QuickResearchResult: {
+            disagreements: components["schemas"]["QuickResearchStatement"][];
+            facts: components["schemas"]["QuickResearchStatement"][];
+            isSynthetic: boolean;
+            limitations: string[];
+            /** Format: uuid */
+            quickRunId: string;
+            sources: components["schemas"]["QuickResearchSource"][];
+            summary: string;
+        };
+        QuickResearchSource: {
+            /** Format: uuid */
+            id: string;
+            isSynthetic: boolean;
+            /** Format: uuid */
+            quickRunId: string;
+            title: string;
+            url: null | string;
+        };
+        QuickResearchStatement: {
+            sourceIds: string[];
+            text: string;
+        };
+        QuickResearchSummary: {
+            /** Format: date-time */
+            completedAt: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            question: string;
+            status: string;
+        };
         ResearchClaimNumericSnapshot: {
             algorithmVersion: null | string;
             /** Format: double */
@@ -916,6 +1007,163 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    ListQuickResearch: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickResearchHistory"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Research database temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CreateQuickResearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuickResearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickResearchDetails"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Research database temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetQuickResearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickResearchDetails"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid authenticated subject */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Research database temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ListResearchRuns: {
         parameters: {
             query?: {

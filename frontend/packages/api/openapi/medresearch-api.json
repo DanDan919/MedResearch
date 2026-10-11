@@ -65,6 +65,18 @@
       "BetweenStudyVarianceFailureReason": {
         "type": "integer"
       },
+      "CreateQuickResearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
+      },
       "CreateResearchRequest": {
         "properties": {
           "question": {
@@ -1467,6 +1479,229 @@
       },
       "QuantitativeSynthesisStatus": {
         "type": "integer"
+      },
+      "QuickResearchDetails": {
+        "properties": {
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuickResearchResult"
+              }
+            ]
+          },
+          "safeError": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "status",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "safeError",
+          "result"
+        ],
+        "type": "object"
+      },
+      "QuickResearchHistory": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QuickResearchSummary"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object"
+      },
+      "QuickResearchResult": {
+        "properties": {
+          "disagreements": {
+            "items": {
+              "$ref": "#/components/schemas/QuickResearchStatement"
+            },
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/QuickResearchStatement"
+            },
+            "type": "array"
+          },
+          "isSynthetic": {
+            "type": "boolean"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "quickRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/QuickResearchSource"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "quickRunId",
+          "isSynthetic",
+          "summary",
+          "facts",
+          "disagreements",
+          "limitations",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "QuickResearchSource": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSynthetic": {
+            "type": "boolean"
+          },
+          "quickRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "quickRunId",
+          "title",
+          "url",
+          "isSynthetic"
+        ],
+        "type": "object"
+      },
+      "QuickResearchStatement": {
+        "properties": {
+          "sourceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "sourceIds"
+        ],
+        "type": "object"
+      },
+      "QuickResearchSummary": {
+        "properties": {
+          "completedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "status",
+          "createdAt",
+          "completedAt"
+        ],
+        "type": "object"
       },
       "ResearchClaimNumericSnapshot": {
         "properties": {
@@ -3207,6 +3442,170 @@
   },
   "openapi": "3.1.1",
   "paths": {
+    "/api/quick-research": {
+      "get": {
+        "operationId": "ListQuickResearch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickResearchHistory"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Quick Research"
+        ]
+      },
+      "post": {
+        "operationId": "CreateQuickResearch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuickResearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickResearchDetails"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Quick Research"
+        ]
+      }
+    },
+    "/api/quick-research/{id}": {
+      "get": {
+        "operationId": "GetQuickResearch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickResearchDetails"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid authenticated subject"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Research database temporarily unavailable"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "tags": [
+          "Quick Research"
+        ]
+      }
+    },
     "/api/research": {
       "get": {
         "operationId": "ListResearchRuns",
@@ -3867,6 +4266,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Quick Research"
+    },
     {
       "name": "Research"
     }

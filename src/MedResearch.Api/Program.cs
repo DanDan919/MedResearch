@@ -1,4 +1,5 @@
 using MedResearch.Api.Research;
+using MedResearch.Api.QuickResearch;
 using System.Data.Common;
 using MedResearch.Api;
 using MedResearch.Domain;
@@ -106,6 +107,7 @@ if (allowedCorsOrigins.Length > 0)
 }
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapQuickResearch();
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions

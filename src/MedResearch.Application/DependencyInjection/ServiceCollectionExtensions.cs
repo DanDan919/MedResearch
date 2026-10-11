@@ -17,6 +17,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<CreateResearchUseCase>();
+        services.AddScoped<MedResearch.Application.QuickResearch.QuickResearchService>();
+        services.AddScoped<MedResearch.Application.QuickResearch.QuickResearchProcessor>();
         services.AddScoped<GetResearchUseCase>();
         services.AddScoped<GetResearchProgressUseCase>();
         services.AddScoped<GetResearchProvenanceUseCase>();

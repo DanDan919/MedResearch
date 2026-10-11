@@ -1,5 +1,18 @@
 # Current State
 
+## QUICK-Q0 Synthetic Skeleton (2026-10-12)
+
+Separate authorized POST/GET/history at `/api/quick-research`, owner-scoped root,
+bounded synthetic source/answer JSONB and one forward migration. Quick uses its
+own small opt-in hosted processor, atomic PostgreSQL claim/reclaim and fenced
+terminal writes; Deep science, retry ledger and algorithms are unchanged.
+Worker default disabled; no external HTTP/LLM/provider port exists in Q0.
+The generated OpenAPI/TypeScript contract includes Quick, but browser UI/BFF does
+not yet expose it. No admission/cost safeguards or idempotent creation are claimed.
+Local and strict CI verification is recorded in `quick-q0-skeleton-ru.md`; local
+Docker unavailability is not PostgreSQL runtime certification. Existing unrelated
+dirty frontend tests and the separate audit document are excluded from Q0.
+
 ## SCI-R01 Synthesis-Only Recovery (2026-10-11)
 
 Adds owner-authenticated GET/POST retry-synthesis, durable failed-stage provenance,

@@ -52,6 +52,11 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString));
         services.AddDbContextFactory<MedResearchDbContext>(options => ConfigurePostgreSql(options, connectionString), ServiceLifetime.Scoped);
 
+        var quickOptions = configuration.GetSection("QuickResearch").Get<MedResearch.Infrastructure.QuickResearch.QuickResearchOptions>() ?? new();
+        quickOptions.Validate();
+        services.AddSingleton(quickOptions);
+        services.AddScoped<MedResearch.Application.QuickResearch.IQuickResearchStore, MedResearch.Infrastructure.QuickResearch.EfQuickResearchStore>();
+
         var admissionOptions = configuration.GetSection("ResearchAdmission").Get<ResearchAdmissionOptions>() ?? new();
         admissionOptions.Validate();
         services.AddSingleton(admissionOptions);
@@ -207,6 +212,8 @@ public static class ServiceCollectionExtensions
         {
             services.AddHostedService<BackgroundResearchWorker>();
         }
+
+        services.AddHostedService<MedResearch.Infrastructure.QuickResearch.BackgroundQuickResearchWorker>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<MedResearchDbContext>("postgresql", tags: ["database", "postgresql", "ready"]);

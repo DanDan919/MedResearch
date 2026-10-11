@@ -1,5 +1,30 @@
 # Architecture
 
+## QUICK-Q0 Isolated Synthetic Slice
+
+Quick research is a separate root, `QuickResearchRun`, with its own owner and
+Queued -> Processing -> Completed/Failed lifecycle. Authorized HTTP endpoints
+delegate to `QuickResearchService`; `IQuickResearchStore` is implemented by EF
+Core/PostgreSQL. One bounded, opt-in `BackgroundQuickResearchWorker` invokes
+`QuickResearchProcessor`, which creates a deterministic synthetic result without
+any literature/LLM dependency. Quick does not enter the Deep queue, stages,
+scientific validators or statistical algorithms.
+
+The existing database holds one new table with a run-scoped JSONB result and
+embedded synthetic source/citation contracts. Domain validation enforces source
+membership; database checks enforce root run identity and synthetic/terminal
+state coherence, not every embedded citation. Owner-filtered reads/history use
+the existing JWT actor; another owner's ID returns the same 404 as an unknown ID.
+Atomic SKIP LOCKED claim/reclaim and owner/version/expiry-fenced terminal writes
+use the established PostgreSQL technique, without extending the Deep-specific
+queue into another general job framework. No heartbeat is needed for the immediate
+Q0 fake step; host cancellation leaves the lease to expire.
+
+The worker is disabled by default; enable `QuickResearch__Enabled=true` only for
+the fake slice. No medical facts/publications are fabricated. Admission, monetary
+budgets, idempotent POST, live-provider capability and browser UI are NOT part of
+Q0. See `docs/development/quick-q0-skeleton-ru.md` for contracts and verification.
+
 ## SCI-R01 Synthesis-Only Recovery
 
 FailedStage/FailureCategory are durably recorded with fenced failure. A separate
