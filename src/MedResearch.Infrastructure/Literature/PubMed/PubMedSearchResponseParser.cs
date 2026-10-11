@@ -13,6 +13,10 @@ public sealed class PubMedSearchResponseParser
         {
             using var document = JsonDocument.Parse(json);
 
+            if (document.RootElement.TryGetProperty("error", out _) ||
+                (document.RootElement.TryGetProperty("esearchresult", out var result) && result.TryGetProperty("ERROR", out _)))
+                throw new PubMedResponseException("PubMed ESearch returned an error instead of search results.");
+
             if (!document.RootElement.TryGetProperty("esearchresult", out var searchResult) ||
                 !searchResult.TryGetProperty("idlist", out var idList) ||
                 idList.ValueKind != JsonValueKind.Array)

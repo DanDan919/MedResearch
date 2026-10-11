@@ -7,6 +7,7 @@ test("report workspace exposes persisted claims and expandable evidence", async 
   await page.goto(`/research/${runId}/report`);
 
   await expect(page.getByRole("heading", { name: "Research Report" })).toBeVisible();
+  await expect(page.getByText("Synthesis confidence: Limited", { exact: true })).toBeVisible();
   await expect(page.getByText("Executive summary from persisted report.")).toBeVisible();
   await expect(page.getByText("Authoritative study title")).toBeVisible();
 

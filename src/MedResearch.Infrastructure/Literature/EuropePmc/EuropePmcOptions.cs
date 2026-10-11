@@ -12,7 +12,7 @@ public sealed class EuropePmcOptions
 
     public string BaseUrl { get; init; } = "https://www.ebi.ac.uk/europepmc/webservices/rest/";
 
-    public int MaxResultsPerQuery { get; init; } = 10;
+    public int MaxResultsPerQuery { get; init; } = 20;
 
     public int PageSize { get; init; } = 25;
 

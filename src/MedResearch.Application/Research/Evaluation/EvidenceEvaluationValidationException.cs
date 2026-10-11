@@ -4,13 +4,13 @@ namespace MedResearch.Application.Research.Evaluation;
 
 public sealed class EvidenceEvaluationValidationException : Exception, IValidationFailure
 {
-    public EvidenceEvaluationValidationException(string message)
+    public EvidenceEvaluationValidationException(string message, ValidationIssue? issue = null)
         : base(message)
     {
-        Issues = [new ValidationIssue(
+        Issues = [issue ?? new ValidationIssue(
             ValidationIssueCodes.EvaluationContractViolation,
             null,
-            "Evaluation semantic repair is not enabled for this stage; preserve explicit Unknown or InsufficientSource states and fail closed.",
+            "This evaluation contract violation is not eligible for repair; preserve explicit Unknown or InsufficientSource states and fail closed.",
             ValidationIssueDisposition.NonRepairable)];
     }
 

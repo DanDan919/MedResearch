@@ -15,6 +15,7 @@ using MedResearch.Infrastructure.Ai.OpenAI;
 using MedResearch.Infrastructure.Extraction.Persistence;
 using MedResearch.Infrastructure.Evaluation.Persistence;
 using MedResearch.Infrastructure.Literature.EuropePmc;
+using MedResearch.Infrastructure.Literature.Crossref;
 using MedResearch.Infrastructure.Literature.Persistence;
 using MedResearch.Infrastructure.Literature.PubMed;
 using MedResearch.Infrastructure.Persistence;
@@ -144,6 +145,20 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IScientificLiteratureSource>(provider =>
                 provider.GetRequiredService<EuropePmcScientificLiteratureSource>());
         }
+
+        var crossrefOptions = CreateCrossrefOptions(configuration);
+        services.AddSingleton(Options.Create(crossrefOptions));
+        services.AddSingleton<ICrossrefRequestGate, CrossrefRequestGate>();
+        services.AddSingleton<ICrossrefRetryDelay, CrossrefRetryDelay>();
+        services.AddHttpClient<CrossrefScientificLiteratureSource>(client =>
+        {
+            client.BaseAddress = new Uri(crossrefOptions.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(crossrefOptions.TimeoutSeconds);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MedResearch/1.0 (https://github.com/DanDan919/MedResearch)");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
+        if (crossrefOptions.Enabled)
+            services.AddScoped<IScientificLiteratureSource>(provider => provider.GetRequiredService<CrossrefScientificLiteratureSource>());
 
         var sourceAcquisitionOptions = CreateSourceAcquisitionOptions(configuration);
         services.AddSingleton(sourceAcquisitionOptions);
@@ -409,7 +424,7 @@ public static class ServiceCollectionExtensions
             ApiKey = string.IsNullOrWhiteSpace(section["ApiKey"])
                 ? null
                 : section["ApiKey"],
-            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"] ?? section["ResultLimit"], 10, "PubMed:MaxResultsPerQuery"),
+            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"] ?? section["ResultLimit"], 20, "PubMed:MaxResultsPerQuery"),
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "PubMed:TimeoutSeconds"),
             MaxSearchResponseBytes = ReadPositiveInt(section["MaxSearchResponseBytes"], 256_000, "PubMed:MaxSearchResponseBytes"),
             MaxFetchResponseBytes = ReadPositiveInt(section["MaxFetchResponseBytes"], 2_000_000, "PubMed:MaxFetchResponseBytes"),
@@ -439,7 +454,7 @@ public static class ServiceCollectionExtensions
             BaseUrl = string.IsNullOrWhiteSpace(section["BaseUrl"])
                 ? "https://www.ebi.ac.uk/europepmc/webservices/rest/"
                 : section["BaseUrl"]!,
-            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"], 10, "EuropePmc:MaxResultsPerQuery"),
+            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"], 20, "EuropePmc:MaxResultsPerQuery"),
             PageSize = ReadPositiveInt(section["PageSize"], 25, "EuropePmc:PageSize"),
             TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 15, "EuropePmc:TimeoutSeconds"),
             MaxResponseBytes = ReadPositiveInt(section["MaxResponseBytes"], 2_000_000, "EuropePmc:MaxResponseBytes"),
@@ -449,6 +464,29 @@ public static class ServiceCollectionExtensions
             RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 250, "EuropePmc:RetryBaseDelayMilliseconds")
         };
 
+        options.Validate();
+        return options;
+    }
+
+    private static CrossrefOptions CreateCrossrefOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(CrossrefOptions.SectionName);
+        var enabled = true;
+        if (section["Enabled"] is { } enabledValue && !bool.TryParse(enabledValue, out enabled))
+            throw new InvalidOperationException("Crossref:Enabled must be true or false.");
+        var options = new CrossrefOptions
+        {
+            Enabled = enabled,
+            BaseUrl = section["BaseUrl"] ?? "https://api.crossref.org/",
+            Email = string.IsNullOrWhiteSpace(section["Email"]) ? null : section["Email"],
+            MaxResultsPerQuery = ReadPositiveInt(section["MaxResultsPerQuery"], 20, "Crossref:MaxResultsPerQuery"),
+            PageSize = ReadPositiveInt(section["PageSize"], 20, "Crossref:PageSize"),
+            TimeoutSeconds = ReadPositiveInt(section["TimeoutSeconds"], 20, "Crossref:TimeoutSeconds"),
+            MaxResponseBytes = ReadPositiveInt(section["MaxResponseBytes"], 2_000_000, "Crossref:MaxResponseBytes"),
+            BodyReadTimeoutSeconds = ReadPositiveInt(section["BodyReadTimeoutSeconds"], 15, "Crossref:BodyReadTimeoutSeconds"),
+            MaxRetryAttempts = ReadNonNegativeInt(section["MaxRetryAttempts"], 2, "Crossref:MaxRetryAttempts"),
+            RetryBaseDelayMilliseconds = ReadPositiveInt(section["RetryBaseDelayMilliseconds"], 500, "Crossref:RetryBaseDelayMilliseconds")
+        };
         options.Validate();
         return options;
     }

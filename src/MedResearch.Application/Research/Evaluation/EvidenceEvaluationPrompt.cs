@@ -6,7 +6,7 @@ namespace MedResearch.Application.Research.Evaluation;
 
 public static class EvidenceEvaluationPrompt
 {
-    public const string Version = "evidence-evaluator-v2-no-raw-summary";
+    public const string Version = "evidence-evaluator-v3-literal-author-limitations";
 
     public static StructuredOutputSchema OutputSchema { get; } = new(
         "evidence_evaluation",
@@ -50,7 +50,7 @@ public static class EvidenceEvaluationPrompt
                 overallConfidence = EnumString("Internal MedResearch methodological confidence category, not GRADE.", ConfidenceValues()),
                 rationale = NullableString("Concise source-aware rationale. Do not include full abstract text.", 1000),
                 reportingLimitations = StringArray("Limitations of available MedResearch representation/source scope, not study misconduct.", 12, 300),
-                authorReportedLimitations = StringArray("Only author/source-reported limitations explicitly present in source text or evidence excerpts.", 8, 300)
+                authorReportedLimitations = StringArray("Only contiguous verbatim excerpts of explicit author/source-reported limitations from supplied source text or evidence supporting text. Do not paraphrase. Use [] if none is reported.", 8, 300)
             }
         }));
 
@@ -65,6 +65,8 @@ public static class EvidenceEvaluationPrompt
             Use only the supplied MedResearch context. Do not use external knowledge about the paper.
             Distinguish source absence from methodological weakness. Not reported in the supplied source material means Unknown or InsufficientSource, not Poor.
             Do not invent randomization, blinding, allocation concealment, dropout rates, statistical power, confounding, single-center status, or author limitations.
+            Each authorReportedLimitations item must be one contiguous verbatim excerpt of at most 300 characters from the supplied source text or grounded evidence supporting text. Preserve wording, punctuation, markup and source typos; do not paraphrase, join separate fragments or add quotation marks not present in the source.
+            If no explicit author-reported limitation is available, return authorReportedLimitations=[]. Missing full text or insufficient methodological detail is a reportingLimitations/source-coverage limitation, not an author-reported study limitation.
             Do not assign numeric quality scores. Do not claim formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa, or any validated framework result.
             Statistical significance is not study quality. p < 0.05 is not high quality; p > 0.05 is not no effect.
             Use NotApplicable when a domain conceptually does not apply. Use InsufficientSource when the source scope is inadequate. Use Unknown when the value cannot be determined from supplied material.

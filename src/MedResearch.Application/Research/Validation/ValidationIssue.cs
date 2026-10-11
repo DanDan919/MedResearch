@@ -22,6 +22,7 @@ public static class ValidationIssueCodes
     public const string SupportingTextNotGrounded = "SupportingTextNotGrounded";
     public const string ExtractionContractViolation = "ExtractionContractViolation";
     public const string EvaluationContractViolation = "EvaluationContractViolation";
+    public const string AuthorReportedLimitationNotGrounded = "AuthorReportedLimitationNotGrounded";
     public const string MixedClaimConflict = "MixedClaimConflict";
     public const string UnknownEvidenceReference = "UnknownEvidenceReference";
     public const string CrossRunEvidenceReference = "CrossRunEvidenceReference";

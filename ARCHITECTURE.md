@@ -38,6 +38,47 @@ MedResearch is a modular, layered monolith. The system should remain simple unti
 
 Report and F13 provenance APIs carry semantics/status without raw SourceMaterial content. Zod validates closed categories; frontend displays backend text/support without reconstructing effect meaning. F12 preserves the existing configurable repair budget (default one replacement, allowed zero through two), uses the same immutable prompt/support and validates every replacement from scratch. F16 no-third-request tests exercise the default one-repair budget, not a new unconditional cap. M17-M24 statistical implementations are unchanged. These rules do not independently establish causal direction, synonym entailment, population generalization or provider correctness. ADR-031 records this boundary.
 
+## Three-Source Retrieval Follow-Up
+
+The single `ScientificLiteratureSearchCoordinator` now selects PubMed,
+EuropePmc and Crossref adapters. Every actual source/query execution retains its
+own logical attempt, search and discoveries. Crossref adds no Domain/EF schema
+or API contract: `ScientificLiteratureSourceNames.Crossref` is the stable port
+identity; transport/parser/query expansion remain in Infrastructure.
+
+Crossref `/works` is supplemental ranked lexical search with journal-article and
+has-abstract filters and explicit `sort=score&order=desc` on every cursor page,
+not a Boolean equivalent of PubMed. Positive supported
+planner operands expand to terms; negative/unsupported constraints fail before
+HTTP. Original queries stay in the plan; actual expansion is the provenance and
+recovery key. This broader retrieval does not implement a relevance/entailment
+gate or make publisher abstracts validated scientific truth.
+
+The singleton Crossref gate combines a one-token/second bucket and a one-request
+concurrency permit held through bounded body reading. Inspection/page/cursor
+budgets include rejected/duplicate records; no title-based merging or unbounded
+scan attempts to fill accepted-candidate slots. DOI identity uses existing
+PostgreSQL serialization and conservative enrichment. Three-source concurrent
+upsert regression verifies one canonical Study, three provenance paths, one
+extraction work item and one synthesis Study from a fresh DbContext.
+
+PubMed now explicitly ignores DTD resolution, requires a PubmedArticleSet with
+no ERROR, retains ArticleIdList PMCID and rejects unrequested batch PMIDs. ESearch
+provider errors fail, rather than becoming valid zero results. Defaults retrieve
+up to 20 records/query/source; downstream defaults remain 10 distinct Studies/run.
+Health and normal CI remain independent from live providers. A separate opt-in
+live suite exercises all three adapters without DB writes or LLM calls. ADR-034
+records the lexical-search policy and first-party contracts.
+
+New plans use `research-planner-v2-portable-keywords`: plain words, phrases,
+explicitly grouped AND/OR, without provider-specific fields/controlled vocabulary,
+wildcards or exclusion operators. Exclusion concepts remain separate plan hints,
+not automatically enforced eligibility filters. A real v1 MeSH query worked in
+PubMed but failed preparation for Europe PMC/Crossref, without HTTP requests.
+The prompt change reduces that mismatch; it does not guarantee model obedience
+or identical search semantics. Existing plans are reused unchanged, and adapters
+still reject unsupported syntax rather than silently stripping constraints.
+
 ## Dependency Direction
 
 ```text
@@ -233,7 +274,7 @@ The LLM is an untrusted planning component, not a scientific authority. It is al
 
 The external LLM input is narrowly scoped to the current submitted research question and planner instructions. Retrieved article abstracts, evidence, unrelated research runs, database records, API keys, authentication headers, and raw provider payloads are not sent as part of this milestone.
 
-The prompt version is `research-planner-v1`. The prompt lives in `ResearchPlannerPrompt` rather than being buried inside the service method. It defines role, allowed task, prohibited behavior, uncertainty behavior, allowed study-type labels, and search-query constraints.
+The prompt version is `research-planner-v2-portable-keywords`. The prompt lives in `ResearchPlannerPrompt` rather than being buried inside the service method. It defines role, allowed task, prohibited behavior, uncertainty behavior, allowed study-type labels, and portable keyword search guidance.
 
 Validation remains mandatory even with provider-side schema enforcement. Application validates at least:
 
@@ -249,15 +290,17 @@ Validation remains mandatory even with provider-side schema enforcement. Applica
 - query text must not contain obvious stable study identifiers such as PMID or DOI.
 
 `ValidationGuidedLlmRepairService` is a provider-neutral Application boundary for
-semantic output correction in `EvidenceExtractor` and `ResearchSynthesizer`.
+semantic output correction in `EvidenceExtractor` and `ResearchSynthesizer`,
+and literal author-limitation quotation repair in `EvidenceEvaluator`.
 Typed `ValidationIssue` values distinguish repairable output defects from
 non-repairable context, ownership, provider, cancellation, and infrastructure
 failures. A repairable issue receives at most the bounded
 `AI:ValidationGuidedRepair:MaxSemanticRepairAttempts` budget (default one,
 maximum two). The service keeps the original prompt context and schema, requests
 a complete replacement, and runs the same validator from scratch. It never
-merges or persists the rejected candidate. Planner and evaluator do not use this
-semantic repair path yet.
+merges or persists the rejected candidate. Planning remains non-repairable;
+evaluation uses this path only for `AuthorReportedLimitationNotGrounded`, not
+identity, other methodological contract failures or provider errors (ADR-027).
 
 OpenAI configuration lives under `AI`:
 
@@ -361,13 +404,13 @@ EvidenceExtraction + grounded Evidence + Study metadata
 
 The evaluator input boundary is limited to the current research question, bounded plan context, relevant study metadata/source text, grounded evidence findings/supporting excerpts, and extraction provenance. It does not receive unrelated studies, unrelated runs, credentials, logs, or raw provider payloads.
 
-The prompt version is `evidence-evaluator-v2-no-raw-summary`. The prompt requires use of supplied material only, preservation of `Unknown`, `InsufficientSource`, and `NotApplicable`, no numeric quality score, no statistical-significance-as-quality shortcut, no invented limitations, and no formal GRADE/RoB claims. Raw extraction ResultSummary is excluded.
+The prompt version is `evidence-evaluator-v3-literal-author-limitations`. The prompt requires use of supplied material only, preservation of `Unknown`, `InsufficientSource`, and `NotApplicable`, no numeric quality score, no statistical-significance-as-quality shortcut, no invented limitations, and no formal GRADE/RoB claims. Author-reported limitations must be contiguous literal source excerpts (at most 300 characters); absent limitations are `[]`, not invented or paraphrased. Source-coverage limitations remain separate. Raw extraction ResultSummary is excluded.
 
 Evaluation uses one study-level `EvidenceEvaluation` per research run, study, and prompt version. The row stores the evaluated `EvidenceIds`, so future synthesis can combine study-level methodology with the exact grounded findings without duplicating the same study assessment across every evidence row.
 
 Deterministic validation checks authoritative run/study identity, supported categories, bounded text, grounded author-reported limitations, source-scope semantics, and rejection of source absence as a concern. For abstract-only inputs, domains such as allocation concealment, detailed attrition assessment, and often blinding are finalized as `InsufficientSource` or `NotApplicable` unless source text supports a more specific judgment.
 
-A study with no extracted evidence is recorded as skipped with `NoExtractedEvidence` and does not call the LLM. Provider failures, malformed output, validation failures, and unsupported methodological claims use the existing safe run failure path. Expected scientific insufficiency is persisted as structured state and does not fail the run.
+A study with no extracted evidence is recorded as skipped with `NoExtractedEvidence` and does not call the LLM. A typed absent author-limitation quotation may receive a bounded complete replacement through the existing repair service; the same validator must accept the replacement. Identity and other contract defects, provider failures, malformed output, exhausted repair and unsupported methodological claims use the safe run failure path. Expected scientific insufficiency is persisted as structured state and does not fail the run.
 
 This evaluator is MedResearch's internal structured assessment. It is not formal GRADE, Cochrane RoB 2, ROBINS-I, AMSTAR-2, Newcastle-Ottawa Scale, or another validated framework.
 
@@ -630,14 +673,14 @@ The compose API service enables config-gated startup migrations with `Database__
 
 ## Current Limitations
 
-- No Crossref, OpenAlex, Semantic Scholar, or publisher source integration exists yet.
+- Crossref is supplemental ranked metadata/abstract search; OpenAlex, Semantic Scholar and publisher crawling are not implemented.
 - OpenAI is the only implemented LLM provider.
 - No live OpenAI smoke test is configured or run by default.
 - No PDF/HTML scraping, publisher crawling, RAG, or vector search exists; bounded Europe PMC structured full text is supported.
 - Lease-based recovery exists for expired in-progress runs, but it is stage-level retry/resume rather than an exactly-once external-work guarantee or distributed scheduler.
 - Formal study quality frameworks, formal evidence certainty frameworks, semantic outcome harmonization, cohort-overlap detection, modified/ad-hoc HKSJ, tau-squared confidence intervals, and forest plots are not implemented.
 - OpenAI retry policy is not implemented; failures are surfaced to the existing run failure path.
-- PubMed and Europe PMC rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
+- PubMed, Europe PMC and Crossref rate limiting are conservative and local to the process; no distributed provider rate limiter exists.
 - PubMed History Server retrieval is deliberately deferred while `MaxResultsPerQuery` remains bounded to small direct PMID batches.
 - Europe PMC live availability is verified only through an optional smoke test, not normal CI.
 - Production migration strategy is not decided yet.

@@ -1,4 +1,5 @@
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Validation;
 using MedResearch.Domain;
 
 namespace MedResearch.Application.Research.Evaluation;
@@ -278,12 +279,20 @@ public sealed class EvidenceEvaluationDraftValidator
         }
 
         var sourceText = BuildSourceText(context);
+        var index = 0;
         foreach (var limitation in limitations)
         {
             if (!Contains(sourceText, limitation))
             {
-                throw new EvidenceEvaluationValidationException("Author-reported limitations must be grounded in supplied source text or evidence excerpts.");
+                throw new EvidenceEvaluationValidationException(
+                    "Author-reported limitations must be grounded in supplied source text or evidence excerpts.",
+                    new ValidationIssue(
+                        ValidationIssueCodes.AuthorReportedLimitationNotGrounded,
+                        $"authorReportedLimitations[{index}]",
+                        "Use only a contiguous verbatim excerpt, at most 300 characters, from the supplied source text or grounded evidence supporting text for each author-reported limitation. Preserve source wording, punctuation and markup; do not paraphrase or invent a limitation. If no explicit author-reported limitation is available, return authorReportedLimitations=[]. Source-coverage limitations belong in reportingLimitations, not authorReportedLimitations.",
+                        ValidationIssueDisposition.Repairable));
             }
+            index++;
         }
     }
 

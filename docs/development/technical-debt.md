@@ -1,5 +1,49 @@
 # Technical Debt
 
+## Supplemental Crossref Retrieval Limits (2026-10-11)
+
+Crossref ranked lexical search is intentionally not Boolean/MeSH-equivalent.
+Positive operands expand to terms; exclusions and unsupported fields fail
+before HTTP. More records/providers do not establish topical relevance,
+independent cohorts, causal support or sufficient source material. A typed
+portable query/relevance contract remains separate work; no overlap heuristic
+is marketed as scientific eligibility.
+
+Planning v2 requests portable keyword/phrase/grouped-Boolean syntax after a
+real v1 MeSH query was rejected by two sources before HTTP. This is prompt
+guidance, not a validated typed query AST or universal syntax/semantic proof.
+Exclusion hints and preferred study types are not automatically enforced
+cross-provider eligibility filters. Historical plans can still be PubMed-only.
+
+Crossref DOI-bearing journal articles with publisher-deposited abstracts are
+only a subset of the corpus. Missing metadata stays missing; conflicting
+non-null metadata is not overwritten. Same-DOI duplicate candidate records
+retain the first candidate within an execution, without intra-response metadata
+conflict reconciliation. Retrieval bounds count inspected records, so skipped
+or duplicate hits can yield fewer candidates than the configured maximum.
+
+Request gates are process-local, not shared across replicas/IP. Crossref public
+headers observed on 2026-10-11 advertised 1 request/second and concurrency 1;
+the conservative gate matches that observation but does not dynamically adapt
+to future policy/header changes. Operators must coordinate replicas and supply
+their actual NCBI contact email; no personal address is invented. Crossref
+mailto is optional; no key/subscription is needed for the implemented route.
+
+Broadening retrieval increases bounded work but is not a monetary/token budget.
+The local scientific extraction cap remains 10 distinct Studies; no live LLM
+completion was established by provider-only contract tests. Separate real
+pipeline runs are recorded in `live-pipeline-repair-2026-10-11-ru.md`; their
+temporary two-Study cap is not an exhaustive review. No new CI run has
+yet verified these edits; native PostgreSQL graph/migration checks are not a
+replacement for all required Testcontainers concurrency/recovery regressions.
+
+Explicit Crossref score ordering improves actual retrieval but does not establish
+question/outcome relevance. The extraction work set is not a persisted combined
+provider relevance ranking. A no-abstract Study can consume a selected slot;
+remaining hits are not automatically sampled to replace it. Source ranking,
+current metadata and selection order can change a bounded live corpus. Case
+reports/reviews are not interchangeable with comparative primary studies.
+
 ## Literal Extraction Quotes And Terminal Progress (2026-10-11)
 
 Live Codex CLI responses can still fail exact-source quotation validation after
@@ -129,7 +173,7 @@ OpenAPI drift remain release work. Historical scientific limits below remain.
 - OpenAI request pacing/rate limiting is not distributed across multiple API instances.
 - Evidence extraction has a bounded validation-guided semantic repair attempt for typed repairable output issues. Provider failures, malformed structured responses, non-repairable validation failures, and a still-invalid replacement use the existing safe failure path.
 - Evidence extraction is abstract-level only; full-text retrieval, section-aware extraction, and publisher/PDF source handling are not implemented.
-- Evidence evaluation has no bounded retry policy yet. Provider failures, malformed structured responses, validation failures, and unsupported methodological claims currently move the run through the existing safe failure path.
+- Evidence evaluation now permits bounded full replacement only for the typed absent author-limitation quotation issue. Other contract failures, provider errors, malformed responses and exhausted repairs fail closed. This is not general methodological repair or transport retry; quotation containment alone does not prove that a sentence is an author-reported limitation.
 - Evidence evaluation is an internal categorical assessment only. It is not a validated GRADE, RoB 2, ROBINS-I, AMSTAR-2, NOS, or other formal study-quality framework.
 - Evidence synthesis has a bounded validation-guided semantic repair attempt for typed repairable output issues. Provider failures, malformed structured responses, cross-run/infrastructure invariants, and a still-invalid replacement use the existing safe failure path.
 - Evidence synthesis now receives and persists narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval artifacts for eligible compatible OR/RR/HR groups. It still does not implement modified/ad-hoc HKSJ, tau-squared confidence intervals, forest plots, vote counting, formal evidence certainty grading, semantic outcome harmonization, cohort-overlap detection, or systematic-review/primary-study citation-overlap detection.

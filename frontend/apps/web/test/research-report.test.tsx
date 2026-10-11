@@ -11,6 +11,22 @@ describe("ResearchReport", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
+  it.each([
+    ["VeryLimited", "Very limited"],
+    ["Limited", "Limited"],
+    ["ModeratelyCertain", "Moderately certain"],
+    ["MoreCertain", "More certain"],
+    ["InsufficientEvidence", "Insufficient evidence"],
+    ["FutureCategory", "FutureCategory"],
+    ["__proto__", "__proto__"],
+    ["toString", "toString"]
+  ])("shows persisted synthesis confidence %s without changing completed status", async (value, label) => {
+    fetchMock.mockResolvedValue(jsonResponse({ ...reportResponse(), synthesisConfidence: value }));
+    renderWithClient(<ResearchReport researchRunId={runId} />);
+    expect(await screen.findByText(`Synthesis confidence: ${label}`)).toBeInTheDocument();
+    expect(screen.getByText("Completed", { exact: true })).toBeInTheDocument();
+  });
+
   it("renders the report narrative and traceable evidence workspace", async () => {
     fetchMock.mockResolvedValue(jsonResponse(reportResponse()));
 

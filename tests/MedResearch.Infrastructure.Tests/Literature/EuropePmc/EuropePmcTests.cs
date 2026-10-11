@@ -63,6 +63,7 @@ public sealed class EuropePmcScientificLiteratureSourceTests
     [Theory]
     [InlineData("TITLE_ABS:(sleep OR cognition) AND adult*")]
     [InlineData("sleep deprivation AND (working memory OR cognition) β")]
+    [InlineData("\"total sleep deprivation\" AND (\"working memory\" OR \"working-memory\") AND healthy AND adults")]
     [InlineData("\"response [baseline]\"")]
     public async Task SearchAsync_PreservesNativeAndUnfieldedQueries(string query)
     {

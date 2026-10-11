@@ -1,5 +1,7 @@
 using MedResearch.Application.Research.Processing;
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Evaluation;
+using MedResearch.Application.Research.Validation;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -137,6 +139,44 @@ public sealed class ResearchRunProcessorTests
         var processor = new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance);
 
         await processor.ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
+
+        Assert.Equal("Research processing failed.", run.FailureReason);
+    }
+
+    [Theory]
+    [InlineData(ResearchRunStatus.Evaluating, true)]
+    [InlineData(ResearchRunStatus.Extracting, false)]
+    public async Task ProcessNextQueuedRunAsync_LimitationFailureReasonIsSafeAndStageSpecific(
+        ResearchRunStatus failingStage, bool actionable)
+    {
+        var run = CreateClaimedRun();
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
+        var exception = new EvidenceEvaluationValidationException("Untrusted provider secret and source content",
+            new ValidationIssue(ValidationIssueCodes.AuthorReportedLimitationNotGrounded,
+                "authorReportedLimitations[0]", "Server-authored instruction", ValidationIssueDisposition.Repairable));
+        var executor = new RecordingStageExecutor(failingStage, exception);
+        var processor = new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance);
+
+        await processor.ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
+
+        Assert.Equal(ResearchRunStatus.Failed, run.Status);
+        Assert.Equal(actionable
+            ? "Evidence evaluation could not verify an author-reported limitation in the supplied source. The unverified evaluation was not accepted."
+            : "Research processing failed.", run.FailureReason);
+        Assert.DoesNotContain("Untrusted", run.FailureReason);
+        Assert.DoesNotContain(ResearchRunStatus.Synthesizing, queue.SavedStatuses);
+    }
+
+    [Fact]
+    public async Task ProcessNextQueuedRunAsync_OtherEvaluationFailureRemainsGeneric()
+    {
+        var run = CreateClaimedRun();
+        var queue = new RecordingResearchRunQueue(CreateClaim(run, "Does sleep improve memory?"));
+        var executor = new RecordingStageExecutor(ResearchRunStatus.Evaluating,
+            new EvidenceEvaluationValidationException("Untrusted provider detail"));
+
+        await new ResearchRunProcessor(queue, executor, NullLogger<ResearchRunProcessor>.Instance)
+            .ProcessNextQueuedRunAsync("worker-1", CancellationToken.None);
 
         Assert.Equal("Research processing failed.", run.FailureReason);
     }

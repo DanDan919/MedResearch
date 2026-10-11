@@ -53,7 +53,7 @@ services:
       QuantitativeSynthesis__MinimumUniqueStudies: ${QUANTITATIVE_SYNTHESIS_MINIMUM_UNIQUE_STUDIES:-2}
       PubMed__Enabled: ${PUBMED_ENABLED:-true}
       PubMed__BaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/
-      PubMed__MaxResultsPerQuery: ${PUBMED_MAX_RESULTS_PER_QUERY:-10}
+      PubMed__MaxResultsPerQuery: ${PUBMED_MAX_RESULTS_PER_QUERY:-20}
       PubMed__TimeoutSeconds: "15"
       PubMed__MaxSearchResponseBytes: ${PUBMED_MAX_SEARCH_RESPONSE_BYTES:-256000}
       PubMed__MaxFetchResponseBytes: ${PUBMED_MAX_FETCH_RESPONSE_BYTES:-2000000}
@@ -67,7 +67,7 @@ services:
       PubMed__RetryBaseDelayMilliseconds: ${PUBMED_RETRY_BASE_DELAY_MILLISECONDS:-250}
       EuropePmc__Enabled: ${EUROPEPMC_ENABLED:-true}
       EuropePmc__BaseUrl: https://www.ebi.ac.uk/europepmc/webservices/rest/
-      EuropePmc__MaxResultsPerQuery: ${EUROPEPMC_MAX_RESULTS_PER_QUERY:-10}
+      EuropePmc__MaxResultsPerQuery: ${EUROPEPMC_MAX_RESULTS_PER_QUERY:-20}
       EuropePmc__PageSize: ${EUROPEPMC_PAGE_SIZE:-25}
       EuropePmc__TimeoutSeconds: "15"
       EuropePmc__MaxResponseBytes: ${EUROPEPMC_MAX_RESPONSE_BYTES:-2000000}
@@ -75,6 +75,15 @@ services:
       EuropePmc__MaxRequestsPerSecond: ${EUROPEPMC_MAX_REQUESTS_PER_SECOND:-2}
       EuropePmc__MaxRetryAttempts: ${EUROPEPMC_MAX_RETRY_ATTEMPTS:-2}
       EuropePmc__RetryBaseDelayMilliseconds: ${EUROPEPMC_RETRY_BASE_DELAY_MILLISECONDS:-250}
+      Crossref__Enabled: ${CROSSREF_ENABLED:-true}
+      Crossref__Email: ${CROSSREF_EMAIL:-}
+      Crossref__MaxResultsPerQuery: ${CROSSREF_MAX_RESULTS_PER_QUERY:-20}
+      Crossref__PageSize: ${CROSSREF_PAGE_SIZE:-20}
+      Crossref__TimeoutSeconds: ${CROSSREF_TIMEOUT_SECONDS:-20}
+      Crossref__MaxResponseBytes: ${CROSSREF_MAX_RESPONSE_BYTES:-2000000}
+      Crossref__BodyReadTimeoutSeconds: ${CROSSREF_BODY_READ_TIMEOUT_SECONDS:-15}
+      Crossref__MaxRetryAttempts: ${CROSSREF_MAX_RETRY_ATTEMPTS:-2}
+      Crossref__RetryBaseDelayMilliseconds: ${CROSSREF_RETRY_BASE_DELAY_MILLISECONDS:-500}
       SourceAcquisition__Enabled: ${SOURCE_ACQUISITION_ENABLED:-true}
       SourceAcquisition__MaxStudiesPerRun: ${SOURCE_ACQUISITION_MAX_STUDIES_PER_RUN:-10}
       SourceAcquisition__MaxContentCharacters: ${SOURCE_ACQUISITION_MAX_CONTENT_CHARACTERS:-30000}

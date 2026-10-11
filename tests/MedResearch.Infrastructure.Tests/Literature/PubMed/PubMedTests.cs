@@ -422,6 +422,21 @@ public sealed class PubMedScientificLiteratureSourceTests
         Assert.Empty(handler.Requests);
     }
 
+    [Fact]
+    public async Task SearchAsync_RejectsMetadataOutsideRequestedBatchWithoutRetry()
+    {
+        var handler = new RecordingPubMedHandler(
+            Response(HttpStatusCode.OK, BuildSearchJson("123")),
+            Response(HttpStatusCode.OK, BuildFetchXml("999")));
+        var delay = new RecordingRetryDelay();
+        var exception = await Assert.ThrowsAsync<ScientificLiteratureSourceException>(() =>
+            CreateSource(handler, retryDelay: delay).SearchAsync(
+                new ScientificSearchRequest(Guid.NewGuid(), Guid.NewGuid(), "batch isolation"), CancellationToken.None));
+        Assert.Equal(MedResearch.Domain.LiteratureProviderFailureCategory.InvalidResponse, exception.FailureCategory);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Empty(delay.Delays);
+    }
+
     private static PubMedScientificLiteratureSource CreateSource(
         RecordingPubMedHandler handler,
         PubMedOptions? options = null,

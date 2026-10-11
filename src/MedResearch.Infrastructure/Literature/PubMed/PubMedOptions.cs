@@ -13,7 +13,7 @@ public sealed class PubMedOptions
 
     public string BaseUrl { get; init; } = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
 
-    public int MaxResultsPerQuery { get; init; } = 10;
+    public int MaxResultsPerQuery { get; init; } = 20;
 
     public int TimeoutSeconds { get; init; } = 15;
 

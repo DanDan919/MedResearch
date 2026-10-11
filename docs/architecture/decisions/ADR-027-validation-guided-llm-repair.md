@@ -47,3 +47,25 @@ Invalid output therefore cannot become Evidence, Evaluation, or a ResearchReport
   is still weaker than semantic association between a number and a statistic.
 - Transport retries, provider reliability, and live external availability remain
   separate operational concerns.
+
+## 2026-10-11: Literal Author-Limitation Repair
+
+A real Codex CLI run persisted grounded extraction but failed in Evaluating:
+an author-reported limitation was absent from supplied source text. The v2
+prompt permitted source-grounded prose without explicitly requiring the
+literal containment enforced by the validator. This exposed a prompt/validator
+contract mismatch, not justification to accept the rejected limitation.
+
+The v3 evaluator prompt explicitly requires contiguous verbatim excerpts and
+an empty array when no author limitation is reported. Only the typed
+`AuthorReportedLimitationNotGrounded` issue can use the existing configurable
+repair budget (default one, zero through two). The replacement is a complete
+object over the same immutable context/schema, validated from scratch; no
+rejected candidate text is appended or persisted. Run/study identity and all
+other evaluation contract failures remain non-repairable. Provider failure and
+cancellation do not trigger semantic repair. No validator predicate is relaxed.
+
+Worker failure diagnostics for this issue in Evaluating use a fixed safe
+message. Historical failed runs are retained, not rewritten or requeued. This
+limited exception supersedes the earlier blanket statement that evaluation
+repair is disabled; planning repair remains disabled.

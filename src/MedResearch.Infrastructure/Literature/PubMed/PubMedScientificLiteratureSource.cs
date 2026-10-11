@@ -158,7 +158,10 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
 
             var stopwatch = Stopwatch.StartNew();
             var content = await SendWithRetryAsync(uri, "EFetch", _options.MaxFetchResponseBytes, cancellationToken);
-            candidates.AddRange(_articleMapper.MapArticles(content));
+            var articles = _articleMapper.MapArticles(content);
+            if (articles.Any(article => article.Pmid is null || !batch.Contains(article.Pmid, StringComparer.Ordinal)))
+                throw new PubMedResponseException("PubMed EFetch returned an article outside the requested PMID batch.");
+            candidates.AddRange(articles);
             stopwatch.Stop();
 
             _logger.LogInformation(

@@ -1,5 +1,104 @@
 # Current State
 
+## Real Pipeline Repair Follow-Up (2026-10-11)
+
+Continues the uncommitted three-source change set at actual HEAD
+`5590b866121e367572cd3e717b7d29845817d5aa`, without resetting local work.
+User-authorized real requests use the existing Codex CLI account, not an
+OpenAI API key, and the preserved local PostgreSQL 18 database. Normal tests
+remain deterministic and fake-provider-based.
+
+Run `6312af8f-72ca-414c-9769-b39c728293c6` searched all three sources,
+extracted three grounded findings, persisted one evaluation and failed on an
+unverified author limitation. Failed history and partial output are retained.
+Live A/B exposed Crossref cursor ordering: explicit score-desc sorting on every
+page replaces the incorrect assumption that an omitted sort gives relevant
+cursor results. Two request regressions failed before the fix.
+
+Evaluation v3 now requires literal author limitations or `[]`. Only the typed
+quote-containment issue uses the existing repair budget; same validator/schema/
+context, no acceptance of rejected drafts. Default one replacement, configurable
+zero through two; identity/other failures stay non-repairable. Four red cases
+proved the old gap; one additional red case proved missing safe diagnostics.
+
+The second real question produced a v1 PubMed MeSH query: PubMed succeeded,
+Europe PMC/Crossref failed preparation before HTTP. Planning v2 now requests
+portable unfielded keyword/phrase/grouped AND/OR queries. One prompt-contract
+test failed first; adapter examples pass. Existing plans are reused unchanged;
+unsupported syntax remains fail-closed and prompt compliance is not guaranteed.
+
+Release build: 0 warnings/errors. Full solution: Domain 45, Application 326,
+Infrastructure 191, Integration 52 passed/134 Docker skips: 614 passed, 0 failed.
+43 targeted planner/evaluator/worker cases and 8 portable adapter cases pass.
+EF reports no pending model changes.
+Real run outcomes, source counts and limitations are recorded separately in
+`live-pipeline-repair-2026-10-11-ru.md`; temporary live processing bounds are
+two Studies, not the normal ten-Study default. New commit/push/CI remains
+unverified until separately authorized and executed.
+
+Real post-fix runs `560816fe-803a-4f41-aa2f-26636cc931d5`,
+`0709e448-8cd5-42a9-84c1-6194b60c708e` and
+`f70115c7-d5bc-45c7-a758-f068a5319ce8` are Completed with persisted reports,
+two StructuredValidated claims each and VeryLimited confidence. The portable
+repeat has three successful20-result source executions,60 paths,56 Study;
+only2 Study were extracted/evaluated. Six citations were checked against
+current-run provenance and BFF. Completed is not scientific certainty.
+
+Real Chrome inspection exposed missing UI synthesisConfidence. Header now
+shows the persisted category, never a calculated score. Six cases failed
+before the fix; unknown/prototype-like category fallback is also tested.
+Final SDK45/Web130,16 deterministic browser cases,6 real Chrome desktop/mobile
+report reads passed; no console/hydration errors or horizontal overflow.
+Dev request cancellations are explicitly separate from actual network failures.
+Lint/typecheck and Next production build pass; new production OIDC runtime
+verification is NOT RUN. Local API restored to normal10-Study downstream caps,
+with all3 sources, readiness/liveness/BFF200; failed history/reservations intact.
+
+## Three-Source Search And PubMed Contract Follow-Up (2026-10-11)
+
+Started at clean `5590b866121e367572cd3e717b7d29845817d5aa`, main/origin/main.
+The existing coordinator now selects PubMed, Europe PMC and supplemental
+Crossref. Default retrieval is 20 records/query/source, independently bounded;
+downstream acquisition/extraction/evaluation/synthesis remain at 10 distinct
+Studies/run. No schema, migration, scientific validator, inference or quota
+change is introduced. Disabled PubMed in the earlier local process was not an
+NCBI outage. The local stand is now explicitly configured with all three sources.
+
+Five PubMed regressions failed before production fixes: ESearch/EFetch error
+payloads could become empty success, invalid XML roots were accepted, and PMCID
+was discarded. The mapper now disables DTD resolution, validates the article
+set, retains PMCID and rejects unrequested batch PMIDs. Genuine zero results
+remain success. Crossref uses bounded DOI-bearing journal-article retrieval
+with abstract filtering, cursor/raw-record budgets, a singleton 1 request/second
+and 1 concurrent body-read gate, bounded transient retry and safe diagnostics.
+Positive PubMed operands expand to supplemental lexical terms, not equivalent
+Boolean/MeSH eligibility; exclusions/unsupported syntax fail before HTTP.
+Actual executed queries remain provenance/recovery keys. See ADR-034.
+
+Final local build: 0 warnings/errors. Full solution: Domain 45,
+Application 314, Infrastructure 189, Integration 52 passed/134 Docker skips;
+600 passed, 0 failed. EF has no pending model changes; Compose config passes.
+Docker Desktop's Linux daemon pipe remains unavailable. A separate fresh
+native PostgreSQL 18 probe applied all 20 migrations and verified concurrent
+PubMed/Europe PMC/Crossref DOI resolution, one canonical Study, three discovery
+paths, one extraction work item and one synthesis Study from fresh contexts.
+This is not execution of the entire Testcontainers suite.
+
+SDK 45/Web 122 passed; lint/typecheck passed; all 16 browser scenarios passed in
+installed Chrome against the existing dev server, including three-source
+provenance under one Study. Standard browser server startup encountered the
+existing Next dev lock; verification reused that server without resetting it.
+New frontend production build/production OIDC suite: NOT RUN for this follow-up.
+
+Explicit standalone live-contract suite: 3 passed, 3 articles/source, four HTTP
+requests (PubMed 2, Europe PMC 1, Crossref 1), no DB writes or LLM calls. The same
+suite without opt-in skips all 3; it is outside MedResearch.slnx and normal CI.
+At that provider-only checkpoint no new live research/paid API request was
+submitted; the separate follow-up above subsequently submits real questions.
+New commit/push/CI: NOT RUN,
+pending authorization for this change set; prior green CI is not certification
+of these edits. Required 134 PostgreSQL tests still need the strict CI runner.
+
 ## Local Extraction Diagnostics Follow-Up (2026-10-11)
 
 The current extractor prompt is `evidence-extractor-v4-literal-quotes`:

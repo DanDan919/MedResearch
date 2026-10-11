@@ -1,5 +1,91 @@
 # Problems
 
+## 2026-10-11: Live Cursor Ranking And Evaluation Contract Failures
+
+Real browser inspection also found a UI omission: report responses persisted
+VeryLimited synthesisConfidence, but the header displayed Completed without
+rendering that field anywhere. Six unit cases failed first. The report now
+shows the backend category independently from completion, with tested unknown
+value fallback and no invented score/percentage/formal certainty grade. All
+three real reports were then inspected in desktop/mobile Chrome; HTTP reports,
+console/hydration and overflow checks passed. Initial dev StrictMode GET aborts
+were identified as cancellations, not provider failures.
+
+The next real sleep/working-memory run exposed a further prompt mismatch:
+v1 planning explicitly asked for PubMed-style queries and produced `[MeSH Terms]`.
+PubMed returned results, but Europe PMC and Crossref failed query preparation
+before HTTP; durable Failed/ProviderProtocolError attempts distinguish that
+from successful zero results or provider downtime. New v2 planning asks for
+portable unfielded keywords/phrases/grouped AND/OR, without provider-specific
+fields/controlled vocabulary, wildcards or negative operators. Exclusion hints
+remain explicit, not silently dropped query constraints. One prompt contract
+case failed first; both adapters accept the portable example in fake-HTTP tests.
+This does not guarantee model obedience or identical provider eligibility.
+Historical plans/queries remain untouched and unsupported syntax still fails.
+
+A real research run (`6312af8f-72ca-414c-9769-b39c728293c6`) exercised all
+three scientific sources and Codex CLI. HTTP success was not sufficient:
+Crossref cursor retrieval without explicit ordering returned off-topic FEBS
+enzyme/bacteria records for a vaping query. A bounded three-record A/B used
+the exact same query/filter/cursor; `sort=score&order=desc` returned topical
+vaping records with substantially higher provider scores. Every page now sends
+that ordering; both request-contract tests failed before the fix. Ranked
+retrieval still does not prove scientific eligibility or stable cursor snapshots.
+
+The same run extracted three grounded findings from two Studies, persisted one
+evaluation, then failed on an author-reported limitation absent from supplied
+source text. The rejected draft is intentionally not persisted, so its exact
+wording/cause is not asserted. The v2 prompt did not explicitly require the
+verbatim quotation that deterministic containment already required.
+
+The v3 prompt makes this requirement and the empty-array alternative explicit.
+Only the typed literal-limitation issue receives the existing bounded full
+replacement repair; all identity/other evaluation contract defects remain
+non-repairable. Same validator, context and schema; no grounding predicate was
+loosened. Four new behavioral cases failed before this change. A separate safe
+worker diagnostic case also failed first. Cancellation, zero budget, wrong
+identity, repeated-invalid replacement and provider failure are regression
+controls. The original failed run and partial persisted output remain intact.
+
+Live validation is temporarily capped at two selected Studies per run to bound
+Codex use, not advertised as a systematic review. A selected PubMed result
+without an abstract consumed one slot and was skipped without an LLM request;
+more discovered records do not mean all were extracted. This selection/source
+coverage limitation remains explicit technical debt.
+
+## 2026-10-11: Disabled PubMed And Empty-Success Provider Errors
+
+The local process had PubMed disabled and Europe PMC capped at 3 records/query.
+No PubMed request was made in that configuration, so an NCBI outage could not be
+inferred. Small official ESearch and batched EFetch probes both returned HTTP
+200; the existing production adapters later passed the standalone opt-in
+three-source live contract test. Availability at that instant is not a future
+availability or scientific-answer guarantee.
+
+Five red-before-green tests exposed independent parser defects: ESearch ERROR
+with an empty idlist, EFetch ERROR/wrong roots accepted as empty success, and
+lost PubMed PMCID. Fixes reject provider-error payloads, require PubmedArticleSet,
+disable external DTD resolution, retain PMCID and reject unrequested batch
+PMIDs. No malformed response becomes a successful zero-result search.
+
+The client source enum rejected Crossref before its compatibility update;
+the added SDK case failed first and passes with the third allowed identifier.
+Browser coverage now verifies three source-specific searches/discoveries under
+one canonical Study. Existing stable-identifier conflicts and conservative
+metadata merge behavior remain authoritative.
+
+Final self-review caught a malformed Crossref Enabled value silently choosing
+true. A negative DI test reproduced it before the fix; explicitly configured
+non-boolean values now fail startup without reflecting the raw value. Default
+enabled and explicit false behavior retain their regression coverage.
+
+Verification constraints observed: the running Debug API locked its output
+DLLs during rebuild, resolved by an idle checked restart/Release build; a second
+Next dev server collided with the existing .next/dev lock, resolved for browser
+checks by using the already running server. Neither involved clearing user data
+or resetting Git. Docker remains unavailable; a native-PG fresh migration and
+concurrency probe supplements but does not replace the required CI suite.
+
 ## 2026-10-11: Live Extraction Quote Rejection And Misleading Progress
 
 Two isolated local Codex CLI runs failed in Extracting with

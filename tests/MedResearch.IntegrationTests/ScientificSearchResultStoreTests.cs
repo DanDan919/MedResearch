@@ -429,6 +429,43 @@ public sealed class ScientificSearchResultStoreTests
         Assert.Equal(2, discoveries.Length);
         Assert.Equal(1, await verificationContext.Studies.CountAsync(study => study.Pmid == pmid, CancellationToken.None));
     }
+    [SkippableFact]
+    public async Task ThreeSources_ConcurrentDoiIdentityPreservesThreePathsAndOneDownstreamStudy()
+    {
+        SkipIfPostgreSqlUnavailable();
+        var runId = await SeedResearchRunAsync("Three source identity and downstream isolation");
+        var doi = $"10.2000/three-sources-{Guid.NewGuid():N}";
+        const string pmid = "91000012";
+        const string pmcid = "PMC91000012";
+        var sources = new[] { ScientificLiteratureSourceNames.PubMed, ScientificLiteratureSourceNames.EuropePmc, ScientificLiteratureSourceNames.Crossref };
+        async Task<ScientificSearchPersistenceResult> Persist(string source)
+        {
+            await using var context = _fixture.CreateDbContext();
+            return await new EfScientificSearchResultStore(context).PersistSearchResultsAsync(
+                CreateRequest(Guid.NewGuid(), runId, "vaping health", [CreateCandidate(
+                    source == ScientificLiteratureSourceNames.Crossref ? null : pmid, doi,
+                    source == ScientificLiteratureSourceNames.EuropePmc ? pmcid : null, source)], source), CancellationToken.None);
+        }
+        var results = await Task.WhenAll(sources.Select(Persist));
+        Assert.Equal(1, results.Sum(result => result.PersistedCount));
+        Assert.Equal(2, results.Sum(result => result.DuplicateCount));
+        await using var verification = _fixture.CreateDbContext();
+        var study = await verification.Studies.SingleAsync(study => study.Doi == doi);
+        Assert.Equal(pmid, study.Pmid);
+        Assert.Equal(pmcid, study.Pmcid);
+        Assert.Equal(3, await verification.LiteratureSearches.CountAsync(search => search.ResearchRunId == runId));
+        var discoveries = await verification.ResearchStudyDiscoveries.Where(discovery => discovery.ResearchRunId == runId).ToArrayAsync();
+        Assert.Equal(3, discoveries.Length);
+        Assert.All(discoveries, discovery => Assert.Equal(study.Id, discovery.StudyId));
+        Assert.Equal(sources.Order(), discoveries.Select(discovery => discovery.Source).Order());
+        var work = await new EfEvidenceExtractionStore(verification).FindStudiesForExtractionAsync(runId, "three-source-test", 10, CancellationToken.None);
+        Assert.Equal(study.Id, Assert.Single(work.Studies).StudyId);
+        var corpus = await new MedResearch.Infrastructure.Synthesis.Persistence.EfResearchSynthesisStore(verification).LoadCorpusAsync(runId, CancellationToken.None);
+        Assert.Equal(study.Id, Assert.Single(corpus.Studies).StudyId);
+        Assert.Equal(3, corpus.Searches.Count);
+        Assert.Empty(corpus.Evidence);
+    }
+
     private async Task<Guid> SeedResearchRunAsync(string questionText)
     {
         await using var context = _fixture.CreateDbContext();

@@ -12,6 +12,18 @@ public sealed class ResearchPlannerTests
     private const string Question = "Does chronic sleep deprivation impair working memory in adults?";
 
     [Fact]
+    public void ResearchPlannerPrompt_RequestsPortableKeywordsNotProviderSpecificSyntax()
+    {
+        var prompt = ResearchPlannerPrompt.Create(Question, 2);
+        Assert.Contains("portable keyword", prompt.SystemPrompt);
+        Assert.Contains("Do not use database-specific field tags", prompt.SystemPrompt);
+        Assert.Contains("exclusionHints", prompt.SystemPrompt);
+        Assert.DoesNotContain("PubMed-style", prompt.UserPrompt);
+        Assert.Contains("one to 2", prompt.UserPrompt);
+        Assert.Contains(Question, prompt.UserPrompt);
+    }
+
+    [Fact]
     public async Task GenerateAndPersistPlanAsync_ValidStructuredOutputBecomesResearchPlan()
     {
         var provider = new FakeStructuredLlmClient(CreateValidDraft());

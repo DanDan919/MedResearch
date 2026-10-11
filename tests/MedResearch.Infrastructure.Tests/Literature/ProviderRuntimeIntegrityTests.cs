@@ -5,6 +5,7 @@ using MedResearch.Domain;
 using MedResearch.Infrastructure.Literature;
 using MedResearch.Infrastructure.Literature.EuropePmc;
 using MedResearch.Infrastructure.Literature.PubMed;
+using MedResearch.Infrastructure.Literature.Crossref;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -28,6 +29,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
     [InlineData("PubMedFetch")]
+    [InlineData("Crossref")]
     public async Task OversizedSuccessIsTypedFailureAndNotRetried(string operation)
     {
         var handler = new FakeHandler(operation == "PubMedFetch" ? [SearchBody, new string('x', 129)] : [new string('x', 129)]);
@@ -41,6 +43,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
     [InlineData("PubMedFetch")]
+    [InlineData("Crossref")]
     public async Task StalledSuccessBodyTimesOutAfterHeadersUsingDeterministicClock(string operation)
     {
         var clock = new DeadlineClock();
@@ -54,6 +57,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [Theory]
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
+    [InlineData("Crossref")]
     public async Task HostCancellationWhileReadingRemainsCancellation(string operation)
     {
         using var cancellation = new CancellationTokenSource();
@@ -69,6 +73,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [InlineData("PubMedSearch", "{}")]
     [InlineData("PubMedSearch", "[]")]
     [InlineData("PubMedFetch", "<invalid>")]
+    [InlineData("Crossref", "{}")]
     public async Task MalformedSuccessIsNotZeroOrRetried(string operation, string body)
     {
         var handler = new FakeHandler(operation == "PubMedFetch" ? [SearchBody, body] : [body]);
@@ -84,6 +89,8 @@ public sealed class ProviderRuntimeIntegrityTests
     [InlineData("PubMedSearch", 500, LiteratureProviderFailureCategory.ProviderProtocolError)]
     [InlineData("EuropePmc", 404, LiteratureProviderFailureCategory.ProviderProtocolError)]
     [InlineData("PubMedSearch", 400, LiteratureProviderFailureCategory.ProviderProtocolError)]
+    [InlineData("Crossref", 429, LiteratureProviderFailureCategory.RateLimited)]
+    [InlineData("Crossref", 400, LiteratureProviderFailureCategory.ProviderProtocolError)]
     public async Task NonSuccessOutcomeIsTypedAndErrorBodyIsNeverRead(string operation, int status, LiteratureProviderFailureCategory category)
     {
         var handler = new FakeHandler([], () => new StallStream(() => throw new InvalidOperationException("Error body must not be read")), (HttpStatusCode)status);
@@ -109,6 +116,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [Theory]
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
+    [InlineData("Crossref")]
     public async Task BodyTimeoutRetriesRemainBounded(string operation)
     {
         var clock = new DeadlineClock();
@@ -121,9 +129,15 @@ public sealed class ProviderRuntimeIntegrityTests
     [Theory]
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
+    [InlineData("Crossref")]
     public async Task ValidSuccessBodyExactlyAtCapIsAccepted(string operation)
     {
-        var body = operation == "EuropePmc" ? "{\"hitCount\":0,\"resultList\":{\"result\":[]}}" : "{\"esearchresult\":{\"idlist\":[]}}";
+        var body = operation switch
+        {
+            "Crossref" => "{\"status\":\"ok\",\"message-type\":\"work-list\",\"message\":{\"total-results\":0,\"items\":[]}}",
+            "EuropePmc" => "{\"hitCount\":0,\"resultList\":{\"result\":[]}}",
+            _ => "{\"esearchresult\":{\"idlist\":[]}}"
+        };
         var result = await CreateSource(operation, new FakeHandler([body]), Encoding.UTF8.GetByteCount(body)).SearchAsync(Request(), CancellationToken.None);
         Assert.Empty(result.Candidates);
         Assert.Equal(0, result.ReturnedResultCount);
@@ -132,6 +146,7 @@ public sealed class ProviderRuntimeIntegrityTests
     [Theory]
     [InlineData("EuropePmc")]
     [InlineData("PubMedSearch")]
+    [InlineData("Crossref")]
     public async Task NetworkExceptionDoesNotExposeSecretRequestUri(string operation)
     {
         const string fakeSecret = "synthetic-sensitive-value";
@@ -148,6 +163,9 @@ public sealed class ProviderRuntimeIntegrityTests
     {
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.invalid/") };
         var gate = new Gate();
+        if (operation == "Crossref") return new CrossrefScientificLiteratureSource(client,
+            Options.Create(new CrossrefOptions { MaxResponseBytes = cap, MaxRetryAttempts = retries }), gate, gate,
+            NullLogger<CrossrefScientificLiteratureSource>.Instance, clock);
         if (operation == "EuropePmc") return new EuropePmcScientificLiteratureSource(client,
             Options.Create(new EuropePmcOptions { MaxResponseBytes = cap, MaxRetryAttempts = retries }), gate, gate, NullLogger<EuropePmcScientificLiteratureSource>.Instance, clock);
         return new PubMedScientificLiteratureSource(client,
@@ -155,8 +173,10 @@ public sealed class ProviderRuntimeIntegrityTests
             new PubMedSearchResponseParser(), new PubMedArticleMapper(), gate, gate, NullLogger<PubMedScientificLiteratureSource>.Instance, clock);
     }
 
-    private sealed class Gate(CancellationTokenSource? cancel = null) : IEuropePmcRequestGate, IPubMedRequestGate, IEuropePmcRetryDelay, IPubMedRetryDelay
+    private sealed class Gate(CancellationTokenSource? cancel = null) : IEuropePmcRequestGate, IPubMedRequestGate, IEuropePmcRetryDelay, IPubMedRetryDelay, ICrossrefRequestGate, ICrossrefRetryDelay, IAsyncDisposable
     {
+        public ValueTask<IAsyncDisposable> AcquireAsync(CancellationToken token) { cancel?.Cancel(); token.ThrowIfCancellationRequested(); return ValueTask.FromResult<IAsyncDisposable>(this); }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         public ValueTask WaitAsync(CancellationToken token) { cancel?.Cancel(); token.ThrowIfCancellationRequested(); return ValueTask.CompletedTask; }
         public Task DelayAsync(TimeSpan delay, CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.CompletedTask; }
     }

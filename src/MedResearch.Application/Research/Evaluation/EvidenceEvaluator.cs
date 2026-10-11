@@ -6,7 +6,7 @@ namespace MedResearch.Application.Research.Evaluation;
 
 public sealed class EvidenceEvaluator : IEvidenceEvaluator
 {
-    private readonly IStructuredLlmClient _structuredLlmClient;
+    private readonly ValidationGuidedLlmRepairService _repairService;
     private readonly EvidenceEvaluationSignalBuilder _signalBuilder;
     private readonly EvidenceEvaluationDraftValidator _validator;
     private readonly ILogger<EvidenceEvaluator> _logger;
@@ -15,9 +15,10 @@ public sealed class EvidenceEvaluator : IEvidenceEvaluator
         IStructuredLlmClient structuredLlmClient,
         EvidenceEvaluationSignalBuilder signalBuilder,
         EvidenceEvaluationDraftValidator validator,
-        ILogger<EvidenceEvaluator> logger)
+        ILogger<EvidenceEvaluator> logger,
+        ValidationGuidedLlmRepairService? repairService = null)
     {
-        _structuredLlmClient = structuredLlmClient;
+        _repairService = repairService ?? new ValidationGuidedLlmRepairService(structuredLlmClient);
         _signalBuilder = signalBuilder;
         _validator = validator;
         _logger = logger;
@@ -56,24 +57,21 @@ public sealed class EvidenceEvaluator : IEvidenceEvaluator
 
         try
         {
-            var generationResult = await _structuredLlmClient.GenerateStructuredAsync<EvidenceEvaluationDraft>(
+            var generationResult = await _repairService.GenerateAndValidateAsync<EvidenceEvaluationDraft, EvidenceEvaluationResult>(
                 new StructuredLlmRequest(
                     EvidenceEvaluationPrompt.Version,
                     prompt.SystemPrompt,
                     prompt.UserPrompt,
                     EvidenceEvaluationPrompt.OutputSchema),
+                (draft, metadata) => _validator.Validate(
+                    context, draft, signals, metadata.Provider, metadata.Model, metadata.GeneratedAt),
+                "evidence evaluation",
                 cancellationToken);
 
-            var result = _validator.Validate(
-                context,
-                generationResult.Value,
-                signals,
-                generationResult.Metadata.Provider,
-                generationResult.Metadata.Model,
-                generationResult.Metadata.GeneratedAt);
+            var result = generationResult.Value;
 
             _logger.LogInformation(
-                "EvidenceEvaluationCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; SourceScope: {SourceScope}; OverallCategory: {OverallCategory}; UnknownDomainCount: {UnknownDomainCount}; InsufficientSourceDomainCount: {InsufficientSourceDomainCount}; DurationMs: {DurationMs}",
+                "EvidenceEvaluationCompleted. ResearchRunId: {ResearchRunId}; StudyId: {StudyId}; Provider: {Provider}; Model: {Model}; PromptVersion: {PromptVersion}; SourceScope: {SourceScope}; OverallCategory: {OverallCategory}; UnknownDomainCount: {UnknownDomainCount}; InsufficientSourceDomainCount: {InsufficientSourceDomainCount}; LlmAttemptCount: {LlmAttemptCount}; RepairedIssueCodes: {RepairedIssueCodes}; DurationMs: {DurationMs}",
                 result.ResearchRunId,
                 result.StudyId,
                 result.EvaluatorProvider,
@@ -83,6 +81,8 @@ public sealed class EvidenceEvaluator : IEvidenceEvaluator
                 result.OverallConfidence,
                 result.UnknownDomainCount,
                 result.InsufficientSourceDomainCount,
+                generationResult.AttemptCount,
+                string.Join(',', generationResult.RepairedIssueCodes),
                 (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
 
             return result;

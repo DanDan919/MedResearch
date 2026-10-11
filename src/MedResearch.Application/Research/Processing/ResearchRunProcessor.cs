@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using MedResearch.Application.Research.Evaluation;
 using MedResearch.Application.Research.Extraction;
+using MedResearch.Application.Research.Validation;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -129,11 +131,18 @@ public sealed class ResearchRunProcessor
                 workerInstanceId,
                 claimedRun.LeaseVersion);
 
+            var failureReason = (run.Status, exception) switch
+            {
+                (ResearchRunStatus.Extracting, EvidenceGroundingValidationException) =>
+                    "Evidence extraction could not verify a unique source quotation. Unverified findings were not accepted.",
+                (ResearchRunStatus.Evaluating, EvidenceEvaluationValidationException evaluation)
+                    when evaluation.Issues.Any(issue => issue.Code == ValidationIssueCodes.AuthorReportedLimitationNotGrounded) =>
+                    "Evidence evaluation could not verify an author-reported limitation in the supplied source. The unverified evaluation was not accepted.",
+                _ => SafeFailureReason
+            };
             var markedFailed = await _researchRunQueue.MarkFailedAsync(
                 claimedRun,
-                run.Status == ResearchRunStatus.Extracting && exception is EvidenceGroundingValidationException
-                    ? "Evidence extraction could not verify a unique source quotation. Unverified findings were not accepted."
-                    : SafeFailureReason,
+                failureReason,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
 

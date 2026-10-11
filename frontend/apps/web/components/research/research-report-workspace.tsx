@@ -39,6 +39,7 @@ export function ResearchReportWorkspace({ researchRunId }: { researchRunId: stri
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <Badge tone={report.status === "Completed" ? "success" : "warning"}>{report.status}</Badge>
           <Badge tone={report.narrativeAuthority === "StructuredClaims" ? "info" : "warning"}>{report.narrativeAuthority === "StructuredClaims" ? "Structured claims" : "Legacy narrative unverified"}</Badge>
+          <p className="max-w-full break-words text-sm font-medium" title="Internal MedResearch synthesis category, not formal evidence grading.">Synthesis confidence: {formatSynthesisConfidence(report.synthesisConfidence)}</p>
           <p className="text-xs text-muted-foreground">Generated {formatTimestamp(report.generatedAt)}</p>
           {quantitativeQuery.data && quantitativeQuery.data.length > 0 ? <Button asChild variant="secondary" size="sm"><Link href={`/research/${researchRunId}/quantitative`}>Quantitative results</Link></Button> : null}
         </div>
@@ -198,4 +199,15 @@ function formatInterval(citation: Citation) {
 function formatTimestamp(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatSynthesisConfidence(value: string) {
+  switch (value) {
+    case "MoreCertain": return "More certain";
+    case "ModeratelyCertain": return "Moderately certain";
+    case "Limited": return "Limited";
+    case "VeryLimited": return "Very limited";
+    case "InsufficientEvidence": return "Insufficient evidence";
+    default: return value;
+  }
 }

@@ -63,7 +63,7 @@ The purpose is not to diagnose patients or recommend treatments. The long-term g
 
 ## Current Scope
 
-This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, a truthful persisted progress endpoint for research execution observability, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities and Europe PMC REST search, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
+This repository currently contains the documentation system, layered .NET solution, PostgreSQL persistence through EF Core, a Docker Compose development environment, the first research API use case, durable lease-backed background processing for queued and recoverable research runs, a truthful persisted progress endpoint for research execution observability, structured AI research planning through OpenAI, and scientific literature retrieval through PubMed/NCBI E-utilities, Europe PMC REST search and supplemental Crossref, source-grounded abstract evidence extraction, structured source-aware evidence evaluation, and traceable persisted evidence synthesis reports.
 
 A client can submit a research question, receive a queued research run id, and retrieve lifecycle progress. The background processor sends only the current submitted research question to the configured OpenAI provider during `Planning`, validates strict structured output into a persisted `ResearchPlan`, then uses accepted plan search queries during `Searching` to retrieve bounded metadata from enabled scientific literature sources. During `Extracting`, it sends only the current question, bounded plan context, and one selected SourceMaterial snapshot and study metadata to the configured OpenAI provider, validates strict structured output, and persists source-grounded evidence with explicit source scope. During `Evaluating`, it combines study metadata, extraction provenance, and grounded evidence into categorical methodological assessments. During `Synthesizing`, it builds a bounded current-run synthesis context and persists a traceable `ResearchReport`. It does not yet implement RAG, diagnosis, treatment recommendations, full-text synthesis, modified/ad-hoc HKSJ, forest plots, formal GRADE, or formal risk-of-bias frameworks. It now includes narrow deterministic common/fixed-effect, REML random-effects Wald, canonical HKSJ, and random-effects prediction interval quantitative synthesis read models for eligible compatible ratio-measure evidence.
 
@@ -239,10 +239,9 @@ harness uses `MEDRESEARCH_LLM_PROVIDER=CodexCli`.
 
 PubMed can be configured with:
 
-- `PubMed:BaseUrl`
 - `PubMed:Enabled`, default `true`
 - `PubMed:BaseUrl`, default `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/`
-- `PubMed:MaxResultsPerQuery`, development default `10`, bounded to 1-200
+- `PubMed:MaxResultsPerQuery`, development default `20`, bounded to 1-200
 - `PubMed:FetchBatchSize`, development default `25`, bounded to 1-200
 - `PubMed:MaxRequestsPerSecond`, development default `2`; cannot exceed 3 without `ApiKey` or 10 with `ApiKey`
 - `PubMed:TimeoutSeconds`, development default `15`, bounded to 1-120
@@ -256,7 +255,7 @@ Europe PMC can be configured with:
 
 - `EuropePmc:Enabled`, default `true`
 - `EuropePmc:BaseUrl`, default `https://www.ebi.ac.uk/europepmc/webservices/rest/`
-- `EuropePmc:MaxResultsPerQuery`, development default `10`, bounded to 1-200
+- `EuropePmc:MaxResultsPerQuery`, development default `20`, bounded to 1-200
 - `EuropePmc:PageSize`, development default `25`, bounded to 1-100
 - `EuropePmc:TimeoutSeconds`, development default `15`, bounded to 1-120
 - `EuropePmc:MaxRequestsPerSecond`, development default `2`, bounded to 1-5 as a conservative local policy
@@ -317,11 +316,25 @@ The report endpoint returns `200 OK` with coverage, deterministic limitations, c
 
 The planner output is treated as untrusted external input. It is deserialized, validated by Application, and only then persisted as `ResearchPlan`. The authoritative `ResearchQuestion` remains separate; the LLM-generated `originalQuestion` field must match the stored question after whitespace normalization and cannot overwrite it.
 
-The prompt version is `research-planner-v1`. The planner is allowed to produce question decomposition and search strategy only. It must not produce PMIDs, DOIs, invented papers, authors, effect sizes, sample sizes, confidence intervals, p-values, evidence grades, diagnoses, treatments, or scientific conclusions.
+The prompt version is `research-planner-v2-portable-keywords`. The planner is allowed to produce question decomposition and search strategy only. It must not produce PMIDs, DOIs, invented papers, authors, effect sizes, sample sizes, confidence intervals, p-values, evidence grades, diagnoses, treatments, or scientific conclusions.
 
 ## Scientific Retrieval
 
-`Searching` is now multi-source. Application depends on provider-neutral literature contracts and a single `IScientificLiteratureSearchCoordinator`; Infrastructure supplies enabled `IScientificLiteratureSource` adapters for PubMed and Europe PMC.
+`Searching` is multi-source. Application depends on provider-neutral literature contracts and a single `IScientificLiteratureSearchCoordinator`; Infrastructure supplies enabled `IScientificLiteratureSource` adapters for PubMed, Europe PMC and Crossref.
+
+New `research-planner-v2-portable-keywords` plans request unfielded keywords,
+phrases and explicitly grouped AND/OR, not PubMed-only controlled vocabulary.
+Exclusion concepts remain separate hints, not automatically enforced filters.
+Adapters still reject unsupported syntax; the prompt is not a deterministic
+guarantee of query portability or equal scientific semantics. Historical plans
+are reused without rewriting their search queries or provenance.
+
+Default retrieval is at most 20 records per query per source (hard configurable
+cap 200), while source acquisition/extraction/evaluation/synthesis remain bounded
+to 10 distinct Studies per run. More discoveries do not mean more independent
+studies or a guaranteed complete/relevant corpus. Disable sources with
+`PubMed__Enabled`, `EuropePmc__Enabled` or `Crossref__Enabled`; disabled sources
+do not issue HTTP requests and are not evidence of an external outage.
 
 Adapters prepare their execution query before provider I/O. Europe PMC translates
 the planner's supported PubMed suffixes `[Title/Abstract]`/`[tiab]` to
@@ -348,11 +361,88 @@ Each planned query is executed once per enabled source. One query against PubMed
 
 PubMed uses ESearch with `db=pubmed`, `retmode=json`, and bounded `retmax`, followed by batched EFetch XML. Requests include configured `tool`/`email` identification and optional `api_key`; ESearch and EFetch share one local token-bucket limiter. PubMed History Server retrieval remains deliberately deferred while `MaxResultsPerQuery` is small and direct ID batching is sufficient.
 
+Real EFetch includes a DOCTYPE: parsing explicitly ignores the DTD and never
+resolves external entities. Wrong XML roots or embedded `ERROR` fail as
+`InvalidResponse`, not successful zero results. Fetched articles must belong to
+the requested PMID batch; PMCID from `ArticleIdList` is retained. NCBI recommends
+a configured contact in `PubMed__Email`, not a fabricated email. No API key is
+necessary at the default two requests/second (maximum 3 without a key, 10 with a
+key); these are process-local limits, not shared-IP coordination.
+
 Europe PMC uses the official Articles REST `/search` endpoint with `format=json`, `resultType=core`, bounded `pageSize`, and cursor pagination through `cursorMark`/`nextCursorMark`. The adapter maps only source-reported PMID, PMCID, DOI, title, abstract, journal, publication date/date parts, publication types, authors, and provider record identity. It skips records without title or any stable identifier rather than merging by title.
+
+### Supplemental Crossref Search
+
+`CrossrefScientificLiteratureSource` uses the official HTTPS `/works` endpoint,
+`query`, `filter=type:journal-article,has-abstract:true`, explicit
+`sort=score&order=desc`, bounded `rows` and cursor
+pagination. This deliberately retrieves journal articles with deposited abstracts,
+not the whole Crossref corpus or publisher full text. No key, registration or paid
+Metadata Plus access is used. Contact `Crossref__Email` is optional (`mailto`).
+
+Crossref is **ranked lexical retrieval**, not PubMed Boolean/MeSH equivalence.
+Supported positive Title/Abstract/Title operands become deduplicated lexical
+terms; grouping/operators/quotes and trailing wildcard syntax are not preserved
+as eligibility guarantees. NOT, negative terms and unsupported fields fail before
+HTTP rather than silently discarding exclusions. The actual expanded query is
+the search/attempt provenance key; the plan retains the original. Grounded text
+alone does not prove question relevance. See
+[ADR-034](docs/architecture/decisions/ADR-034-supplemental-crossref-search.md).
+
+Sorting is explicit on every cursor page: a real control query returned
+off-topic low-score records without sorting and topical high-score records
+with score ordering. This is retrieval ranking, not a scientific relevance
+guarantee. A record without extractable source text still cannot become Evidence.
+
+Evaluation uses `evidence-evaluator-v3-literal-author-limitations`: author
+limitations must be verbatim source excerpts, or `[]` if none is reported.
+Only an absent limitation quotation may use the existing bounded semantic
+repair budget; identity/other contract failures remain non-repairable. Rejected
+output is never persisted, and neither containment nor source-scope validation
+is relaxed. See ADR-027 for the narrow repair decision.
+
+One singleton gate permits one request/second and **one in flight including body
+reads** across all Crossref instances in a process. This matches the public list
+headers observed on 2026-10-11 (`1/1s`, concurrency `1`); replicas still share IP
+quota. Retries (default 2) are limited to 429, 500/502/503/504, network failures
+and timeouts, with bounded exponential jitter. Retry-After is respected up to
+30 seconds; longer cooldown fails explicitly, never retries early. Cancellation
+interrupts waits/reads. Invalid JSON/byte-cap violations and 400/401/403/404 do
+not retry. No raw response/error body or transport URI is logged.
+
+`Crossref` options: Enabled=true, BaseUrl=`https://api.crossref.org/`, optional
+Email, MaxResultsPerQuery=20 (1..200), PageSize=20 (1..100), TimeoutSeconds=20,
+MaxResponseBytes=2000000, BodyReadTimeoutSeconds=15, MaxRetryAttempts=2 (0..5),
+RetryBaseDelayMilliseconds=500 (1..60000). Timeouts are 1..120 seconds; response
+cap 1..10000000 bytes. All use normal .NET environment overrides, e.g.
+`Crossref__MaxResultsPerQuery`; Compose maps `CROSSREF_*` from `.env.example`.
+An explicitly configured `Crossref__Enabled` must be `true` or `false`; an
+invalid value fails startup rather than accidentally enabling outbound search.
+
+Records use normalized DOI identity, never ranking score/title similarity as
+identity or certainty. Missing metadata remains null; publication date-parts
+remain partial, never replaced by created/deposited/indexed dates. Abstract
+markup is retained as source content. Existing metadata conflicts, fenced stores
+and per-search discoveries are reused. A DOI found by three sources keeps three
+paths but one downstream Study work item. No schema/migration change is needed.
+
+Normal solution tests use fake HTTP only. A separate opt-in suite checks all
+three production adapters, at most three articles each and four requests total
+with retries disabled; it never writes a database or invokes an LLM:
+
+```powershell
+$env:MEDRESEARCH_RUN_LIVE_SEARCH_TESTS = 'true'
+# Optional real contact settings: PubMed__Email, Crossref__Email.
+dotnet test tests/MedResearch.LiveScientificSearchSmokeTests/MedResearch.LiveScientificSearchSmokeTests.csproj
+Remove-Item Env:MEDRESEARCH_RUN_LIVE_SEARCH_TESTS
+```
+
+It is outside `MedResearch.slnx` and normal CI. External availability is not a
+health probe and is reported separately from deterministic regression.
 
 Study identity is deterministic over normalized PMID, PMCID, and DOI. Missing metadata stays missing. Existing non-null metadata is not overwritten by null incoming values. New non-conflicting identifiers and metadata may enrich an existing Study. If an incoming candidate's stable identifiers point to different persisted Studies, MedResearch treats it as a hard identity conflict, logs bounded diagnostics, preserves existing Studies, skips the ambiguous discovery, and continues processing other candidates.
 
-Both adapters use HttpClientFactory, cancellation tokens, process-local rate limiting, and bounded retries for transient provider failures. F15.2 adds durable `LiteratureProviderAttempt` outcomes: successful results, successful zero results, failed, timed out, cancelled, or started with no recorded outcome after interruption. Successful attempts are committed with `LiteratureSearch`/discovery output; failed attempts do not create scientific search results. Recovery reuses successful execution keys and records a new logical attempt for a failed/interrupted call. `/api/research/{id}/provenance` and the Evidence workspace expose this history under the existing owner boundary.
+All three adapters use HttpClientFactory, cancellation tokens, process-local rate limiting, and bounded retries for transient provider failures. F15.2 adds durable `LiteratureProviderAttempt` outcomes: successful results, successful zero results, failed, timed out, cancelled, or started with no recorded outcome after interruption. Successful attempts are committed with `LiteratureSearch`/discovery output; failed attempts do not create scientific search results. Recovery reuses successful execution keys and records a new logical attempt for a failed/interrupted call. `/api/research/{id}/provenance` and the Evidence workspace expose this history under the existing owner boundary.
 
 Success bodies have inclusive byte caps: PubMed ESearch 256,000, PubMed EFetch 2,000,000, Europe PMC search 2,000,000, and full-text XML 2,000,000 bytes. `PubMed:MaxSearchResponseBytes`, `PubMed:MaxFetchResponseBytes`, `EuropePmc:MaxResponseBytes` and both search providers' `BodyReadTimeoutSeconds` are env-overridable; the body timeout defaults to 15 seconds independently of the headers timeout. Full text uses its existing `TimeoutSeconds` for the body deadline. Oversized/malformed responses fail, rather than yielding partial Studies. Automatic HTTP URI logging is disabled for these clients, particularly because PubMed query strings may contain a key. Structured provider logs contain no raw error body or transport exception transcript.
 

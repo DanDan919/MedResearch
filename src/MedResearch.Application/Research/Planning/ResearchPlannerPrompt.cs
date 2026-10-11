@@ -5,7 +5,7 @@ namespace MedResearch.Application.Research.Planning;
 
 public static class ResearchPlannerPrompt
 {
-    public const string Version = "research-planner-v1";
+    public const string Version = "research-planner-v2-portable-keywords";
 
     public static StructuredOutputSchema OutputSchema { get; } = CreateOutputSchema(ResearchPlanValidator.MaximumSearchQueryCount);
 
@@ -41,7 +41,7 @@ public static class ResearchPlannerPrompt
                 comparator = NullableString("Comparator when inferable, otherwise null."),
                 outcomes = StringArray("Outcome concepts to search for; empty array when absent."),
                 preferredStudyTypes = StringArray("Preferred study designs using the allowed labels in the prompt; empty array when absent."),
-                searchQueries = SearchQueryArray($"One to {maxSearchQueries} conservative scientific database search queries. Do not include PMID, DOI, or invented titles.", maxSearchQueries),
+                searchQueries = SearchQueryArray($"One to {maxSearchQueries} portable keyword queries with phrases, parentheses and AND/OR only; no database-specific fields, filters or exclusion operators. Do not include PMID, DOI, or invented titles.", maxSearchQueries),
                 exclusionHints = StringArray("Concepts that may be excluded later; empty array when absent.")
             }
             }));
@@ -63,6 +63,8 @@ public static class ResearchPlannerPrompt
             Treat uncertain or absent PICO-like components as null or empty arrays instead of inventing details.
             Do not output PMIDs, DOIs, paper titles, authors, effect sizes, sample sizes, confidence intervals, p-values, evidence grades, diagnoses, treatments, or conclusions.
             Preferred study types must use only these labels when relevant: randomized controlled trial, controlled trial, cohort study, case-control study, cross-sectional study, systematic review, meta-analysis, observational study, experimental study, qualitative study, review, other.
+            Produce portable keyword queries shared by multiple scientific databases. Use plain words, quoted phrases, parentheses and AND/OR; group OR alternatives in explicit parentheses. Keywords are retrieval concepts, not proof of study eligibility.
+            Do not use database-specific field tags, controlled-vocabulary syntax, field prefixes, API parameters, filters, wildcard operators or NOT/minus exclusion operators. Put concepts that require later exclusion in exclusionHints instead of silently translating or discarding constraints.
             Return only the strict structured object requested by the schema.
             """,
             $"""
@@ -70,7 +72,7 @@ public static class ResearchPlannerPrompt
             Submitted research question:
             {researchQuestion}
 
-            Copy the submitted research question exactly into originalQuestion. Generate one to {maxSearchQueries} bounded search queries suitable for PubMed-style scientific retrieval.
+            Copy the submitted research question exactly into originalQuestion. Generate one to {maxSearchQueries} bounded portable keyword search queries for multi-source scientific retrieval.
             """);
     }
 

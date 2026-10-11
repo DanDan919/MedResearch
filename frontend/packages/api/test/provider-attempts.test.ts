@@ -4,6 +4,9 @@ import { literatureProviderAttemptSchema } from "../src/schemas";
 const base = { attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", researchPlanId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", source: "PubMed", query: "query", status: "Failed", resultCount: null, failureCategory: "NetworkFailure", startedAt: "2026-10-08T00:00:00Z", completedAt: "2026-10-08T00:00:01Z", literatureSearchId: null };
 
 describe("provider attempt runtime contract", () => {
+  it.each(["PubMed", "EuropePmc", "Crossref"])("accepts an enabled scientific source %s", source => {
+    expect(literatureProviderAttemptSchema.safeParse({ ...base, source }).success).toBe(true);
+  });
   it.each(["source", "status", "failureCategory"])("rejects an unknown %s", field => {
     expect(literatureProviderAttemptSchema.safeParse({ ...base, [field]: "unknown" }).success).toBe(false);
   });

@@ -1,5 +1,6 @@
 using MedResearch.Application.Research.Ai;
 using MedResearch.Application.Research.Evaluation;
+using MedResearch.Application.Research.Validation;
 using MedResearch.Domain;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -100,6 +101,105 @@ public sealed class EvidenceEvaluationSignalBuilderTests
 
 public sealed class EvidenceEvaluatorTests
 {
+    [Fact]
+    public void EvaluationPrompt_RequiresLiteralAuthorLimitationsAndAllowsEmptyList()
+    {
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([]);
+        var prompt = EvidenceEvaluationPrompt.Create(context, new EvidenceEvaluationSignalBuilder().Build(context));
+        Assert.Contains("verbatim", prompt.SystemPrompt);
+        Assert.Contains("authorReportedLimitations=[]", prompt.SystemPrompt);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EvaluateAsync_RepairsOnlyUngroundedAuthorLimitationsUsingSameContext(bool omitLimitation)
+    {
+        const string quotation = "The sample was small.";
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()],
+            abstractText: "A randomized trial reported improved recall in 120 adults. The sample was small.");
+        var invalid = CreateValidDraft(context) with { AuthorReportedLimitations = ["Invented author limitation"] };
+        var corrected = CreateValidDraft(context) with { AuthorReportedLimitations = omitLimitation ? [] : [quotation] };
+        var llm = new SequenceStructuredLlmClient(invalid, corrected);
+        var result = await CreateEvaluator(llm).EvaluateAsync(context, CancellationToken.None);
+
+        Assert.Equal(2, llm.Requests.Count);
+        Assert.Equal(omitLimitation ? [] : [quotation], result.AuthorReportedLimitations);
+        Assert.StartsWith(llm.Requests[0].UserPrompt, llm.Requests[1].UserPrompt);
+        Assert.Same(llm.Requests[0].OutputSchema, llm.Requests[1].OutputSchema);
+        Assert.Equal(llm.Requests[0].SystemPrompt, llm.Requests[1].SystemPrompt);
+        Assert.Contains("authorReportedLimitations[0]", llm.Requests[1].UserPrompt);
+        Assert.DoesNotContain("Invented author limitation", llm.Requests[1].UserPrompt);
+        Assert.Equal(context.ResearchRunId, result.ResearchRunId);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RepeatedUngroundedLimitationHasNoThirdLlmCall()
+    {
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()]);
+        var invalid = CreateValidDraft(context) with { AuthorReportedLimitations = ["Invented author limitation"] };
+        var llm = new SequenceStructuredLlmClient(invalid, invalid);
+        await Assert.ThrowsAsync<EvidenceEvaluationValidationException>(() => CreateEvaluator(llm).EvaluateAsync(context, CancellationToken.None));
+        Assert.Equal(2, llm.Requests.Count);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WrongRunWithUngroundedLimitationDoesNotRequestRepair()
+    {
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()]);
+        var invalid = CreateValidDraft(context) with { ResearchRunId = Guid.NewGuid().ToString(), AuthorReportedLimitations = ["Invented author limitation"] };
+        var llm = new SequenceStructuredLlmClient(invalid);
+        await Assert.ThrowsAsync<EvidenceEvaluationValidationException>(() => CreateEvaluator(llm).EvaluateAsync(context, CancellationToken.None));
+        Assert.Single(llm.Requests);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ZeroRepairBudgetRejectsUngroundedLimitationImmediately()
+    {
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()]);
+        var invalid = CreateValidDraft(context) with { AuthorReportedLimitations = ["Invented limitation"] };
+        var llm = new SequenceStructuredLlmClient(invalid);
+        var repair = new ValidationGuidedLlmRepairService(llm,
+            new ValidationGuidedLlmRepairOptions { MaxSemanticRepairAttempts = 0 });
+        var evaluator = new EvidenceEvaluator(llm, new EvidenceEvaluationSignalBuilder(),
+            new EvidenceEvaluationDraftValidator(), NullLogger<EvidenceEvaluator>.Instance, repair);
+
+        var exception = await Assert.ThrowsAsync<EvidenceEvaluationValidationException>(() =>
+            evaluator.EvaluateAsync(context, CancellationToken.None));
+
+        Assert.Single(llm.Requests);
+        Assert.Equal(ValidationIssueCodes.AuthorReportedLimitationNotGrounded, Assert.Single(exception.Issues).Code);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ReplacementWithForeignIdentityStillFailsClosed()
+    {
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()]);
+        var invalid = CreateValidDraft(context) with { AuthorReportedLimitations = ["Invented limitation"] };
+        var foreign = CreateValidDraft(context) with { StudyId = Guid.NewGuid().ToString() };
+        var llm = new SequenceStructuredLlmClient(invalid, foreign);
+
+        var exception = await Assert.ThrowsAsync<EvidenceEvaluationValidationException>(() =>
+            CreateEvaluator(llm).EvaluateAsync(context, CancellationToken.None));
+
+        Assert.Equal(2, llm.Requests.Count);
+        Assert.Equal(ValidationIssueDisposition.NonRepairable, Assert.Single(exception.Issues).Disposition);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CancellationBeforeRepairMakesNoSecondCall()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var context = EvidenceEvaluationSignalBuilderTests.CreateContext([EvidenceEvaluationSignalBuilderTests.CreateEvidence()]);
+        var invalid = CreateValidDraft(context) with { AuthorReportedLimitations = ["Invented limitation"] };
+        var llm = new SequenceStructuredLlmClient(invalid) { AfterGeneration = cancellation.Cancel };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            CreateEvaluator(llm).EvaluateAsync(context, cancellation.Token));
+
+        Assert.Single(llm.Requests);
+    }
+
     [Fact]
     public async Task EvaluateAsync_AcceptsValidEvaluationAndPreservesAuthoritativeIdentity()
     {
@@ -269,10 +369,12 @@ public sealed class EvidenceEvaluatorTests
         var context = EvidenceEvaluationSignalBuilderTests.CreateContext([
             EvidenceEvaluationSignalBuilderTests.CreateEvidence()
         ]);
-        var evaluator = CreateEvaluator(new FakeStructuredLlmClient(CreateValidDraft(context), new StructuredLlmException("provider failed")));
+        var llm = new FakeStructuredLlmClient(CreateValidDraft(context), new StructuredLlmException("provider failed"));
+        var evaluator = CreateEvaluator(llm);
 
         await Assert.ThrowsAsync<StructuredLlmException>(() =>
             evaluator.EvaluateAsync(context, CancellationToken.None));
+        Assert.Equal(1, llm.CallCount);
     }
 
     private static EvidenceEvaluator CreateEvaluator(IStructuredLlmClient llm)
@@ -334,6 +436,21 @@ public sealed class EvidenceEvaluatorTests
             return Task.FromResult(new StructuredGenerationResult<T>(
                 (T)_value,
                 new StructuredLlmProviderMetadata("FakeLLM", "fake-model", "response-1", DateTimeOffset.UtcNow)));
+        }
+    }
+
+    private sealed class SequenceStructuredLlmClient(params EvidenceEvaluationDraft[] drafts) : IStructuredLlmClient
+    {
+        public List<StructuredLlmRequest> Requests { get; } = [];
+        public Action? AfterGeneration { get; init; }
+        public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(StructuredLlmRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(request);
+            Assert.True(Requests.Count <= drafts.Length, "Unexpected additional LLM request.");
+            AfterGeneration?.Invoke();
+            return Task.FromResult(new StructuredGenerationResult<T>((T)(object)drafts[Requests.Count - 1],
+                new StructuredLlmProviderMetadata("FakeLLM", "fake-model", null, DateTimeOffset.UtcNow)));
         }
     }
 }

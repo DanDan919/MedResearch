@@ -32,6 +32,21 @@ test("partial provider failure remains visible beside persisted studies", async 
   await expect(page.getByRole("heading", { name: "Sleep and recall" })).toBeVisible();
 });
 
+test("Crossref coverage preserves three discovery paths under one canonical Study", async ({ page }) => {
+  const response = provenanceResponse(false);
+  const searchId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  response.searches.push({ ...response.searches[0], literatureSearchId: searchId, source: "Crossref", persistedStudyCount: 0, duplicateStudyCount: 1 });
+  response.studies[0].discoveryPaths.push({ ...response.studies[0].discoveryPaths[0], researchStudyDiscoveryId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", literatureSearchId: searchId, source: "Crossref", sourceStudyIdentifier: response.studies[0].doi });
+  response.providerAttempts = response.searches.map(search => ({ attemptId: search.literatureSearchId, researchPlanId: runId, source: search.source, query: search.query, status: "SucceededWithResults", resultCount: 1, failureCategory: null, startedAt: response.createdAt, completedAt: response.completedAt, literatureSearchId: search.literatureSearchId }));
+  response.coverage.literatureSearchCount = 3;
+  response.coverage.discoveryPathCount = 3;
+  await mockProvenanceApi(page, response);
+  await page.goto(`/research/${runId}/evidence`);
+  await expect(page.getByRole("region", { name: "Provider coverage" }).getByText("Crossref", { exact: true })).toBeVisible();
+  await expect(page.getByText("Discovery paths (3)")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sleep and recall" })).toHaveCount(1);
+});
+
 test("evidence workspace links claims and quantitative contributions to persisted evidence", async ({ page }) => {
   await mockProvenanceApi(page, provenanceResponse(true));
   await page.goto(`/research/${runId}/evidence`);

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 using MedResearch.Application.Research.Literature;
 using MedResearch.Infrastructure.Literature.Identity;
@@ -14,7 +15,14 @@ public sealed class PubMedArticleMapper
     {
         try
         {
-            var document = XDocument.Parse(xml);
+            using var reader = XmlReader.Create(new StringReader(xml), new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                XmlResolver = null
+            });
+            var document = XDocument.Load(reader);
+            if (document.Root?.Name != "PubmedArticleSet" || document.Descendants("ERROR").Any())
+                throw new PubMedResponseException("PubMed EFetch response did not contain a valid article set.");
             return document
                 .Descendants("PubmedArticle")
                 .Select(MapArticle)
@@ -46,7 +54,8 @@ public sealed class PubMedArticleMapper
 
         return new ScientificStudyCandidate(
             pmid,
-            null,
+            ScientificIdentifierNormalizer.NormalizePmcid(pubmedData?.Element("ArticleIdList")?.Elements("ArticleId")
+                .FirstOrDefault(element => string.Equals((string?)element.Attribute("IdType"), "pmc", StringComparison.OrdinalIgnoreCase))?.Value),
             ReadDoi(articleElement, pubmedData),
             title,
             ReadAbstract(articleElement),

@@ -528,7 +528,7 @@ const quantitativeContributionProvenanceSchema = z.object({
 export const literatureProviderAttemptSchema = z.object({
   attemptId: z.string().uuid(),
   researchPlanId: z.string().uuid(),
-  source: z.enum(["PubMed", "EuropePmc"]),
+  source: z.enum(["PubMed", "EuropePmc", "Crossref"]),
   query: z.string().min(1).max(2000),
   status: z.enum(["Started", "SucceededWithResults", "SucceededZeroResults", "Failed", "TimedOut", "Cancelled"]),
   resultCount: z.number().int().nonnegative().nullable(),

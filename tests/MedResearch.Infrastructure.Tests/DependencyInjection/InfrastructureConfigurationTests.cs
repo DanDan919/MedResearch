@@ -123,7 +123,24 @@ public sealed class InfrastructureConfigurationTests
 
         var sources = provider.GetServices<IScientificLiteratureSource>().Select(source => source.SourceName).Order().ToArray();
 
-        Assert.Equal([ScientificLiteratureSourceNames.EuropePmc, ScientificLiteratureSourceNames.PubMed], sources);
+        Assert.Equal([ScientificLiteratureSourceNames.Crossref, ScientificLiteratureSourceNames.EuropePmc, ScientificLiteratureSourceNames.PubMed], sources);
+    }
+
+    [Fact]
+    public void AddInfrastructure_DisabledCrossrefIsNotSelected()
+    {
+        var services = new ServiceCollection().AddInfrastructure(CreateConfiguration(new()
+        { ["Crossref:Enabled"] = "false" }));
+        using var provider = services.BuildServiceProvider();
+        Assert.DoesNotContain(provider.GetServices<IScientificLiteratureSource>(), source => source.SourceName == ScientificLiteratureSourceNames.Crossref);
+    }
+
+    [Fact]
+    public void AddInfrastructure_InvalidCrossrefEnableFlagDoesNotSilentlyEnableSource()
+    {
+        var configuration = CreateConfiguration(new() { ["Crossref:Enabled"] = "disabled" });
+        var exception = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddInfrastructure(configuration));
+        Assert.Contains("Crossref:Enabled", exception.Message);
     }
 
     [Fact]
