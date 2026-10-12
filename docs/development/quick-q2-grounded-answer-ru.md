@@ -193,7 +193,25 @@ passed,0 failed,182 Docker skips; всего800 passed/182 skipped. Q2 доба�
 47 Application,18 Infrastructure,9 PostgreSQL/Integration. После EF generation
 Windows escaped CRLF churn в двух старых constraint strings был исключён только
 из новых generated artifacts; old migrations не изменены. Pending model passed.
-CI результат фиксируется после фактического PostgreSQL прогона.
+Strict CI `38245545764` на implementation commit
+`61ba4e9b342e8233808531b400f68994922e2e8d`: **SUCCESS во всех трёх jobs**.
+Run: https://github.com/DanDan919/MedResearch/actions/runs/38245545764.
+Runner ubuntu-latest, .NET10.0.x, Docker info passed,
+MEDRESEARCH_REQUIRE_DOCKER_TESTS=true. TRX check annotations прочитаны независимо:
+Domain62/Application437/Infrastructure234/Integration249 — **982 passed,
+0 failed,0 skipped**. Все182 Docker/PostgreSQL cases исполнились, включая9 новых Q2.
+Fresh Testcontainers fixtures применили migration chain на пустой PostgreSQL;
+generation reservation/settlement, concurrency/fencing, input drift, owner/API
+restart и read integrity cases прошли. Pending-model/Compose, generated OpenAPI
+drift, frontend unit/browser/production-auth, actual API + migrated PostgreSQL
+HTTPS smoke и web/API container builds прошли. Первый Q2 CI не потребовал
+исправляющего production commit. Fake HTTP/LLM не являются live медицинской
+верификацией; научные/paid requests не выполнялись.
+
+Во время проверки CI public REST стал возвращать404: authenticated read подтвердил,
+что repository сейчас private. Visibility/settings не изменялись; CI прочитан
+через существующую GitHub-авторизацию без вывода/сохранения credentials. Browser
+tool не инициализировался (permission-path diagnostic); это не отказ проекта/CI.
 
 ## Что не доказано
 

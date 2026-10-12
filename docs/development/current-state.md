@@ -14,7 +14,14 @@ Parallel Deep/M24 work is excluded; Q2 validation uses isolated checkout. Result
 configuration and scientific limitations: quick-q2-grounded-answer-ru.md.
 Local isolated backend:800 passed,0 failed,182 Docker skips; Domain62/Application437/
 Infrastructure234/Integration67. OpenAPI5, SDK45/Web157, lint/typecheck/build/model/
-Compose passed. PostgreSQL runtime confidence requires actually successful strict CI.
+Compose passed. Q2 COMPLETE -- DETERMINISTIC at implementation commit
+`61ba4e9b342e8233808531b400f68994922e2e8d`: CI38245545764 success in all three jobs.
+Domain62/Application437/Infrastructure234/Integration249:982 passed,0 failed/skipped;
+all182 required PostgreSQL cases ran, including9 Q2. Fresh migrations, EF/model/
+Compose/OpenAPI, frontend/browser/auth, HTTPS API/PostgreSQL smoke and container
+builds passed. No live providers/LLMs, deployment or user DB/stand changes.
+This certifies committed Q2 deterministic/runtime checks, not medical accuracy
+or the preserved parallel dirty Deep/M24 tree. Existing Q0/Q1 terminal runs unchanged.
 
 ## QUICK-Q1 Bounded Retrieval (2026-10-12)
 
