@@ -142,7 +142,22 @@ Canonical OpenAPI tests5, SDK45, frontend lint/typecheck/production build passed
 Compose config passed; Docker info failed (dockerDesktopLinuxEngine pipe отсутствует).
 Сторонние dirty Deep UI/M24 tests не исключаются из их будущей работы и не чинятся
 в Q1; full regression исходного смешанного дерева не выдаётся за green Q1.
-Real PostgreSQL confidence заявляется только после strict CI без required skips.
+Strict CI `38207871495` на implementation commit
+`d1c0de065a2b64171b1d7e2077087cdac92c8f95`: **success во всех трёх jobs**.
+Run: https://github.com/DanDan919/MedResearch/actions/runs/38207871495.
+Runner ubuntu-latest, .NET10.0.x; Docker info passed, enforcement
+MEDRESEARCH_REQUIRE_DOCKER_TESTS=true. TRX annotations независимо прочитаны:
+Domain62/Application390/Infrastructure216/Integration240 — всего908 passed,
+0 failed,0 skipped. Все173 Docker/PostgreSQL cases выполнились, включая7 новых Q1.
+Fresh PostgreSQL fixtures применяют весь migration chain через MigrateAsync;
+migration-history test, Quick JSONB/provenance/owner/reclaim cases, pending-model
+check и Compose config прошли. Frontend lint/typecheck/tests, Chromium browser,
+production OIDC/BFF, actual API + migrated PostgreSQL HTTPS smoke и container
+builds прошли. Это проверка committed Q1, не параллельного dirty Deep/M24 дерева.
+Первый Q1 CI успешен без исправляющего production commit. Есть non-blocking
+GitHub warnings о Node20 action runtime и будущей смене ubuntu-latest image;
+изменение workflow не включено в Q1. Реальных научных HTTP/LLM calls не было:
+provider contracts проверены fake HTTP/providers, не live availability.
 
 ## Focused engineering prompt
 

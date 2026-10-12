@@ -8,11 +8,18 @@ source/query provenance. Metadata is not Evidence or a medical answer. Glossary
 coverage and lexical relevance limitations remain explicit; no LLM/live calls.
 Forward migration `20261012000308_AddQuickBoundedRetrieval` affects only Quick.
 Parallel Deep/M24/audit/UI work is preserved and excluded. Validation uses an
-isolated Q1 checkout; PostgreSQL confidence requires actually green strict CI.
+isolated Q1 checkout; PostgreSQL confidence is backed by strict CI below.
 Results and remaining limitations: `quick-q1-retrieval-ru.md`.
 Local isolated Q1:735 passed,0 failed,173 Docker skips; Domain62/Application390/
 Infrastructure216/Integration67. Model/Compose/OpenAPI/SDK/lint/typecheck/build pass.
-No live scientific requests or user DB changes; strict PostgreSQL CI still required.
+Q1 COMPLETE -- DETERMINISTIC at implementation commit
+`d1c0de065a2b64171b1d7e2077087cdac92c8f95`: CI38207871495 success in all three jobs.
+Domain62/Application390/Infrastructure216/Integration240 passed:908 total,
+0 failed/skipped; all173 required PostgreSQL cases ran, including7 Q1.
+Fresh migrations, EF pending-model/Compose, frontend/browser/auth and actual
+API/PostgreSQL HTTPS release checks passed. No live scientific/LLM requests or
+user DB/stand changes. This does not validate the preserved dirty Deep/M24 work,
+clinical relevance, universal RU translation or production live availability.
 
 ## QUICK-Q0 Synthetic Skeleton (2026-10-12)
 
