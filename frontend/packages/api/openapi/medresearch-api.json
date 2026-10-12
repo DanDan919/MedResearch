@@ -1480,6 +1480,107 @@
       "QuantitativeSynthesisStatus": {
         "type": "integer"
       },
+      "QuickAnswer": {
+        "properties": {
+          "contradictions": {
+            "items": {
+              "$ref": "#/components/schemas/QuickAnswerContradiction"
+            },
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/QuickAnswerFinding"
+            },
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "quickRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortAnswer": {
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uncertainty": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "quickRunId",
+          "shortAnswer",
+          "findings",
+          "contradictions",
+          "limitations",
+          "uncertainty",
+          "sourceReferences"
+        ],
+        "type": "object"
+      },
+      "QuickAnswerCitation": {
+        "properties": {
+          "excerpt": {
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceId",
+          "excerpt"
+        ],
+        "type": "object"
+      },
+      "QuickAnswerContradiction": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/QuickAnswerCitation"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "citations"
+        ],
+        "type": "object"
+      },
+      "QuickAnswerFinding": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/QuickAnswerCitation"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "citations"
+        ],
+        "type": "object"
+      },
       "QuickDiscovery": {
         "properties": {
           "attemptId": {
@@ -1617,6 +1718,22 @@
       },
       "QuickResearchDetails": {
         "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuickAnswer"
+              }
+            ]
+          },
+          "answerStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "completedAt": {
             "format": "date-time",
             "type": [
@@ -1681,7 +1798,9 @@
           "completedAt",
           "safeError",
           "result",
-          "retrieval"
+          "retrieval",
+          "answer",
+          "answerStatus"
         ],
         "type": "object"
       },

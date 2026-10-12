@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using MedResearch.Application.QuickResearch;
+using MedResearch.Application.Research.Ai;
 using MedResearch.Domain.QuickResearch;
 using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.QuickResearch;
@@ -111,6 +113,51 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
         Assert.Equal(0, (await foreign.GetFromJsonAsync<QuickResearchHistory>("/api/quick-research"))!.TotalCount);
     }
 
+    [SkippableFact]
+    public async Task AnswerApi_PersistsValidatedAnswer_AfterHostRestart_WithoutGenerationMetadata()
+    {
+        Skip.IfNot(fixture.IsAvailable, $"Docker-backed PostgreSQL tests skipped: {fixture.UnavailableReason}");
+        var ownerId = Guid.NewGuid().ToString();
+        var llm = new ApiAnswerLlm();
+        Guid id;
+        using (var host = new QuickApiFactory(fixture, processing: true, retrievalSources: new ApiRetrievalSources(true), answerClient: llm))
+        {
+            using var owner = host.ForOwner(ownerId);
+            var accepted = await owner.PostAsJsonAsync("/api/quick-research", new { question = "Влияет ли креатин на память?" });
+            Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+            id = (await accepted.Content.ReadFromJsonAsync<QuickResearchDetails>())!.Id;
+            QuickResearchDetails? result = null;
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                result = await owner.GetFromJsonAsync<QuickResearchDetails>($"/api/quick-research/{id}");
+                if (result!.Status is "Completed" or "Failed") break;
+                await Task.Delay(50);
+            }
+            Assert.Equal("Completed", result!.Status);
+            Assert.Equal("Succeeded", result.AnswerStatus);
+            Assert.NotNull(result.Answer);
+            Assert.Equal(Assert.Single(result.Retrieval!.Sources).Id, Assert.Single(result.Answer.SourceReferences));
+            Assert.Equal(2, result.Retrieval.Sources[0].Discoveries.Length);
+            Assert.Equal(1, llm.Calls);
+        }
+        using var restarted = new QuickApiFactory(fixture);
+        using var sameOwner = restarted.ForOwner(ownerId);
+        var response = await sameOwner.GetAsync($"/api/quick-research/{id}");
+        Assert.True(response.Headers.CacheControl!.Private);
+        Assert.True(response.Headers.CacheControl.NoStore);
+        var saved = (await response.Content.ReadFromJsonAsync<QuickResearchDetails>())!;
+        Assert.Equal("Succeeded", saved.AnswerStatus);
+        Assert.NotEmpty(saved.Answer!.Findings);
+        var json = await sameOwner.GetStringAsync($"/api/quick-research/{id}");
+        Assert.DoesNotContain("inputFingerprint", json);
+        Assert.DoesNotContain("promptVersion", json);
+        Assert.DoesNotContain("not-public-model", json);
+        using var foreign = restarted.ForOwner("another-Q2-owner");
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/quick-research/{id}")).StatusCode);
+        Assert.Equal(0, (await foreign.GetFromJsonAsync<QuickResearchHistory>("/api/quick-research"))!.TotalCount);
+    }
+
     [Theory]
     [InlineData("question")]
     [InlineData("owner")]
@@ -128,7 +175,8 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false, IQuickScientificSources? retrievalSources = null) : WebApplicationFactory<Program>
+    private sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false,
+        IQuickScientificSources? retrievalSources = null, IStructuredLlmClient? answerClient = null) : WebApplicationFactory<Program>
     {
         public HttpClient ForOwner(string subject)
         {
@@ -151,7 +199,7 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
             services.RemoveAll<IDbContextFactory<MedResearchDbContext>>();
             services.AddDbContextFactory<MedResearchDbContext>(options => options.UseNpgsql(database.ConnectionString), ServiceLifetime.Scoped);
             services.RemoveAll<QuickResearchOptions>();
-            services.AddSingleton(new QuickResearchOptions { Enabled = processing, PollIntervalSeconds = 1 });
+            services.AddSingleton(new QuickResearchOptions { Enabled = processing, PollIntervalSeconds = 1, LeaseDurationSeconds = answerClient is null ? 60 : 90 });
             if (retrievalSources is not null)
             {
                 services.RemoveAll<IQuickScientificSources>();
@@ -159,17 +207,42 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
                 services.RemoveAll<QuickRetrievalOptions>();
                 services.AddSingleton(new QuickRetrievalOptions { Enabled = true });
             }
+            if (answerClient is not null)
+            {
+                services.RemoveAll<IStructuredLlmClient>();
+                services.AddSingleton(answerClient);
+                services.RemoveAll<QuickAnswerOptions>();
+                services.AddSingleton(new QuickAnswerOptions { Enabled = true });
+            }
             if (processing) services.AddHostedService<BackgroundQuickResearchWorker>();
         });
     }
 
-    private sealed class ApiRetrievalSources : IQuickScientificSources
+    private sealed class ApiRetrievalSources(bool includeAbstract = false) : IQuickScientificSources
     {
         public string[] EnabledProviders => ["PubMed", "EuropePmc"];
         public string PrepareQuery(string provider, string query) => query;
         public Task<QuickProviderPage> SearchAsync(string provider, Guid runId, Guid attemptId, string query, CancellationToken token) =>
-            Task.FromResult(new QuickProviderPage(1, [new("123", null, "10.1234/creatine", "Creatine and memory.", null, null, null, 2024,
+            Task.FromResult(new QuickProviderPage(1, [new("123", null, "10.1234/creatine", "Creatine and memory.",
+                includeAbstract ? "This abstract describes creatine and memory outcomes in adults. Context is limited." : null, null, null, 2024,
                 [], [], new(attemptId, provider, "123"))], 0));
+    }
+
+    private sealed class ApiAnswerLlm : IStructuredLlmClient
+    {
+        public int Calls { get; private set; }
+        public Task<StructuredGenerationResult<T>> GenerateStructuredAsync<T>(StructuredLlmRequest request, CancellationToken token)
+        {
+            Calls++;
+            using var data = JsonDocument.Parse(request.UserPrompt);
+            var source = data.RootElement.GetProperty("publications")[0];
+            var id = source.GetProperty("sourceId").GetGuid();
+            const string text = "В аннотации описано влияние креатина на память.";
+            var draft = new QuickAnswerDraft(text, [new(text, [new(id, source.GetProperty("abstractText").GetString()!)])], [],
+                ["Доступный материал не позволяет делать выводы для каждого человека."], "VeryLimited", [id]);
+            return Task.FromResult(new StructuredGenerationResult<T>((T)(object)draft,
+                new("Fake", "not-public-model", null, DateTimeOffset.UtcNow)));
+        }
     }
 
     private sealed class QuickTestAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)

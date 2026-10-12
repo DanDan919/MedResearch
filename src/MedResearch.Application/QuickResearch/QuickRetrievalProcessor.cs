@@ -26,16 +26,17 @@ public sealed class QuickRetrievalProcessor(IQuickResearchStore store, IQuickSci
 {
     public bool Enabled => options.Enabled;
 
-    public async Task ProcessAsync(QuickResearchClaim claim, CancellationToken token)
+    public async Task<QuickRetrievalSnapshot> ProcessAsync(QuickResearchClaim claim, CancellationToken token, bool settle = true)
     {
         var snapshot = claim.Retrieval ?? new QuickRetrievalSnapshot(claim.RunId, QuickQueryPreparation.Prepare(claim.Question!),
             [], [], [], QuickRetrievalOutcome.Searching, false, 0, []);
         snapshot.Validate(claim.RunId);
         if (snapshot.Plan.Queries.Length == 0)
         {
-            await Save(snapshot with { Outcome = QuickRetrievalOutcome.NeedsClarification, IsFinal = true,
-                Limitations = ["A bounded query could not be prepared without guessing. Rephrase in English or use supported Russian terms."] }, true);
-            return;
+            snapshot = snapshot with { Outcome = QuickRetrievalOutcome.NeedsClarification, IsFinal = true,
+                Limitations = ["A bounded query could not be prepared without guessing. Rephrase in English or use supported Russian terms."] };
+            await Save(snapshot, settle);
+            return snapshot;
         }
         // An abandoned Started attempt has an unknown outcome: never spend another call automatically.
         snapshot = snapshot with { Attempts = snapshot.Attempts.Select(a => a.Outcome == QuickSearchOutcome.Started
@@ -83,11 +84,13 @@ public sealed class QuickRetrievalProcessor(IQuickResearchStore store, IQuickSci
         var outcome = successful == 0 ? QuickRetrievalOutcome.Failed : failures > 0 ? QuickRetrievalOutcome.Partial
             : selection.Sources.Length > 0 ? QuickRetrievalOutcome.Selected : snapshot.Attempts.All(a => a.ReturnedCount == 0)
                 ? QuickRetrievalOutcome.ZeroResults : QuickRetrievalOutcome.NoRelevantSources;
-        await Save(snapshot with { Candidates = [], Sources = selection.Sources, IsFinal = true, Outcome = outcome,
+        snapshot = snapshot with { Candidates = [], Sources = selection.Sources, IsFinal = true, Outcome = outcome,
             RejectedCount = snapshot.RejectedCount + selection.RejectedCount,
             Limitations = ["Publication selection uses lexical topic/population matching, not clinical evidence evaluation.",
                 "Source-reported identifiers are normalized and consistency-checked, not independently verified against an identifier registry.",
-                "This is a bounded search, not an exhaustive review or medical answer. Missing abstracts remain missing."] }, true);
+                "This is a bounded search, not an exhaustive review or medical answer. Missing abstracts remain missing."] };
+        await Save(snapshot, settle);
+        return snapshot;
 
         async Task Save(QuickRetrievalSnapshot value, bool settle)
         {

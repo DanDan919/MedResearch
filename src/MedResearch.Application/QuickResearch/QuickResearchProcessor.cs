@@ -3,7 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace MedResearch.Application.QuickResearch;
 
-public sealed class QuickResearchProcessor(IQuickResearchStore store, ILogger<QuickResearchProcessor> logger, QuickRetrievalProcessor? retrieval = null)
+public sealed class QuickResearchProcessor(IQuickResearchStore store, ILogger<QuickResearchProcessor> logger,
+    QuickRetrievalProcessor? retrieval = null, QuickAnswerProcessor? answer = null)
 {
     public async Task<bool> ProcessNextAsync(string workerId, TimeSpan leaseDuration, CancellationToken token)
     {
@@ -13,6 +14,16 @@ public sealed class QuickResearchProcessor(IQuickResearchStore store, ILogger<Qu
         try
         {
             token.ThrowIfCancellationRequested();
+            if (answer is not null && (answer.Enabled || claim.AnswerGeneration is not null || claim.Retrieval?.IsFinal == true))
+            {
+                if (claim.Retrieval?.IsFinal != true)
+                {
+                    if (retrieval is null) throw new InvalidOperationException("Quick retrieval is required before answering.");
+                    claim = claim with { Retrieval = await retrieval.ProcessAsync(claim, token, settle: false) };
+                }
+                await answer.ProcessAsync(claim, token);
+                return true;
+            }
             if (retrieval is not null && (retrieval.Enabled || claim.Retrieval is not null))
             {
                 await retrieval.ProcessAsync(claim, token);

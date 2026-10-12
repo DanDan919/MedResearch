@@ -519,6 +519,29 @@ export interface components {
             uniqueStudyCount: number;
         };
         QuantitativeSynthesisStatus: number;
+        QuickAnswer: {
+            contradictions: components["schemas"]["QuickAnswerContradiction"][];
+            findings: components["schemas"]["QuickAnswerFinding"][];
+            limitations: string[];
+            /** Format: uuid */
+            quickRunId: string;
+            shortAnswer: string;
+            sourceReferences: string[];
+            uncertainty: string;
+        };
+        QuickAnswerCitation: {
+            excerpt: string;
+            /** Format: uuid */
+            sourceId: string;
+        };
+        QuickAnswerContradiction: {
+            citations: components["schemas"]["QuickAnswerCitation"][];
+            text: string;
+        };
+        QuickAnswerFinding: {
+            citations: components["schemas"]["QuickAnswerCitation"][];
+            text: string;
+        };
         QuickDiscovery: {
             /** Format: uuid */
             attemptId: string;
@@ -548,6 +571,8 @@ export interface components {
             url: null | string;
         };
         QuickResearchDetails: {
+            answer: null | components["schemas"]["QuickAnswer"];
+            answerStatus: null | string;
             /** Format: date-time */
             completedAt: null | string;
             /** Format: date-time */

@@ -12,3 +12,8 @@ public class StructuredLlmException : Exception
     {
     }
 }
+
+public sealed class StructuredLlmTimeoutException : StructuredLlmException
+{
+    public StructuredLlmTimeoutException() : base("Bounded structured generation timed out.") { }
+}

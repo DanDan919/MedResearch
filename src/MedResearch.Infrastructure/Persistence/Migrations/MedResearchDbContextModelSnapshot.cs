@@ -554,6 +554,10 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AnswerGeneration")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answer_generation");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -618,6 +622,8 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
 
                     b.ToTable("quick_research_runs", null, t =>
                         {
+                            t.HasCheckConstraint("ck_quick_answer", "answer_generation IS NULL OR (result IS NULL AND COALESCE(answer_generation ->> 'QuickRunId' = id::text AND retrieval ->> 'IsFinal' = 'true' AND answer_generation ->> 'AttemptCount' IN ('0','1') AND ((answer_generation ->> 'Outcome' = '0' AND status = 'Processing' AND answer_generation ->> 'AttemptCount' = '1' AND answer_generation ->> 'FinishedAt' IS NULL AND answer_generation ->> 'Answer' IS NULL) OR (answer_generation ->> 'Outcome' IN ('1','2') AND status = 'Completed' AND answer_generation ->> 'FinishedAt' IS NOT NULL AND answer_generation -> 'Answer' ->> 'QuickRunId' = id::text) OR (answer_generation ->> 'Outcome' IN ('3','4') AND status = 'Failed' AND answer_generation ->> 'FinishedAt' IS NOT NULL AND answer_generation ->> 'Answer' IS NULL)), FALSE))");
+
                             t.HasCheckConstraint("ck_quick_lease", "lease_version >= 0 AND ((status = 'Processing' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL) OR (status <> 'Processing' AND lease_owner IS NULL AND lease_expires_at IS NULL))");
 
                             t.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND ((result IS NOT NULL AND retrieval IS NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (result IS NULL AND retrieval IS NOT NULL AND COALESCE(retrieval ->> 'IsFinal' = 'true', FALSE)))) OR (status <> 'Completed' AND result IS NULL)");

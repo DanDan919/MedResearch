@@ -1,5 +1,21 @@
 # Current State
 
+## QUICK-Q2 Source-Linked Answers (2026-10-12)
+
+Isolated one-attempt structured answer over Q1's saved selected abstracts, no
+Deep stages/calculators. Exact current-run references/excerpts, bounded output,
+backend safety limitations and explicit insufficiency; source existence is not
+medical entailment. Nullable Quick answer_generation JSONB and forward migration
+20261012112257_AddQuickGroundedAnswers; pending reservation stops redispatch after
+reclaim. Atomic receipt uses lease/inputs/generation fences and terminal cleanup.
+Live answer/retrieval defaults remain off. Shared request limits are optional;
+Deep defaults remain unchanged, bounded Codex CLI use fails before process launch.
+Parallel Deep/M24 work is excluded; Q2 validation uses isolated checkout. Results,
+configuration and scientific limitations: quick-q2-grounded-answer-ru.md.
+Local isolated backend:800 passed,0 failed,182 Docker skips; Domain62/Application437/
+Infrastructure234/Integration67. OpenAPI5, SDK45/Web157, lint/typecheck/build/model/
+Compose passed. PostgreSQL runtime confidence requires actually successful strict CI.
+
 ## QUICK-Q1 Bounded Retrieval (2026-10-12)
 
 Opt-in, isolated PubMed/EuropePmc retrieval: one bounded deterministic RU/EN query,

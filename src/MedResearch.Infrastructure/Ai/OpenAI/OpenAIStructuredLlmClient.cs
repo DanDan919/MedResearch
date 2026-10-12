@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using MedResearch.Application.Research.Ai;
+using MedResearch.Infrastructure.Literature;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -38,14 +39,18 @@ public sealed class OpenAIStructuredLlmClient : IStructuredLlmClient
         ArgumentException.ThrowIfNullOrWhiteSpace(request.UserPrompt);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OutputSchema.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OutputSchema.JsonSchema);
+        request.Limits?.Validate();
 
         EnsureConfigured();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (request.Limits is { } bounds) deadline.CancelAfter(TimeSpan.FromSeconds(bounds.TimeoutSeconds));
+        var operationToken = request.Limits is null ? cancellationToken : deadline.Token;
 
         try
         {
             using var httpRequest = BuildHttpRequest(request);
-            using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var response = await _httpClient.SendAsync(httpRequest,
+                request.Limits is null ? HttpCompletionOption.ResponseContentRead : HttpCompletionOption.ResponseHeadersRead, operationToken);
 
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
@@ -61,6 +66,10 @@ public sealed class OpenAIStructuredLlmClient : IStructuredLlmClient
             {
                 throw new StructuredLlmException($"OpenAI request failed with HTTP {(int)response.StatusCode}.");
             }
+
+            var content = request.Limits is { } limits
+                ? await BoundedProviderBody.ReadAsync(response.Content, limits.MaxResponseBytes, TimeSpan.FromSeconds(limits.TimeoutSeconds), operationToken)
+                : await response.Content.ReadAsStringAsync(cancellationToken);
 
             var (responseId, outputText) = ReadStructuredOutput(content);
             var value = JsonSerializer.Deserialize<T>(outputText, SerializerOptions);
@@ -80,7 +89,12 @@ public sealed class OpenAIStructuredLlmClient : IStructuredLlmClient
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
+            if (request.Limits is not null) throw new StructuredLlmTimeoutException();
             throw new StructuredLlmException("OpenAI request timed out.", exception);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested)
+        {
+            throw new StructuredLlmTimeoutException();
         }
         catch (OperationCanceledException)
         {
@@ -89,6 +103,14 @@ public sealed class OpenAIStructuredLlmClient : IStructuredLlmClient
         catch (JsonException exception)
         {
             throw new StructuredLlmException("OpenAI returned malformed structured output.", exception);
+        }
+        catch (ProviderResponseTooLargeException)
+        {
+            throw new StructuredLlmException("Structured response exceeded its byte limit.");
+        }
+        catch (TimeoutException)
+        {
+            throw new StructuredLlmTimeoutException();
         }
         catch (HttpRequestException exception)
         {
@@ -141,7 +163,7 @@ public sealed class OpenAIStructuredLlmClient : IStructuredLlmClient
                     ["schema"] = schema
                 }
             },
-            ["max_output_tokens"] = _options.BoundedMaxOutputTokens
+            ["max_output_tokens"] = Math.Min(_options.BoundedMaxOutputTokens, request.Limits?.MaxOutputTokens ?? _options.BoundedMaxOutputTokens)
         };
 
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, "responses")

@@ -4,10 +4,12 @@ using MedResearch.Domain.QuickResearch;
 namespace MedResearch.Application.QuickResearch;
 
 public sealed record QuickResearchDetails(Guid Id, string Question, string Status, DateTimeOffset CreatedAt,
-    DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? SafeError, QuickResearchResult? Result, QuickRetrievalResult? Retrieval = null);
+    DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? SafeError, QuickResearchResult? Result, QuickRetrievalResult? Retrieval = null,
+    QuickAnswer? Answer = null, string? AnswerStatus = null);
 public sealed record QuickResearchSummary(Guid Id, string Question, string Status, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
 public sealed record QuickResearchHistory(QuickResearchSummary[] Items, int Page, int PageSize, int TotalCount);
-public sealed record QuickResearchClaim(Guid RunId, string WorkerId, long LeaseVersion, string? Question = null, QuickRetrievalSnapshot? Retrieval = null);
+public sealed record QuickResearchClaim(Guid RunId, string WorkerId, long LeaseVersion, string? Question = null,
+    QuickRetrievalSnapshot? Retrieval = null, QuickAnswerGeneration? AnswerGeneration = null);
 public sealed record QuickRetrievalAttempt(Guid Id, string Provider, string Query, string? ExecutedQuery, DateTimeOffset StartedAt,
     DateTimeOffset? FinishedAt, string Outcome, int? ReturnedCount, string? FailureCategory);
 public sealed record QuickRetrievalResult(Guid QuickRunId, string QueryVersion, string Language, string[] Queries,

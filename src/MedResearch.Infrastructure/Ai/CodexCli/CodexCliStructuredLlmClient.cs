@@ -36,6 +36,8 @@ public sealed class CodexCliStructuredLlmClient : IStructuredLlmClient
         ArgumentException.ThrowIfNullOrWhiteSpace(request.UserPrompt);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OutputSchema.Name);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.OutputSchema.JsonSchema);
+        if (request.Limits is not null)
+            throw new StructuredLlmException("Codex CLI does not support bounded Quick answer generation.");
         _options.Validate();
 
         var prompt = BuildPrompt(request);

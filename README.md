@@ -1,5 +1,13 @@
 # MedResearch
 
+## Quick Q2 Answer Foundation
+
+Quick can settle one bounded structured answer over its persisted Q1 abstracts,
+with same-run citations, exact excerpt checks and durable one-attempt recovery.
+Answer generation and live retrieval remain disabled by default. No medical
+accuracy or live-provider performance is certified by fake tests. See
+[Q2 contracts, bounds and verification](docs/development/quick-q2-grounded-answer-ru.md).
+
 ## Quick Research (Q0/Q1)
 
 `/api/quick-research` is a separate owner-authenticated API, not yet exposed by
