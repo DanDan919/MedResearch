@@ -1,5 +1,6 @@
 import { normalizeApiBaseUrl } from "./config";
 import { createApiError, MedResearchApiError } from "./errors";
+import { quickResearchDetailsSchema, quickResearchHistorySchema, type QuickResearchDetails, type QuickResearchHistory } from "./quick";
 import {
   createResearchResponseSchema,
   researchRunProgressResponseSchema,
@@ -53,6 +54,20 @@ export class MedResearchApiClient {
     } catch {
       return "unavailable";
     }
+  }
+
+  public getQuickResearch(runId: string, signal?: AbortSignal): Promise<QuickResearchDetails> {
+    return this.requestJson(`/api/quick-research/${encodeURIComponent(runId)}`, value => {
+      const parsed = quickResearchDetailsSchema.parse(value);
+      if (parsed.id.toLowerCase() !== runId.toLowerCase()) throw new MedResearchApiError("Quick result identity mismatch", "unexpected");
+      return parsed;
+    }, { method: "GET", signal, cache: "no-store", headers: { Accept: "application/json" } });
+  }
+
+  public listQuickResearch(page = 1, signal?: AbortSignal): Promise<QuickResearchHistory> {
+    if (!Number.isInteger(page) || page < 1 || page > 100000) throw new MedResearchApiError("Invalid Quick page", "validation");
+    return this.requestJson(`/api/quick-research?page=${page}&pageSize=20`, quickResearchHistorySchema.parse,
+      { method: "GET", signal, cache: "no-store", headers: { Accept: "application/json" } });
   }
 
   public async createResearch(

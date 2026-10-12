@@ -2,6 +2,8 @@ export { defaultApiBaseUrl, normalizeApiBaseUrl } from "./config";
 export { MedResearchApiClient } from "./client";
 export { MedResearchApiError, mapStatusToKind } from "./errors";
 export { queryKeys } from "./query-keys";
+export { quickQueryKeys, safeQuickPublicationUrl } from "./quick";
+export type { QuickResearchDetails, QuickResearchHistory, QuickPublication } from "./quick";
 export {
   hasActiveResearchRuns,
   isTerminalResearchStatus,

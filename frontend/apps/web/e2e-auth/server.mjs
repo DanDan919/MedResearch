@@ -9,6 +9,7 @@ import { spawn, execFileSync } from "node:child_process";
 import selfsigned from "selfsigned";
 import { generateKeyPair, exportJWK, SignJWT, jwtVerify } from "jose";
 import { createTestCertificates } from "../e2e-fullstack/test-certificates.mjs";
+import { quickDetails, quickHistory, quickRunId } from "../../../packages/api/test/fixtures/quick.ts";
 
 const issuer = "https://127.0.0.1:3443";
 const web = "https://localhost:3441";
@@ -129,6 +130,11 @@ const apiServer = http.createServer(safe(async (request, response) => {
   try { subject = (await jwtVerify((request.headers.authorization ?? "").replace(/^Bearer /, ""), publicKey, { issuer, audience })).payload.sub; }
   catch { return json(response, 401, { title: "Unauthorized" }); }
   if (!subject) return json(response, 403, { title: "Invalid subject" });
+  // Quick fixtures are read-only and scoped to User A; the full-stack fixture uses the actual API instead.
+  if (url.pathname === "/api/quick-research" && request.method === "GET")
+    return json(response, 200, subject === "UserA" ? quickHistory() : { items: [], page: 1, pageSize: 20, totalCount: 0 });
+  if (url.pathname === `/api/quick-research/${quickRunId}` && request.method === "GET")
+    return json(response, subject === "UserA" ? 200 : 404, subject === "UserA" ? quickDetails() : { title: "Not found" });
   if (url.pathname === "/api/research" && request.method === "POST") {
     const incoming = JSON.parse(await body(request)); const id = randomUUID(); const now = new Date().toISOString();
     runs.set(id, { researchRunId: id, researchQuestionId: randomUUID(), question: incoming.question, status: "Queued", createdAt: now,

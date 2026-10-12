@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FlaskConical, Home, LogOut, Microscope, Settings } from "lucide-react";
+import { Activity, BookOpen, ClipboardList, FlaskConical, Home, LogOut, Microscope, Settings } from "lucide-react";
 import { Button, cn, Separator } from "@medresearch/ui";
 import { ApiStatusIndicator } from "./api-status-indicator";
 import { ThemeToggle } from "./theme-toggle";
@@ -11,6 +11,7 @@ import { useState } from "react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
+  { href: "/quick-research", label: "Quick Research", icon: BookOpen },
   { href: "/research/new", label: "New Research", icon: Microscope },
   { href: "/research", label: "Research Runs", icon: ClipboardList },
   { href: "/studies", label: "Studies", icon: FlaskConical },

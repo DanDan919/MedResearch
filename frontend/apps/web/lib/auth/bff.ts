@@ -9,6 +9,7 @@ import { clearSession, readPrivateSession, sessionOptions, type PrivateSession }
 const id = "[a-f\\d]{8}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{4}-[a-f\\d]{12}";
 const researchPath = new RegExp(`^/api/research(?:/${id}(?:/(?:progress|report|quantitative|provenance|retry-synthesis))?)?$`, "i");
 const synthesisRetryPath = new RegExp(`^/api/research/${id}/retry-synthesis$`, "i");
+const quickPath = new RegExp(`^/api/quick-research(?:/${id})?$`, "i");
 const statuses = new Set(["Queued", "Planning", "Searching", "Extracting", "Evaluating", "Synthesizing", "Completed", "Failed", "Cancelled"]);
 const submissionKey = new RegExp(`^${id}$`, "i");
 const admissionProblems: Record<string, { status: number; title: string }> = {
@@ -26,6 +27,16 @@ export function allowedUpstreamPath(url: URL, method: string): string | null {
   if (!url.pathname.startsWith("/api/backend/")) return null;
   const path = url.pathname.slice("/api/backend".length);
   if (path === "/health/ready" && method === "GET" && !url.search) return path;
+  if (quickPath.test(path)) {
+    if (method !== "GET" || url.search && path !== "/api/quick-research") return null;
+    const seen = new Set<string>();
+    for (const [key, value] of url.searchParams) {
+      if (seen.has(key) || !["page", "pageSize"].includes(key) || !/^\d{1,6}$/.test(value)
+        || Number(value) < 1 || Number(value) > (key === "page" ? 100000 : 50)) return null;
+      seen.add(key);
+    }
+    return path + url.search;
+  }
   if (!researchPath.test(path) || (method !== "GET" && !(method === "POST" && (path === "/api/research" || synthesisRetryPath.test(path))))) return null;
   if (url.search && (path !== "/api/research" || method !== "GET")) return null;
   const seen = new Set<string>();
@@ -50,6 +61,10 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
   const upstreamPath = allowedUpstreamPath(new URL(request.url), request.method);
   if (!upstreamPath) return problem(404, "Endpoint not found", "path-rejected");
   if (!trustedRequest(request, config, request.method !== "GET")) return problem(403, "Request origin is not allowed", "origin-rejected");
+  if (quickPath.test(new URL(request.url).pathname.slice("/api/backend".length))
+    && (request.headers.get("origin") && request.headers.get("origin") !== config.webOrigin
+      || ["cross-site", "same-site"].includes(request.headers.get("sec-fetch-site") ?? "")))
+    return problem(403, "Request origin is not allowed", "origin-rejected");
   const health = upstreamPath === "/health/ready";
   let session: PrivateSession | null = null;
   if (!health && config.mode === "oidc") {
