@@ -145,8 +145,41 @@ engine. 182 PostgreSQL skips не названы runtime verification.
 Frontend, Build and test, Actual API PostgreSQL HTTPS web RC.
 Linux/.NET 10/Node 24; `MEDRESEARCH_REQUIRE_DOCKER_TESTS=true` должен
 обеспечить реальные PostgreSQL tests без required skips.
-Результат Q3 CI будет записан после push и проверки фактического run;
-предыдущий зелёный Q2 run не является доказательством Q3.
+Фактически проверенный Q3 run:
+[38262188656](https://github.com/DanDan919/MedResearch/actions/runs/38262188656),
+commit `fb0137befba2ea1f9aeb24ff2c1f9204b7c0969e`, итог `success`.
+Все три jobs завершились `success`. TRX annotations:
+
+| Suite в CI | Executed | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: | ---: |
+| Domain | 62 | 62 | 0 | 0 |
+| Application | 437 | 437 | 0 | 0 |
+| Infrastructure | 234 | 234 | 0 | 0 |
+| Integration | 249 | 249 | 0 | 0 |
+
+Итого backend: 982 passed, 0 failed, 0 skipped. В отличие от локального
+прогона, все 182 Docker-required PostgreSQL cases реально выполнены.
+Docker info, EF pending-model verification и Compose validation в CI прошли;
+full-stack job проверил actual API, freshly migrated PostgreSQL, production
+Next/HTTPS и контейнерные сборки. Frontend job проверил deterministic Quick
+и Deep suites, Chromium и production OIDC/BFF, без live medical providers.
+CI workflow и PostgreSQL tests не ослаблялись ради зелёного статуса.
+
+После проверки добавлена только эта запись доказательств отдельным docs
+коммитом Q3. Его CI проверяется отдельно перед финальным отчётом.
+
+## Локальный просмотр
+
+Для просмотра поднят изолированный development UI:
+`http://127.0.0.1:3000/quick-research` (HTTP 200). Локальный API на 5252
+запущен с отключёнными Deep/Quick workers, retrieval/answer и startup
+миграциями, поэтому просмотр не инициирует live или paid provider calls.
+Однако `GET /health/ready` локально вернул `503 Unhealthy`: текущая локальная
+PostgreSQL конфигурация API не прошла connectivity check. Это не объявлено
+успешным локальным DB runtime verification; изменение пароля/данных или
+ремонт локальной БД не выполнялся. Пока readiness не восстановлена, UI
+показывает честную ошибку чтения вместо synthetic results. PostgreSQL
+проверка Q3 подтверждена CI, не этим локальным просмотром.
 
 ## Ограничения и следующий шаг
 
