@@ -12,7 +12,8 @@ public sealed class QuickResearchRunConfiguration : IEntityTypeConfiguration<Qui
         builder.ToTable("quick_research_runs", table =>
         {
             table.HasCheckConstraint("ck_quick_status", "status IN ('Queued','Processing','Completed','Failed')");
-            table.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND result IS NOT NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (status <> 'Completed' AND result IS NULL)");
+            table.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND ((result IS NOT NULL AND retrieval IS NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (result IS NULL AND retrieval IS NOT NULL AND COALESCE(retrieval ->> 'IsFinal' = 'true', FALSE)))) OR (status <> 'Completed' AND result IS NULL)");
+            table.HasCheckConstraint("ck_quick_retrieval", "retrieval IS NULL OR (status <> 'Queued' AND result IS NULL AND COALESCE(retrieval ->> 'QuickRunId' = id::text, FALSE))");
             table.HasCheckConstraint("ck_quick_lease", "lease_version >= 0 AND ((status = 'Processing' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL) OR (status <> 'Processing' AND lease_owner IS NULL AND lease_expires_at IS NULL))");
             table.HasCheckConstraint("ck_quick_terminal", "((status IN ('Completed','Failed')) = (completed_at IS NOT NULL)) AND ((status = 'Failed') = (safe_error IS NOT NULL))");
         });
@@ -30,6 +31,8 @@ public sealed class QuickResearchRunConfiguration : IEntityTypeConfiguration<Qui
         builder.Property(x => x.LeaseVersion).HasColumnName("lease_version");
         builder.Property(x => x.Result).HasColumnName("result").HasColumnType("jsonb")
             .HasConversion(result => JsonSerializer.Serialize(result, (JsonSerializerOptions?)null), json => JsonSerializer.Deserialize<QuickResearchResult>(json, (JsonSerializerOptions?)null));
+        builder.Property(x => x.Retrieval).HasColumnName("retrieval").HasColumnType("jsonb")
+            .HasConversion(value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null), json => JsonSerializer.Deserialize<QuickRetrievalSnapshot>(json, (JsonSerializerOptions?)null));
         builder.HasIndex(x => new { x.OwnerSubjectId, x.CreatedAt, x.Id });
         builder.HasIndex(x => new { x.Status, x.LeaseExpiresAt, x.CreatedAt });
     }

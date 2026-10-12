@@ -55,6 +55,14 @@ public static class ServiceCollectionExtensions
         var quickOptions = configuration.GetSection("QuickResearch").Get<MedResearch.Infrastructure.QuickResearch.QuickResearchOptions>() ?? new();
         quickOptions.Validate();
         services.AddSingleton(quickOptions);
+        var quickRetrievalOptions = configuration.GetSection("QuickResearch:Retrieval").Get<MedResearch.Application.QuickResearch.QuickRetrievalOptions>() ?? new();
+        quickRetrievalOptions.Validate();
+        if (quickRetrievalOptions.Enabled && quickOptions.LeaseDurationSeconds < 4 * quickRetrievalOptions.SearchTimeoutSeconds + 10)
+            throw new InvalidOperationException("Quick lease must cover the four-search deadline budget plus 10 seconds.");
+        services.AddSingleton(quickRetrievalOptions);
+        services.AddScoped<MedResearch.Application.QuickResearch.IQuickScientificSources, MedResearch.Infrastructure.QuickResearch.QuickScientificSources>();
+        services.AddScoped<MedResearch.Application.QuickResearch.IQuickPublicationSelector, MedResearch.Application.QuickResearch.QuickPublicationSelector>();
+        services.AddScoped<MedResearch.Application.QuickResearch.QuickRetrievalProcessor>();
         services.AddScoped<MedResearch.Application.QuickResearch.IQuickResearchStore, MedResearch.Infrastructure.QuickResearch.EfQuickResearchStore>();
 
         var admissionOptions = configuration.GetSection("ResearchAdmission").Get<ResearchAdmissionOptions>() ?? new();

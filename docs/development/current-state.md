@@ -1,5 +1,19 @@
 # Current State
 
+## QUICK-Q1 Bounded Retrieval (2026-10-12)
+
+Opt-in, isolated PubMed/EuropePmc retrieval: one bounded deterministic RU/EN query,
+at most8 candidates/provider, at most5 selected publications and durable run-scoped
+source/query provenance. Metadata is not Evidence or a medical answer. Glossary
+coverage and lexical relevance limitations remain explicit; no LLM/live calls.
+Forward migration `20261012000308_AddQuickBoundedRetrieval` affects only Quick.
+Parallel Deep/M24/audit/UI work is preserved and excluded. Validation uses an
+isolated Q1 checkout; PostgreSQL confidence requires actually green strict CI.
+Results and remaining limitations: `quick-q1-retrieval-ru.md`.
+Local isolated Q1:735 passed,0 failed,173 Docker skips; Domain62/Application390/
+Infrastructure216/Integration67. Model/Compose/OpenAPI/SDK/lint/typecheck/build pass.
+No live scientific requests or user DB changes; strict PostgreSQL CI still required.
+
 ## QUICK-Q0 Synthetic Skeleton (2026-10-12)
 
 Separate authorized POST/GET/history at `/api/quick-research`, owner-scoped root,

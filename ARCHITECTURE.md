@@ -1,5 +1,32 @@
 # Architecture
 
+## QUICK-Q1 Bounded Retrieval
+
+QuickRetrievalProcessor prepares one versioned deterministic RU/EN query and
+uses QuickScientificSources with the existing PubMed/EuropePmc adapters. The
+optional ScientificSearchRequest.MaxResults narrows adapter bounds; null keeps
+Deep behavior unchanged. Singleton rate gates, batching, retries and byte caps
+are reused. Quick never enters Deep stages or its run/plan-specific stores.
+
+QuickPublicationSelector merges only consistent normalized PMID/PMCID/DOI
+identity components. Conflicting components/titles are rejected; incompatible
+optional metadata becomes missing with explicit conflict markers. At most5 refs
+are selected from at most8 candidates/provider by lexical topic/population
+checks, not expert-verified clinical relevance. An explicit bilingual glossary
+does not provide universal Russian translation; unsupported scope needs clarification.
+
+A bounded retrieval JSONB snapshot in the existing Quick table records each
+logical source slot before HTTP. Snapshot writes and settlement are lease-fenced.
+Abandoned Started slots become OutcomeUnknown and are not automatically replayed.
+Zero, no-relevant-source, partial and all-failed outcomes remain distinct. Final
+snapshots discard candidate buffers; owner-filtered GET revalidates embedded
+lineage. SQL checks enforce root identity, not every JSON citation relationship.
+
+Retrieval defaults disabled and has per-search deadlines; its configured lease
+must cover four search deadlines plus10s. Q1 adds no LLM, full text, scientific
+answer, browser UI, public quotas or deployment. See
+`docs/development/quick-q1-retrieval-ru.md` for runtime checks and limitations.
+
 ## QUICK-Q0 Isolated Synthetic Slice
 
 Quick research is a separate root, `QuickResearchRun`, with its own owner and

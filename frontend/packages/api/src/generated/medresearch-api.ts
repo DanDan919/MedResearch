@@ -519,6 +519,34 @@ export interface components {
             uniqueStudyCount: number;
         };
         QuantitativeSynthesisStatus: number;
+        QuickDiscovery: {
+            /** Format: uuid */
+            attemptId: string;
+            provider: string;
+            providerRecordId: null | string;
+        };
+        QuickPublication: {
+            abstract: null | string;
+            authors: string[];
+            discoveries: components["schemas"]["QuickDiscovery"][];
+            doi: null | string;
+            /** Format: uuid */
+            id: string;
+            journal: null | string;
+            metadataConflicts: string[];
+            pmcid: null | string;
+            pmid: null | string;
+            populationMatch: string;
+            /** Format: date */
+            publicationDate: null | string;
+            publicationTypes: string[];
+            /** Format: int32 */
+            publicationYear: null | number;
+            /** Format: uuid */
+            quickRunId: string;
+            title: string;
+            url: null | string;
+        };
         QuickResearchDetails: {
             /** Format: date-time */
             completedAt: null | string;
@@ -528,6 +556,7 @@ export interface components {
             id: string;
             question: string;
             result: null | components["schemas"]["QuickResearchResult"];
+            retrieval: null | components["schemas"]["QuickRetrievalResult"];
             safeError: null | string;
             /** Format: date-time */
             startedAt: null | string;
@@ -574,6 +603,35 @@ export interface components {
             id: string;
             question: string;
             status: string;
+        };
+        QuickRetrievalAttempt: {
+            executedQuery: null | string;
+            failureCategory: null | string;
+            /** Format: date-time */
+            finishedAt: null | string;
+            /** Format: uuid */
+            id: string;
+            outcome: string;
+            provider: string;
+            query: string;
+            /** Format: int32 */
+            returnedCount: null | number;
+            /** Format: date-time */
+            startedAt: string;
+        };
+        QuickRetrievalResult: {
+            attempts: components["schemas"]["QuickRetrievalAttempt"][];
+            isFinal: boolean;
+            language: string;
+            limitations: string[];
+            outcome: string;
+            queries: string[];
+            queryVersion: string;
+            /** Format: uuid */
+            quickRunId: string;
+            /** Format: int32 */
+            rejectedCount: number;
+            sources: components["schemas"]["QuickPublication"][];
         };
         ResearchClaimNumericSnapshot: {
             algorithmVersion: null | string;

@@ -59,9 +59,10 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
 
         try
         {
+            var maximum = request.BoundResults(_options.BoundedMaxResultsPerQuery);
             var searchedAt = DateTimeOffset.UtcNow;
-            var searchResult = await SearchPmidsAsync(request.Query, cancellationToken);
-            var pmids = searchResult.Pmids.Distinct(StringComparer.Ordinal).Take(_options.BoundedMaxResultsPerQuery).ToArray();
+            var searchResult = await SearchPmidsAsync(request.Query, maximum, cancellationToken);
+            var pmids = searchResult.Pmids.Distinct(StringComparer.Ordinal).Take(maximum).ToArray();
 
             _logger.LogInformation(
                 "PubMedESearchCompleted. ResearchRunId: {ResearchRunId}; SearchExecutionId: {SearchExecutionId}; ReturnedPmidCount: {ReturnedPmidCount}; TotalAvailableCount: {TotalAvailableCount}",
@@ -117,13 +118,13 @@ public sealed class PubMedScientificLiteratureSource : IScientificLiteratureSour
         }
     }
 
-    private async Task<PubMedSearchResult> SearchPmidsAsync(string query, CancellationToken cancellationToken)
+    private async Task<PubMedSearchResult> SearchPmidsAsync(string query, int maximum, CancellationToken cancellationToken)
     {
         var uri = BuildUri("esearch.fcgi", new Dictionary<string, string?>
         {
             ["db"] = "pubmed",
             ["term"] = query,
-            ["retmax"] = _options.BoundedMaxResultsPerQuery.ToString(CultureInfo.InvariantCulture),
+            ["retmax"] = maximum.ToString(CultureInfo.InvariantCulture),
             ["retmode"] = "json",
             ["sort"] = "relevance"
         });

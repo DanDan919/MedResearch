@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using MedResearch.Application.QuickResearch;
+using MedResearch.Domain.QuickResearch;
 using MedResearch.Infrastructure.Persistence;
 using MedResearch.Infrastructure.QuickResearch;
 using Microsoft.AspNetCore.Authentication;
@@ -74,6 +75,42 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/quick-research", new { question = "Question" })).StatusCode);
     }
 
+    [SkippableFact]
+    public async Task RetrievalApi_ReturnsOnlyOwnerScopedPublicationReferences_AfterHostRestart()
+    {
+        Skip.IfNot(fixture.IsAvailable, $"Docker-backed PostgreSQL tests skipped: {fixture.UnavailableReason}");
+        var subject = Guid.NewGuid().ToString();
+        Guid id;
+        using (var host = new QuickApiFactory(fixture, processing: true, retrievalSources: new ApiRetrievalSources()))
+        {
+            using var owner = host.ForOwner(subject);
+            var accepted = await owner.PostAsJsonAsync("/api/quick-research", new { question = "Влияет ли креатин на память?" });
+            Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+            id = (await accepted.Content.ReadFromJsonAsync<QuickResearchDetails>())!.Id;
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            QuickResearchDetails? result;
+            do
+            {
+                result = await owner.GetFromJsonAsync<QuickResearchDetails>($"/api/quick-research/{id}");
+                if (result!.Status == "Completed") break;
+                await Task.Delay(50);
+            } while (DateTimeOffset.UtcNow < deadline);
+            Assert.Equal("Completed", result!.Status);
+            Assert.Null(result.Result);
+            Assert.Equal("ru", result.Retrieval!.Language);
+            Assert.Equal("Selected", result.Retrieval.Outcome);
+            Assert.Equal(2, Assert.Single(result.Retrieval.Sources).Discoveries.Length);
+        }
+        using var restarted = new QuickApiFactory(fixture);
+        using var sameOwner = restarted.ForOwner(subject);
+        var saved = (await sameOwner.GetFromJsonAsync<QuickResearchDetails>($"/api/quick-research/{id}"))!;
+        Assert.Equal("123", Assert.Single(saved.Retrieval!.Sources).Pmid);
+        Assert.DoesNotContain("candidates", await sameOwner.GetStringAsync($"/api/quick-research/{id}"));
+        using var foreign = restarted.ForOwner("other-retrieval-owner");
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/quick-research/{id}")).StatusCode);
+        Assert.Equal(0, (await foreign.GetFromJsonAsync<QuickResearchHistory>("/api/quick-research"))!.TotalCount);
+    }
+
     [Theory]
     [InlineData("question")]
     [InlineData("owner")]
@@ -91,7 +128,7 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false) : WebApplicationFactory<Program>
+    private sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false, IQuickScientificSources? retrievalSources = null) : WebApplicationFactory<Program>
     {
         public HttpClient ForOwner(string subject)
         {
@@ -115,8 +152,24 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
             services.AddDbContextFactory<MedResearchDbContext>(options => options.UseNpgsql(database.ConnectionString), ServiceLifetime.Scoped);
             services.RemoveAll<QuickResearchOptions>();
             services.AddSingleton(new QuickResearchOptions { Enabled = processing, PollIntervalSeconds = 1 });
+            if (retrievalSources is not null)
+            {
+                services.RemoveAll<IQuickScientificSources>();
+                services.AddSingleton(retrievalSources);
+                services.RemoveAll<QuickRetrievalOptions>();
+                services.AddSingleton(new QuickRetrievalOptions { Enabled = true });
+            }
             if (processing) services.AddHostedService<BackgroundQuickResearchWorker>();
         });
+    }
+
+    private sealed class ApiRetrievalSources : IQuickScientificSources
+    {
+        public string[] EnabledProviders => ["PubMed", "EuropePmc"];
+        public string PrepareQuery(string provider, string query) => query;
+        public Task<QuickProviderPage> SearchAsync(string provider, Guid runId, Guid attemptId, string query, CancellationToken token) =>
+            Task.FromResult(new QuickProviderPage(1, [new("123", null, "10.1234/creatine", "Creatine and memory.", null, null, null, 2024,
+                [], [], new(attemptId, provider, "123"))], 0));
     }
 
     private sealed class QuickTestAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)

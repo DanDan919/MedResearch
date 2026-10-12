@@ -25,6 +25,7 @@ public sealed class QuickResearchRun
     public DateTimeOffset? CompletedAt { get; private set; }
     public string? SafeError { get; private set; }
     public QuickResearchResult? Result { get; private set; }
+    public QuickRetrievalSnapshot? Retrieval { get; private set; }
     public string? LeaseOwner { get; private set; }
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
     public long LeaseVersion { get; private set; }

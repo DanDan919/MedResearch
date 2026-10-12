@@ -80,6 +80,7 @@ public sealed class QuickResearchProcessorTests
         }
 
         public Task CreateAsync(QuickResearchRun run, CancellationToken token) => throw new NotSupportedException();
+        public Task<bool> SaveRetrievalAsync(QuickResearchClaim claim, QuickRetrievalSnapshot snapshot, bool settle, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchDetails?> FindAsync(Guid runId, string owner, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchHistory> ListAsync(string owner, int page, int pageSize, CancellationToken token) => throw new NotSupportedException();
     }

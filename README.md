@@ -1,5 +1,16 @@
 # MedResearch
 
+## Quick Research (Q0/Q1)
+
+`/api/quick-research` is a separate owner-authenticated API, not yet exposed by
+the browser BFF/UI. Q0 is synthetic; Q1 adds bounded PubMed/Europe PMC retrieval,
+run-scoped publication references and search provenance, not medical answers.
+The Quick worker and retrieval both default off. Retrieval uses one prepared
+RU/EN query, at most8 candidates/provider and at most5 selected publications.
+Normal tests use fake HTTP/providers, never live scientific calls. Public live
+usage still requires admission/resource safeguards. See
+[Q1 boundaries and verification](docs/development/quick-q1-retrieval-ru.md).
+
 ## Synthesis Contract And Partial Results (SCI-HF01)
 
 Structured report claims default to at most12. `Synthesis__MaxClaims` uses the

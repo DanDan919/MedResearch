@@ -1,6 +1,13 @@
 namespace MedResearch.Application.Research.Literature;
 
-public sealed record ScientificSearchRequest(Guid ResearchRunId, Guid SearchExecutionId, string Query);
+public sealed record ScientificSearchRequest(Guid ResearchRunId, Guid SearchExecutionId, string Query, int? MaxResults = null)
+{
+    public int BoundResults(int configuredMaximum)
+    {
+        if (MaxResults is <= 0 or > 200) throw new ArgumentOutOfRangeException(nameof(MaxResults));
+        return Math.Min(configuredMaximum, MaxResults ?? configuredMaximum);
+    }
+}
 
 public sealed record ScientificSearchResult(
     string Source,

@@ -58,6 +58,7 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
         }
 
         var executionQuery = PrepareQuery(request.Query);
+        var maximum = request.BoundResults(_options.BoundedMaxResultsPerQuery);
 
         try
         {
@@ -66,11 +67,11 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
             string? cursorMark = "*";
             var pageNumber = 0;
 
-            while (candidates.Count < _options.BoundedMaxResultsPerQuery && !string.IsNullOrWhiteSpace(cursorMark))
+            while (candidates.Count < maximum && !string.IsNullOrWhiteSpace(cursorMark))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 pageNumber++;
-                var remaining = _options.BoundedMaxResultsPerQuery - candidates.Count;
+                var remaining = maximum - candidates.Count;
                 var pageSize = Math.Min(_options.BoundedPageSize, remaining);
                 var uri = BuildUri("search", new Dictionary<string, string?>
                 {
@@ -108,7 +109,7 @@ public sealed class EuropePmcScientificLiteratureSource : IScientificLiteratureS
             }
 
             var deduplicated = DeduplicateCandidates(candidates)
-                .Take(_options.BoundedMaxResultsPerQuery)
+                .Take(maximum)
                 .ToArray();
 
             return new ScientificSearchResult(SourceName, searchedAt, deduplicated.Length, deduplicated);

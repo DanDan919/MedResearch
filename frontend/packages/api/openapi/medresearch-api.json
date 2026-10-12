@@ -1480,6 +1480,141 @@
       "QuantitativeSynthesisStatus": {
         "type": "integer"
       },
+      "QuickDiscovery": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerRecordId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "attemptId",
+          "provider",
+          "providerRecordId"
+        ],
+        "type": "object"
+      },
+      "QuickPublication": {
+        "properties": {
+          "abstract": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "discoveries": {
+            "items": {
+              "$ref": "#/components/schemas/QuickDiscovery"
+            },
+            "type": "array"
+          },
+          "doi": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadataConflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "pmcid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pmid": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "populationMatch": {
+            "type": "string"
+          },
+          "publicationDate": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicationTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "publicationYear": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "quickRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "quickRunId",
+          "pmid",
+          "pmcid",
+          "doi",
+          "title",
+          "abstract",
+          "journal",
+          "publicationDate",
+          "publicationYear",
+          "authors",
+          "publicationTypes",
+          "discoveries",
+          "metadataConflicts",
+          "populationMatch",
+          "url"
+        ],
+        "type": "object"
+      },
       "QuickResearchDetails": {
         "properties": {
           "completedAt": {
@@ -1510,6 +1645,16 @@
               }
             ]
           },
+          "retrieval": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuickRetrievalResult"
+              }
+            ]
+          },
           "safeError": {
             "type": [
               "null",
@@ -1535,7 +1680,8 @@
           "startedAt",
           "completedAt",
           "safeError",
-          "result"
+          "result",
+          "retrieval"
         ],
         "type": "object"
       },
@@ -1700,6 +1846,128 @@
           "status",
           "createdAt",
           "completedAt"
+        ],
+        "type": "object"
+      },
+      "QuickRetrievalAttempt": {
+        "properties": {
+          "executedQuery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "failureCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "returnedCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "query",
+          "executedQuery",
+          "startedAt",
+          "finishedAt",
+          "outcome",
+          "returnedCount",
+          "failureCategory"
+        ],
+        "type": "object"
+      },
+      "QuickRetrievalResult": {
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/QuickRetrievalAttempt"
+            },
+            "type": "array"
+          },
+          "isFinal": {
+            "type": "boolean"
+          },
+          "language": {
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "queryVersion": {
+            "type": "string"
+          },
+          "quickRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rejectedCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/QuickPublication"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "quickRunId",
+          "queryVersion",
+          "language",
+          "queries",
+          "outcome",
+          "isFinal",
+          "sources",
+          "attempts",
+          "rejectedCount",
+          "limitations"
         ],
         "type": "object"
       },

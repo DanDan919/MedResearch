@@ -18,8 +18,9 @@ public sealed class EfQuickResearchStore(MedResearchDbContext db) : IQuickResear
     {
         var run = await db.QuickResearchRuns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerSubjectId == owner, token);
         if (run is null) return null;
-        run.Result?.ValidateQ0(run.Id);
-        return new(run.Id, run.Question, run.Status.ToString(), run.CreatedAt, run.StartedAt, run.CompletedAt, run.SafeError, run.Result);
+        ValidateStored(run);
+        return new(run.Id, run.Question, run.Status.ToString(), run.CreatedAt, run.StartedAt, run.CompletedAt, run.SafeError, run.Result,
+            run.Retrieval is null ? null : QuickRetrievalResult.From(run.Retrieval));
     }
 
     public async Task<QuickResearchHistory> ListAsync(string owner, int page, int pageSize, CancellationToken token)
@@ -48,7 +49,8 @@ public sealed class EfQuickResearchStore(MedResearchDbContext db) : IQuickResear
             FROM candidate WHERE run.id = candidate.id RETURNING run.*
             """).AsNoTracking().ToArrayAsync(token);
         var run = claimed.SingleOrDefault();
-        return run is null ? null : new(run.Id, workerId, run.LeaseVersion);
+        if (run is not null) ValidateStored(run);
+        return run is null ? null : new(run.Id, workerId, run.LeaseVersion, run.Question, run.Retrieval);
     }
 
     public async Task<bool> CompleteAsync(QuickResearchClaim claim, QuickResearchResult result, CancellationToken token)
@@ -58,7 +60,7 @@ public sealed class EfQuickResearchStore(MedResearchDbContext db) : IQuickResear
         return await db.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE quick_research_runs SET status = 'Completed', result = CAST({payload} AS jsonb), completed_at = clock_timestamp(),
                 lease_owner = NULL, lease_expires_at = NULL
-            WHERE id = {claim.RunId} AND status = 'Processing' AND lease_owner = {claim.WorkerId}
+            WHERE id = {claim.RunId} AND retrieval IS NULL AND status = 'Processing' AND lease_owner = {claim.WorkerId}
                 AND lease_version = {claim.LeaseVersion} AND lease_expires_at > clock_timestamp()
             """, token) == 1;
     }
@@ -70,4 +72,27 @@ public sealed class EfQuickResearchStore(MedResearchDbContext db) : IQuickResear
             WHERE id = {claim.RunId} AND status = 'Processing' AND lease_owner = {claim.WorkerId}
                 AND lease_version = {claim.LeaseVersion} AND lease_expires_at > clock_timestamp()
             """, token) == 1;
+
+    public async Task<bool> SaveRetrievalAsync(QuickResearchClaim claim, QuickRetrievalSnapshot snapshot, bool settle, CancellationToken token)
+    {
+        snapshot.Validate(claim.RunId);
+        if (snapshot.IsFinal != settle) throw new ArgumentException("Quick retrieval settlement must match the snapshot.");
+        var payload = JsonSerializer.Serialize(snapshot);
+        var status = !settle ? "Processing" : snapshot.Outcome == QuickRetrievalOutcome.Failed ? "Failed" : "Completed";
+        string? error = status == "Failed" ? "QuickRetrievalFailed" : null;
+        return await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE quick_research_runs SET retrieval = CAST({payload} AS jsonb), status = {status}, safe_error = {error},
+                completed_at = CASE WHEN {settle} THEN clock_timestamp() ELSE NULL END,
+                lease_owner = CASE WHEN {settle} THEN NULL ELSE lease_owner END,
+                lease_expires_at = CASE WHEN {settle} THEN NULL ELSE lease_expires_at END
+            WHERE id = {claim.RunId} AND status = 'Processing' AND result IS NULL AND lease_owner = {claim.WorkerId}
+                AND lease_version = {claim.LeaseVersion} AND lease_expires_at > clock_timestamp()
+            """, token) == 1;
+    }
+
+    private static void ValidateStored(QuickResearchRun run)
+    {
+        try { run.Result?.ValidateQ0(run.Id); run.Retrieval?.Validate(run.Id); }
+        catch (ArgumentException) { throw new InvalidDataException("Stored Quick data failed integrity validation."); }
+    }
 }

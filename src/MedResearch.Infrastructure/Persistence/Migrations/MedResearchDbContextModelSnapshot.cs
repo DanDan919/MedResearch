@@ -591,6 +591,10 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("result");
 
+                    b.Property<string>("Retrieval")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("retrieval");
+
                     b.Property<string>("SafeError")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -616,7 +620,9 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_quick_lease", "lease_version >= 0 AND ((status = 'Processing' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL) OR (status <> 'Processing' AND lease_owner IS NULL AND lease_expires_at IS NULL))");
 
-                            t.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND result IS NOT NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (status <> 'Completed' AND result IS NULL)");
+                            t.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND ((result IS NOT NULL AND retrieval IS NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (result IS NULL AND retrieval IS NOT NULL AND COALESCE(retrieval ->> 'IsFinal' = 'true', FALSE)))) OR (status <> 'Completed' AND result IS NULL)");
+
+                            t.HasCheckConstraint("ck_quick_retrieval", "retrieval IS NULL OR (status <> 'Queued' AND result IS NULL AND COALESCE(retrieval ->> 'QuickRunId' = id::text, FALSE))");
 
                             t.HasCheckConstraint("ck_quick_status", "status IN ('Queued','Processing','Completed','Failed')");
 
