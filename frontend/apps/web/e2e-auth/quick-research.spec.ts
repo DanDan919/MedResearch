@@ -26,7 +26,7 @@ test("production Quick BFF verifies owner, no-store and read-only access with in
     expect(foreign.status()).toBe(404); expect(await foreign.text()).not.toContain(shortAnswer);
     expect((await b.request.get("/api/backend/api/quick-research/99999999-9999-4999-8999-999999999999")).status()).toBe(404);
     expect((await (await b.request.get("/api/backend/api/quick-research")).json()).items).toEqual([]);
-    expect((await a.request.post("/api/backend/api/quick-research", { headers: { Origin: "https://localhost:3441" }, data: { question: "not allowed" } })).status()).toBe(404);
+    expect((await a.request.post(`/api/backend/api/quick-research/${quickRunId}`, { headers: { Origin: "https://localhost:3441" }, data: { question: "not allowed" } })).status()).toBe(404);
     expect((await a.request.get(`/api/backend/api/quick-research/${quickRunId}`, { headers: { Origin: "https://evil.example" } })).status()).toBe(403);
     expect(await pa.content()).not.toMatch(/accessToken|clientSecret|synthetic-refresh-not-retained/);
   } finally { await a.close(); await b.close(); }

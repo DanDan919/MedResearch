@@ -9,7 +9,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ title: "Request origin is not allowed", status: 403 }, { status: 403, headers: privateHeaders });
   }
   const path = request.nextUrl.pathname;
-  const isWorkspace = path === "/" || /^\/(research|studies|settings)(\/|$)/.test(path);
+  const isWorkspace = path === "/" || /^\/(research|quick-research|studies|settings)(\/|$)/.test(path);
   if (isWorkspace && config.mode !== "development-local") {
     const session = config.mode === "oidc" ? await readPrivateSession(request.cookies.get(sessionOptions(config).cookieName)?.value, config) : null;
     if (!session) {
@@ -26,4 +26,4 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/", "/research/:path*", "/studies/:path*", "/settings/:path*", "/login"] };
+export const config = { matcher: ["/", "/research/:path*", "/quick-research/:path*", "/studies/:path*", "/settings/:path*", "/login"] };

@@ -139,8 +139,9 @@ export function QuickNotice({ title, message, alert = false }: { title: string; 
 }
 export function QuickError({ error, refresh }: { error: unknown; refresh: () => void }) {
   const missing = error instanceof MedResearchApiError && error.kind === "not-found";
+  const unavailable = error instanceof MedResearchApiError && (error.status === 503 || error.kind === "network");
   return <div className="mx-auto max-w-4xl space-y-4"><Link href="/quick-research" className="text-sm text-primary underline">Quick Research</Link>
-    <QuickNotice title={missing ? "Result not available" : "Could not load Quick Research"}
+    <QuickNotice title={missing ? "Result not available" : unavailable ? "Service unavailable" : "Could not load Quick Research"}
       message={missing ? "This result is not available to your account." : "The service could not return this result."} alert />
     {!missing && <Button variant="secondary" size="sm" onClick={refresh}><RefreshCw className="h-4 w-4" />Refresh</Button>}
   </div>;

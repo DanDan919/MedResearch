@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { components } from "./generated/medresearch-api";
 
-const id = z.string().uuid();
+// .NET Guid includes deterministic source hashes, not only RFC-versioned UUIDs.
+const id = z.string().guid().refine(value => value !== "00000000-0000-0000-0000-000000000000", "Empty Guid is not a persisted identity");
 const text = (max: number) => z.string().min(1).max(max);
 const timestamp = z.iso.datetime({ offset: true });
 const status = z.enum(["Queued", "Processing", "Completed", "Failed"]);

@@ -64,6 +64,13 @@ export class MedResearchApiClient {
     }, { method: "GET", signal, cache: "no-store", headers: { Accept: "application/json" } });
   }
 
+  public createQuickResearch(question: string, signal?: AbortSignal): Promise<QuickResearchDetails> {
+    const trimmed = question.trim();
+    if (!trimmed || trimmed.length > 2000) throw new MedResearchApiError("Quick question must contain 1..2000 characters", "validation");
+    return this.requestJson("/api/quick-research", quickResearchDetailsSchema.parse,
+      { method: "POST", signal, cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ question: trimmed }) });
+  }
+
   public listQuickResearch(page = 1, signal?: AbortSignal): Promise<QuickResearchHistory> {
     if (!Number.isInteger(page) || page < 1 || page > 100000) throw new MedResearchApiError("Invalid Quick page", "validation");
     return this.requestJson(`/api/quick-research?page=${page}&pageSize=20`, quickResearchHistorySchema.parse,

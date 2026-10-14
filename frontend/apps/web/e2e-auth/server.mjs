@@ -2,7 +2,7 @@
 import http from "node:http";
 import https from "node:https";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
-import { mkdtemp, writeFile, rm, cp, access } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, cp, access, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
@@ -18,6 +18,8 @@ const audience = "synthetic-research-api";
 const clientSecret = randomBytes(32).toString("hex");
 const sessionSecret = randomBytes(48).toString("hex");
 const fullStack = process.env.MEDRESEARCH_FULL_STACK === "true";
+const quickAcceptance = process.env.MEDRESEARCH_QUICK_ACCEPTANCE === "true";
+let quickScenario = "normal";
 const { privateKey, publicKey } = await generateKeyPair("RS256");
 const wrong = await generateKeyPair("RS256");
 const jwk = { ...await exportJWK(publicKey), kid: "ephemeral-test-key", use: "sig", alg: "RS256" };
@@ -45,10 +47,14 @@ async function stopApi() {
 }
 async function startApi() {
   if (!fullStack) throw new Error("Actual API is available only in the full-stack fixture");
-  actualApi = spawn("dotnet", [process.env.MEDRESEARCH_API_DLL], { cwd: resolve("../../../src/MedResearch.Api"),
+  actualApi = spawn("dotnet", quickAcceptance ? [process.env.MEDRESEARCH_QUICK_API_DLL, "--quick-api"] : [process.env.MEDRESEARCH_API_DLL], { cwd: resolve("../../../src/MedResearch.Api"),
     env: { ...process.env, SSL_CERT_FILE: ca, ASPNETCORE_ENVIRONMENT: "Production", ASPNETCORE_URLS: "http://127.0.0.1:3442",
       Authentication__Mode: "JwtBearer", Authentication__Authority: issuer, Authentication__Audience: audience,
-      ResearchProcessing__Enabled: "false", Database__ApplyMigrationsOnStartup: "true", EuropePmc__Enabled: "false", EuropePmcFullText__Enabled: "false" },
+      ResearchProcessing__Enabled: "false", Database__ApplyMigrationsOnStartup: quickAcceptance ? "false" : "true", EuropePmc__Enabled: "false", EuropePmcFullText__Enabled: "false",
+      ...(quickAcceptance ? { QuickResearch__Enabled: "true", QuickResearch__PollIntervalSeconds: "1", QuickResearch__LeaseDurationSeconds: "90",
+        QuickResearch__Retrieval__Enabled: "true", QuickResearch__Answer__Enabled: "true", QuickResearch__Answer__TimeoutSeconds: "2",
+        "Logging__LogLevel__Microsoft.EntityFrameworkCore": "Warning",
+        MEDRESEARCH_QUICK_FAKE_SCENARIO: quickScenario } : {}) },
     windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   actualApi.stdout.on("data", chunk => process.stdout.write(chunk));
   actualApi.stderr.on("data", chunk => process.stderr.write(chunk));
@@ -164,14 +170,27 @@ const webServer = https.createServer({ key: certificates.private, cert: certific
   if (request.url === "/_fixture/ready") { response.writeHead(ready ? 200 : 503); response.end(); return; }
   if (fullStack && request.url === "/_fixture/control" && request.method === "POST") {
     void safe(async (request, response) => {
-      const { action } = JSON.parse(await body(request));
+      const { action, scenario } = JSON.parse(await body(request));
       if (action === "api-stop") await stopApi();
       else if (action === "api-restart") { await stopApi(); await startApi(); }
       else if (action === "issuer-stop") issuerAvailable = false;
       else if (action === "issuer-start") issuerAvailable = true;
+      else if (quickAcceptance && action === "quick-scenario") {
+        if (!["normal", "partial", "zero", "failed", "no-abstract", "invalid-json", "invalid-citation", "timeout"].includes(scenario)) return json(response, 400, { title: "Invalid fixture scenario" });
+        quickScenario = scenario; await stopApi(); await startApi();
+      }
       else if (action === "postgres-pause" || action === "postgres-resume") {
-        if (!/^[a-f0-9]{64}$/.test(process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID ?? "")) throw new Error("Invalid fixture container");
-        execFileSync("docker", [action === "postgres-pause" ? "pause" : "unpause", process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID], { stdio: "ignore", timeout: 10_000 });
+        if (quickAcceptance && process.platform === "win32" && process.env.MEDRESEARCH_QUICK_LOCAL_CONFIG) {
+          const configPath = resolve(process.env.MEDRESEARCH_QUICK_LOCAL_CONFIG);
+          const config = JSON.parse(await readFile(configPath, "utf8"));
+          if (config.Purpose !== "medresearch-quick-q4-local-v1" || config.Port !== 55434 || config.Database !== "medresearch_quick_q4") throw new Error("Not the dedicated Q4 PostgreSQL runtime");
+          const data = join(dirname(configPath), "pgdata");
+          execFileSync("C:/Program Files/PostgreSQL/18/bin/pg_ctl.exe", ["-D", data, ...action === "postgres-pause" ? ["-m", "fast", "-w", "stop"]
+            : ["-l", join(dirname(configPath), "postgresql.log"), "-o", "-h 127.0.0.1 -p 55434", "-w", "start"]], { stdio: "ignore", windowsHide: true, timeout: 15000 });
+        } else {
+          if (!/^[a-f0-9]{64}$/.test(process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID ?? "")) throw new Error("Invalid fixture container");
+          execFileSync("docker", [action === "postgres-pause" ? "pause" : "unpause", process.env.MEDRESEARCH_FIXTURE_CONTAINER_ID], { stdio: "ignore", timeout: 10_000 });
+        }
       }
       else return json(response, 400, { title: "Unknown fixture action" });
       json(response, 200, { ok: true });

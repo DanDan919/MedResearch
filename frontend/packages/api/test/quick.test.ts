@@ -4,6 +4,15 @@ import { quickResearchDetailsSchema, quickResearchHistorySchema, quickQueryKeys,
 import { quickDetails, quickHistory, quickInsufficient, quickProcessing, quickRunId, otherQuickRunId, quickWithContradiction } from "./fixtures/quick";
 
 describe("Quick read contracts", () => {
+  it("accepts the API's deterministic non-RFC source Guid without relaxing run/citation membership", () => {
+    const details = quickDetails(); const hashed = "abcdef01-2345-f678-0123-456789abcdef";
+    details.retrieval!.sources[0].id = hashed;
+    details.answer!.findings[0].citations[0].sourceId = hashed;
+    details.answer!.sourceReferences = [hashed];
+    expect(quickResearchDetailsSchema.safeParse(details).success).toBe(true);
+    details.answer!.findings[0].citations[0].sourceId = otherQuickRunId;
+    expect(quickResearchDetailsSchema.safeParse(details).success).toBe(false);
+  });
   it.each([quickDetails(), quickInsufficient(), quickProcessing(), quickProcessing(true), quickWithContradiction()])("accepts saved state %#", details => {
     expect(quickResearchDetailsSchema.safeParse(details).success).toBe(true);
   });
@@ -42,9 +51,29 @@ describe("Quick read contracts", () => {
     expect(mock.mock.calls[2][0]).toBe("/api/backend/api/quick-research?page=1&pageSize=20");
     expect(() => client.listQuickResearch(0)).toThrow();
   });
+  it("creates a bounded question once, without retry/key or owner in the transport", async () => {
+    const accepted = { ...quickProcessing(), status: "Queued", startedAt: null };
+    const mock = vi.fn<typeof fetch>().mockResolvedValue(Response.json(accepted, { status: 202 }));
+    const api = new MedResearchApiClient({ baseUrl: "/api/backend", fetch: mock });
+    const signal = new AbortController().signal;
+    await api.createQuickResearch("  Как влияет сон на память?  ", signal);
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(mock.mock.calls[0][0]).toBe("/api/backend/api/quick-research");
+    expect(mock.mock.calls[0][1]).toMatchObject({ method: "POST", cache: "no-store", signal, body: JSON.stringify({ question: "Как влияет сон на память?" }) });
+    expect(new Headers(mock.mock.calls[0][1]?.headers).has("idempotency-key")).toBe(false);
+    expect(() => api.createQuickResearch(" ")).toThrow(); expect(() => api.createQuickResearch("x".repeat(2001))).toThrow();
+    mock.mockResolvedValue(Response.json({ title: "Unavailable" }, { status: 503 }));
+    await expect(api.createQuickResearch("Another question")).rejects.toMatchObject({ status: 503 });
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("Quick publication links", () => {
+  it("still rejects an empty Guid rather than weakening persisted identity validation", () => {
+    const details = quickDetails();
+    details.id = "00000000-0000-0000-0000-000000000000";
+    expect(quickResearchDetailsSchema.safeParse(details).success).toBe(false);
+  });
   it.each(["javascript:alert(1)", "data:text/html,evil", "http://pubmed.ncbi.nlm.nih.gov/12345678/", "//pubmed.ncbi.nlm.nih.gov/12345678/",
     "https://evil.example/12345678/", "https://pubmed.ncbi.nlm.nih.gov.evil.example/12345678/", "https://user:pass@pubmed.ncbi.nlm.nih.gov/12345678/",
     "https://pubmed.ncbi.nlm.nih.gov:8443/12345678/", "https://pubmed.ncbi.nlm.nih.gov/99999999/", "https://pubmed.ncbi.nlm.nih.gov/12345678/?redirect=evil",

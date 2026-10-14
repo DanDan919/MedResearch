@@ -74,7 +74,7 @@ export function safeReturnPath(value: string | null | undefined): string {
     if (unsafe(decoded) || decoded.includes("%") || decoded.startsWith("//")) return "/";
     const path = new URL(value, "https://return.invalid");
     if (path.origin !== "https://return.invalid" || path.hash ||
-      !/^\/(?:research(?:\/(?:new|[a-f\d-]{36}(?:\/(?:report|evidence|quantitative))?))?|quick-research(?:\/[a-f\d-]{36})?|studies|settings)?$/i.test(path.pathname)) return "/";
+      !/^\/(?:research(?:\/(?:new|[a-f\d-]{36}(?:\/(?:report|evidence|quantitative))?))?|quick-research(?:\/(?:new|[a-f\d-]{36}))?|studies|settings)?$/i.test(path.pathname)) return "/";
     return path.pathname + path.search;
   } catch { return "/"; }
 }

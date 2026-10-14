@@ -115,7 +115,7 @@ describe("Quick private data queries", () => {
     render(wrapper(<QuickResultWorkspace runId={quickRunId} />));
     await screen.findByRole("alert");
     expect(screen.queryByText("private diagnostics")).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(status === 404 ? "Result not available" : "Could not load");
+    expect(screen.getByRole("alert")).toHaveTextContent(status === 404 ? "Result not available" : "Service unavailable");
   });
   it("removes old answer and open excerpt on account or run change", async () => {
     const mock = vi.fn(async () => Response.json(quickDetails())); vi.stubGlobal("fetch", mock);

@@ -23,7 +23,7 @@ describe("read-only Quick BFF", () => {
   it.each([base, `${base}?page=1&pageSize=20`, `${base}/${quickRunId}`])("allows exact GET %s", path => {
     expect(allowedUpstreamPath(new URL(config.webOrigin + path), "GET")).toBe(path.replace("/api/backend", ""));
   });
-  it.each([[base, "POST"], [base, "DELETE"], [`${base}/${quickRunId}`, "PATCH"], [`${base}/${quickRunId}/report`, "GET"],
+  it.each([[`${base}/${quickRunId}`, "POST"], [base, "DELETE"], [`${base}/${quickRunId}`, "PATCH"], [`${base}/${quickRunId}/report`, "GET"],
     [`${base}?owner=UserB`, "GET"], [`${base}?page=1&page=2`, "GET"], [`${base}?page=0`, "GET"], [`${base}?pageSize=51`, "GET"],
     [`${base}/${quickRunId}?owner=UserB`, "GET"], [`${base}/not-id`, "GET"]])("rejects %s %s", (path, method) => {
     expect(allowedUpstreamPath(new URL(config.webOrigin + path), method)).toBeNull();
@@ -60,7 +60,30 @@ describe("read-only Quick BFF", () => {
   it("supports safe login returns without allowing traversal or external redirects", () => {
     expect(safeReturnPath(`/quick-research/${quickRunId}`)).toBe(`/quick-research/${quickRunId}`);
     expect(safeReturnPath("/quick-research")).toBe("/quick-research");
+    expect(safeReturnPath("/quick-research/new")).toBe("/quick-research/new");
     expect(safeReturnPath("/quick-research/../api/auth/login")).toBe("/");
     expect(safeReturnPath("//evil.example/quick-research")).toBe("/");
+  });
+  it("creates only through exact authenticated same-origin POST, with private bearer and no fictitious idempotency", async () => {
+    const d = deps();
+    d.fetch.mockResolvedValue(Response.json({}, { status: 202, headers: { location: `/api/quick-research/${quickRunId}` } }));
+    const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", origin: config.webOrigin, "content-type": "application/json",
+      authorization: "Bearer forged", "x-owner-id": "UserB", "idempotency-key": quickRunId }, body: JSON.stringify({ question: "A medical question" }) });
+    const result = await forwardBackend(req, d);
+    expect(result.status).toBe(202); expect(result.headers.get("location")).toBe(`${base}/${quickRunId}`);
+    const headers = new Headers(d.fetch.mock.calls[0][1]?.headers);
+    expect(headers.get("authorization")).toBe(`Bearer ${data.accessToken}`);
+    expect(headers.has("x-owner-id")).toBe(false); expect(headers.has("idempotency-key")).toBe(false);
+    expect(result.headers.get("cache-control")).toContain("private, no-store");
+  });
+  it.each([{ question: " " }, { question: "x".repeat(2001) }, { question: "Valid", owner: "UserB" }, { question: 123 }, []])("rejects invalid Quick create payload %# before persistence", async payload => {
+    const d = deps();
+    const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", origin: config.webOrigin, "content-type": "application/json" }, body: JSON.stringify(payload) });
+    expect((await forwardBackend(req, d)).status).toBe(400); expect(d.fetch).not.toHaveBeenCalled();
+  });
+  it.each([undefined, "https://evil.example", "null"])("rejects POST Origin %s before upstream", async origin => {
+    const d = deps(); const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", ...(origin ? { origin } : {}),
+      "content-type": "application/json" }, body: JSON.stringify({ question: "Valid" }) });
+    expect((await forwardBackend(req, d)).status).toBe(403); expect(d.fetch).not.toHaveBeenCalled();
   });
 });

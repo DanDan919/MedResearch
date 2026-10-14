@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Badge, Button } from "@medresearch/ui";
 import { useQuickHistory } from "../../lib/quick-research";
 import { QuickError, QuickNotice } from "./quick-result-workspace";
@@ -17,8 +17,9 @@ export function QuickHistory() {
   if (query.isError || !query.data) return <QuickError error={query.error} refresh={() => void query.refetch()} />;
   const history = query.data;
   return <div className="mx-auto max-w-4xl space-y-5">
-    <header className="flex items-center justify-between gap-3 border-b border-border pb-5"><h1 className="text-2xl font-semibold">Quick Research</h1>
-      <Button variant="ghost" size="sm" onClick={() => void query.refetch()} disabled={query.isFetching} aria-label="Refresh results" title="Refresh results"><RefreshCw className="h-4 w-4" /></Button></header>
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5"><h1 className="text-2xl font-semibold">Quick Research</h1>
+      <div className="flex shrink-0 items-center gap-2"><Link href="/quick-research/new" className="inline-flex min-h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4" />Ask a question</Link>
+      <Button variant="ghost" size="sm" onClick={() => void query.refetch()} disabled={query.isFetching} aria-label="Refresh results" title="Refresh results"><RefreshCw className="h-4 w-4" /></Button></div></header>
     {history.items.length === 0 ? <p className="py-5 text-sm text-muted-foreground">No Quick results yet.</p> : <ul className="divide-y divide-border">
       {history.items.map(run => <li key={run.id} className="py-4"><Link href={`/quick-research/${run.id}`} className="flex items-start gap-3 py-1 focus-visible:outline-2 focus-visible:outline-ring">
         <BookOpen className="mt-1 h-4 w-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-sm font-medium leading-6 [overflow-wrap:anywhere]" dir="auto">{run.question}</p>

@@ -28,6 +28,7 @@ export function allowedUpstreamPath(url: URL, method: string): string | null {
   const path = url.pathname.slice("/api/backend".length);
   if (path === "/health/ready" && method === "GET" && !url.search) return path;
   if (quickPath.test(path)) {
+    if (method === "POST") return path === "/api/quick-research" && !url.search ? path : null;
     if (method !== "GET" || url.search && path !== "/api/quick-research") return null;
     const seen = new Set<string>();
     for (const [key, value] of url.searchParams) {
@@ -90,13 +91,20 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
       if (!incoming || Array.isArray(incoming) || typeof incoming !== "object" || (retry ? Object.keys(incoming).length !== 0 :
         typeof incoming.question !== "string" || Object.keys(incoming).some(key => key !== "question")))
         return problem(400, "Invalid research request", "invalid-request");
+      if (upstreamPath === "/api/quick-research") {
+        const length = (incoming.question as string).trim().length;
+        if (length < 1 || length > 2000) return problem(400, "Quick question must contain 1..2000 characters", "invalid-request");
+      }
       body = retry ? "{}" : JSON.stringify({ question: incoming.question });
       headers["Content-Type"] = "application/json";
     } catch (error) { return problem(error instanceof BodyLimitExceeded ? 413 : 400, "Invalid research request", "invalid-request"); }
-    const key = request.headers.get("idempotency-key");
-    if (!key || !submissionKey.test(key) || key === "00000000-0000-0000-0000-000000000000")
-      return problem(400, "A valid submission key is required", "admission-invalid-key");
-    headers["Idempotency-Key"] = key.toLowerCase();
+    // Quick currently has no backend creation idempotency; never imply that forwarding a key provides it.
+    if (upstreamPath !== "/api/quick-research") {
+      const key = request.headers.get("idempotency-key");
+      if (!key || !submissionKey.test(key) || key === "00000000-0000-0000-0000-000000000000")
+        return problem(400, "A valid submission key is required", "admission-invalid-key");
+      headers["Idempotency-Key"] = key.toLowerCase();
+    }
   }
   try {
     const upstream = await (dependencies.fetch ?? fetch)(config.apiBaseUrl + upstreamPath, {
@@ -130,7 +138,8 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
     if (location) {
       try {
         const target = new URL(location, config.apiBaseUrl);
-        if (target.origin === new URL(config.apiBaseUrl).origin && researchPath.test(target.pathname) && !target.search && !target.hash)
+        if (target.origin === new URL(config.apiBaseUrl).origin && (researchPath.test(target.pathname)
+          || upstreamPath === "/api/quick-research" && quickPath.test(target.pathname) && target.pathname !== "/api/quick-research") && !target.search && !target.hash)
           response.headers.set("Location", `/api/backend${target.pathname}`);
       } catch { /* Invalid upstream Location is omitted, not a new failed creation. */ }
     }
