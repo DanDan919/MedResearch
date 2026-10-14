@@ -115,7 +115,18 @@ Q4 расширяет existing `MedResearch.WebReleaseTests` harness: снача
 
 `.github/workflows/ci.yml` добавляет upload `TestResults/QuickQ4`. Там: immutable saved run snapshots, provider-events JSONL, control-question scorecard; Playwright сохраняет полные фактические результаты, длительности, screenshots и failure traces. Артефакты используют только synthetic questions/users/sources и не содержат credentials.
 
-Статус CI для Q4 при подготовке этого коммита: **ещё не проверен**, будет указан отдельно после push. Предыдущий Q3 green не считается доказательством Q4.
+Q4 feature commit: `24ece7b20ba97eebdf47c23b2bf815b504b0c827` (`feat: verify Quick research product flow`), push в `origin/main` выполнен. Незакоммиченная параллельная работа в основных файлах сохранена; staged patch был побайтно сопоставлен с isolated Q4 patch, без Deep изменений.
+
+**Проверен фактический CI [38533854331](https://github.com/DanDan919/MedResearch/actions/runs/38533854331): SUCCESS**, все три jobs зелёные. Runner `ubuntu-latest`, фактический image Ubuntu 24.04, SDK 10.0.402, runtime 10.0.13, Docker доступен. Это проверка нового Q4 commit, не перенос доверия с Q3.
+
+- Backend TRX: Domain 62, Application 437, Infrastructure 234, Integration 249; **982 passed / 0 failed / 0 skipped**. Все 182 Docker-required PostgreSQL tests выполнились реально, не были пропущены.
+- Fresh Testcontainers PostgreSQL 17: all existing migrations, EF pending-model check и Compose config прошли.
+- Frontend logs: SDK 77, web unit 206, development Chromium 27, production OIDC/BFF Chromium 19; все passed.
+- Actual API/PG trusted-HTTPS job: **17 existing Deep/full-stack tests + 11 Quick tests passed**, без TLS bypass в Linux; fresh-context dispatch check десяти Quick runs прошёл.
+- API и web Docker builds прошли. Required skips: 0. Live source/LLM requests: 0; test fakes не заменяют live clinical verification.
+- Q4 CI fixes после первого push не потребовались. Есть non-blocking предупреждение actions v4 о Node 20 compatibility и уведомление о будущей смене ubuntu-latest image; workflow не менялся ради несвязанных обновлений.
+
+Отдельный local development demo также проверен Chromium после запуска: форма 1280/390 без page errors/overflow, настоящий BFF POST 202, PostgreSQL/worker ответ Completed / Succeeded. Source и answer синтетические. Старые пользовательские сервисы и БД сохранены.
 
 ## Test inventory: keep / change / remove
 
