@@ -164,7 +164,7 @@ public sealed class QuickAnswerPersistenceTests(PostgreSqlFixture fixture)
     private static async Task<(QuickResearchRun, QuickResearchClaim)> Seed(EfQuickResearchStore store, bool metadataOnly = false)
     {
         var run = new QuickResearchRun("Magnesium insomnia adults", Guid.NewGuid().ToString(), DateTimeOffset.UtcNow);
-        await store.CreateAsync(run, default);
+        await store.CreateAsync(run, Guid.NewGuid(), default);
         var claim = (await store.ClaimAsync("answer-worker", TimeSpan.FromMinutes(2), default))!;
         Assert.Equal(run.Id, claim.RunId);
         var retrieval = await new QuickRetrievalProcessor(store, new Sources(metadataOnly), new QuickPublicationSelector(),

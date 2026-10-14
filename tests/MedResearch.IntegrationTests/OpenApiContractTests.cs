@@ -25,6 +25,12 @@ public sealed class OpenApiContractTests
         Assert.True(key["required"]!.GetValue<bool>());
         Assert.Equal("uuid", key["schema"]!["format"]!.GetValue<string>());
         foreach (var status in new[] { "400", "409", "429", "503" }) Assert.NotNull(create["responses"]![status]);
+        var quickCreate = actual["paths"]!["/api/quick-research"]!["post"]!;
+        var quickKey = Assert.Single(quickCreate["parameters"]!.AsArray())!;
+        Assert.Equal("Idempotency-Key", quickKey["name"]!.GetValue<string>());
+        Assert.True(quickKey["required"]!.GetValue<bool>());
+        Assert.Equal("uuid", quickKey["schema"]!["format"]!.GetValue<string>());
+        Assert.NotNull(quickCreate["responses"]!["409"]);
         Assert.True(JsonNode.DeepEquals(expected, actual), "Backend OpenAPI drift: regenerate the canonical snapshot with MEDRESEARCH_UPDATE_OPENAPI=true, review, then pnpm api:generate.");
         foreach (var path in actual["paths"]!.AsObject().Where(path => path.Key.StartsWith("/api/research", StringComparison.Ordinal)))
             foreach (var operation in path.Value!.AsObject()) Assert.NotNull(operation.Value!["security"]);

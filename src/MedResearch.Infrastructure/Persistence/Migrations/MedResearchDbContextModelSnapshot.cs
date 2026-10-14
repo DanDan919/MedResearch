@@ -566,6 +566,15 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CreationFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("creation_fingerprint");
+
+                    b.Property<Guid?>("CreationKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("creation_key");
+
                     b.Property<DateTimeOffset?>("LeaseExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_expires_at");
@@ -616,6 +625,11 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OwnerSubjectId", "CreationKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_quick_owner_creation_key")
+                        .HasFilter("creation_key IS NOT NULL");
+
                     b.HasIndex("OwnerSubjectId", "CreatedAt", "Id");
 
                     b.HasIndex("Status", "LeaseExpiresAt", "CreatedAt");
@@ -623,6 +637,8 @@ namespace MedResearch.Infrastructure.Persistence.Migrations
                     b.ToTable("quick_research_runs", null, t =>
                         {
                             t.HasCheckConstraint("ck_quick_answer", "answer_generation IS NULL OR (result IS NULL AND COALESCE(answer_generation ->> 'QuickRunId' = id::text AND retrieval ->> 'IsFinal' = 'true' AND answer_generation ->> 'AttemptCount' IN ('0','1') AND ((answer_generation ->> 'Outcome' = '0' AND status = 'Processing' AND answer_generation ->> 'AttemptCount' = '1' AND answer_generation ->> 'FinishedAt' IS NULL AND answer_generation ->> 'Answer' IS NULL) OR (answer_generation ->> 'Outcome' IN ('1','2') AND status = 'Completed' AND answer_generation ->> 'FinishedAt' IS NOT NULL AND answer_generation -> 'Answer' ->> 'QuickRunId' = id::text) OR (answer_generation ->> 'Outcome' IN ('3','4') AND status = 'Failed' AND answer_generation ->> 'FinishedAt' IS NOT NULL AND answer_generation ->> 'Answer' IS NULL)), FALSE))");
+
+                            t.HasCheckConstraint("ck_quick_creation", "(creation_key IS NULL AND creation_fingerprint IS NULL) OR (creation_key IS NOT NULL AND creation_key <> '00000000-0000-0000-0000-000000000000'::uuid AND creation_fingerprint IS NOT NULL AND creation_fingerprint ~ '^[0-9A-F]{64}$')");
 
                             t.HasCheckConstraint("ck_quick_lease", "lease_version >= 0 AND ((status = 'Processing' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL) OR (status <> 'Processing' AND lease_owner IS NULL AND lease_expires_at IS NULL))");
 

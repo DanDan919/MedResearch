@@ -54,7 +54,7 @@ internal static class ApiOpenApiConfiguration
                     operation.Value.Responses.TryAdd("401", new OpenApiResponse { Description = "Authentication required" });
                     operation.Value.Responses.TryAdd("403", new OpenApiResponse { Description = "Invalid authenticated subject" });
                     operation.Value.Responses.TryAdd("503", new OpenApiResponse { Description = "Research database temporarily unavailable" });
-                    if ((route == "/api/research" || route.EndsWith("/retry-synthesis", StringComparison.Ordinal)) && description.HttpMethod == "POST")
+                    if ((route is "/api/research" or "/api/quick-research" || route.EndsWith("/retry-synthesis", StringComparison.Ordinal)) && description.HttpMethod == "POST")
                     {
                         var header = operation.Value.Parameters?.OfType<OpenApiParameter>().Single(parameter => parameter.Name == "Idempotency-Key");
                         if (header is not null)

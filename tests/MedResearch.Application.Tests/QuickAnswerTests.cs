@@ -377,7 +377,7 @@ public sealed class QuickAnswerTests
         { RetrievalWrites++; throw new InvalidOperationException("Retrieval must not repeat"); }
         public Task<bool> FailAsync(QuickResearchClaim claim, CancellationToken token) => throw new InvalidOperationException("No failure expected");
         public Task<bool> CompleteAsync(QuickResearchClaim claim, QuickResearchResult result, CancellationToken token) => throw new InvalidOperationException("No synthetic fallback");
-        public Task CreateAsync(QuickResearchRun run, CancellationToken token) => throw new NotSupportedException();
+        public Task<QuickResearchDetails> CreateAsync(QuickResearchRun run, Guid key, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchDetails?> FindAsync(Guid runId, string owner, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchHistory> ListAsync(string owner, int page, int pageSize, CancellationToken token) => throw new NotSupportedException();
     }

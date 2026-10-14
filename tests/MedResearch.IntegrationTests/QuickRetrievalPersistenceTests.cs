@@ -23,7 +23,7 @@ public sealed class QuickRetrievalPersistenceTests(PostgreSqlFixture fixture)
         await using (var db = fixture.CreateDbContext())
         {
             var store = new EfQuickResearchStore(db);
-            await store.CreateAsync(run, CancellationToken.None);
+            await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
             var claim = (await store.ClaimAsync("retrieval", TimeSpan.FromMinutes(1), CancellationToken.None))!;
             var sources = new TestSources("normal") { OnSearch = async attemptId =>
             {
@@ -58,7 +58,7 @@ public sealed class QuickRetrievalPersistenceTests(PostgreSqlFixture fixture)
         var run = new QuickResearchRun("Magnesium insomnia adults", "owner", DateTimeOffset.UtcNow);
         await using var db = fixture.CreateDbContext();
         var store = new EfQuickResearchStore(db);
-        await store.CreateAsync(run, CancellationToken.None);
+        await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         var claim = (await store.ClaimAsync("worker", TimeSpan.FromMinutes(1), CancellationToken.None))!;
         await Processor(store, new TestSources(mode)).ProcessAsync(claim, CancellationToken.None);
         await using var fresh = fixture.CreateDbContext();
@@ -76,7 +76,7 @@ public sealed class QuickRetrievalPersistenceTests(PostgreSqlFixture fixture)
         await using var db = fixture.CreateDbContext();
         var store = new EfQuickResearchStore(db);
         var run = new QuickResearchRun("Magnesium insomnia adults", "owner", DateTimeOffset.UtcNow);
-        await store.CreateAsync(run, CancellationToken.None);
+        await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         var old = (await store.ClaimAsync("old", TimeSpan.FromMinutes(1), CancellationToken.None))!;
         var plan = QuickQueryPreparation.Prepare(run.Question);
         var started = new QuickSearchAttempt(Guid.NewGuid(), run.Id, "PubMed", plan.Queries[0], plan.Queries[0], DateTimeOffset.UtcNow,
@@ -102,7 +102,7 @@ public sealed class QuickRetrievalPersistenceTests(PostgreSqlFixture fixture)
         await using var db = fixture.CreateDbContext();
         var store = new EfQuickResearchStore(db);
         var run = new QuickResearchRun("Magnesium insomnia adults", "owner", DateTimeOffset.UtcNow);
-        await store.CreateAsync(run, CancellationToken.None);
+        await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         var claim = (await store.ClaimAsync("reader", TimeSpan.FromMinutes(1), CancellationToken.None))!;
         var invalidRoot = JsonSerializer.Serialize(new { QuickRunId = Guid.NewGuid(), IsFinal = false });
         await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE quick_research_runs SET retrieval = CAST({invalidRoot} AS jsonb) WHERE id = {run.Id}"));

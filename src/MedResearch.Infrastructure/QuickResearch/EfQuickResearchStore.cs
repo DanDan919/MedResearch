@@ -3,15 +3,33 @@ using MedResearch.Application.QuickResearch;
 using MedResearch.Domain.QuickResearch;
 using MedResearch.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
+using MedResearch.Application.Research.Admission;
 
 namespace MedResearch.Infrastructure.QuickResearch;
 
 public sealed class EfQuickResearchStore(MedResearchDbContext db) : IQuickResearchStore, IQuickAnswerStore
 {
-    public async Task CreateAsync(QuickResearchRun run, CancellationToken token)
+    public async Task<QuickResearchDetails> CreateAsync(QuickResearchRun run, Guid key, CancellationToken token)
     {
-        db.QuickResearchRuns.Add(run);
-        await db.SaveChangesAsync(token);
+        if (key == Guid.Empty) throw new ResearchAdmissionException(ResearchAdmissionFailure.InvalidKey);
+        var fingerprint = QuickCreateIdentity.Fingerprint(run.Question);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, token);
+        // The unique index arbitrates competing replicas. A loser waits for the winner's commit;
+        // the next READ COMMITTED statement sees that row, without aborting the transaction.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO quick_research_runs (id, owner_subject_id, question, status, created_at, lease_version, creation_key, creation_fingerprint)
+            VALUES ({run.Id}, {run.OwnerSubjectId}, {run.Question}, 'Queued', {run.CreatedAt}, 0, {key}, {fingerprint})
+            ON CONFLICT (owner_subject_id, creation_key) WHERE creation_key IS NOT NULL DO NOTHING
+            """, token);
+        var existing = await db.QuickResearchRuns.AsNoTracking()
+            .Where(x => x.OwnerSubjectId == run.OwnerSubjectId && EF.Property<Guid?>(x, "CreationKey") == key)
+            .Select(x => new { x.Id, Fingerprint = EF.Property<string>(x, "CreationFingerprint") }).SingleAsync(token);
+        if (existing.Fingerprint != fingerprint) throw new ResearchAdmissionException(ResearchAdmissionFailure.IdempotencyConflict);
+        var result = await FindAsync(existing.Id, run.OwnerSubjectId, token)
+            ?? throw new InvalidDataException("Stored Quick creation is unavailable.");
+        await transaction.CommitAsync(token);
+        return result;
     }
 
     public async Task<QuickResearchDetails?> FindAsync(Guid id, string owner, CancellationToken token)

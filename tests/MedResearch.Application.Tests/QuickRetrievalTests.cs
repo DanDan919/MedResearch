@@ -258,7 +258,7 @@ public sealed class QuickRetrievalTests
         public QuickRetrievalSnapshot? Last { get; private set; }
         public Task<bool> SaveRetrievalAsync(QuickResearchClaim claim, QuickRetrievalSnapshot snapshot, bool settle, CancellationToken token)
         { snapshot.Validate(claim.RunId); Last = snapshot; return Task.FromResult(AllowWrites); }
-        public Task CreateAsync(QuickResearchRun run, CancellationToken token) => throw new NotSupportedException();
+        public Task<QuickResearchDetails> CreateAsync(QuickResearchRun run, Guid key, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchDetails?> FindAsync(Guid runId, string owner, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchHistory> ListAsync(string owner, int page, int pageSize, CancellationToken token) => throw new NotSupportedException();
         public Task<QuickResearchClaim?> ClaimAsync(string workerId, TimeSpan leaseDuration, CancellationToken token) => throw new NotSupportedException();

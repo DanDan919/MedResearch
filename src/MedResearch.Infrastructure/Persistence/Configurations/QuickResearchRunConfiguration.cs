@@ -11,6 +11,7 @@ public sealed class QuickResearchRunConfiguration : IEntityTypeConfiguration<Qui
     {
         builder.ToTable("quick_research_runs", table =>
         {
+            table.HasCheckConstraint("ck_quick_creation", "(creation_key IS NULL AND creation_fingerprint IS NULL) OR (creation_key IS NOT NULL AND creation_key <> '00000000-0000-0000-0000-000000000000'::uuid AND creation_fingerprint IS NOT NULL AND creation_fingerprint ~ '^[0-9A-F]{64}$')");
             table.HasCheckConstraint("ck_quick_status", "status IN ('Queued','Processing','Completed','Failed')");
             table.HasCheckConstraint("ck_quick_result", "(status = 'Completed' AND ((result IS NOT NULL AND retrieval IS NULL AND COALESCE(result ->> 'QuickRunId' = id::text AND result ->> 'IsSynthetic' = 'true', FALSE)) OR (result IS NULL AND retrieval IS NOT NULL AND COALESCE(retrieval ->> 'IsFinal' = 'true', FALSE)))) OR (status <> 'Completed' AND result IS NULL)");
             table.HasCheckConstraint("ck_quick_retrieval", "retrieval IS NULL OR (status <> 'Queued' AND result IS NULL AND COALESCE(retrieval ->> 'QuickRunId' = id::text, FALSE))");
@@ -19,6 +20,11 @@ public sealed class QuickResearchRunConfiguration : IEntityTypeConfiguration<Qui
             table.HasCheckConstraint("ck_quick_terminal", "((status IN ('Completed','Failed')) = (completed_at IS NOT NULL)) AND ((status = 'Failed') = (safe_error IS NOT NULL))");
         });
         builder.HasKey(x => x.Id);
+        // Nullable only for historical rows; API creation always supplies both values.
+        builder.Property<Guid?>("CreationKey").HasColumnName("creation_key");
+        builder.Property<string?>("CreationFingerprint").HasColumnName("creation_fingerprint").HasMaxLength(64);
+        builder.HasIndex(nameof(QuickResearchRun.OwnerSubjectId), "CreationKey").IsUnique()
+            .HasDatabaseName("ux_quick_owner_creation_key").HasFilter("creation_key IS NOT NULL");
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(x => x.OwnerSubjectId).HasColumnName("owner_subject_id").HasMaxLength(200).IsRequired();
         builder.Property(x => x.Question).HasColumnName("question").HasMaxLength(2000).IsRequired();

@@ -98,13 +98,10 @@ export async function forwardBackend(request: Request, dependencies: BffDependen
       body = retry ? "{}" : JSON.stringify({ question: incoming.question });
       headers["Content-Type"] = "application/json";
     } catch (error) { return problem(error instanceof BodyLimitExceeded ? 413 : 400, "Invalid research request", "invalid-request"); }
-    // Quick currently has no backend creation idempotency; never imply that forwarding a key provides it.
-    if (upstreamPath !== "/api/quick-research") {
-      const key = request.headers.get("idempotency-key");
-      if (!key || !submissionKey.test(key) || key === "00000000-0000-0000-0000-000000000000")
-        return problem(400, "A valid submission key is required", "admission-invalid-key");
-      headers["Idempotency-Key"] = key.toLowerCase();
-    }
+    const key = request.headers.get("idempotency-key");
+    if (!key || !submissionKey.test(key) || key === "00000000-0000-0000-0000-000000000000")
+      return problem(400, "A valid submission key is required", "admission-invalid-key");
+    headers["Idempotency-Key"] = key.toLowerCase();
   }
   try {
     const upstream = await (dependencies.fetch ?? fetch)(config.apiBaseUrl + upstreamPath, {

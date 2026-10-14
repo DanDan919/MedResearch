@@ -64,11 +64,13 @@ export class MedResearchApiClient {
     }, { method: "GET", signal, cache: "no-store", headers: { Accept: "application/json" } });
   }
 
-  public createQuickResearch(question: string, signal?: AbortSignal): Promise<QuickResearchDetails> {
+  public createQuickResearch(question: string, idempotencyKey: string, signal?: AbortSignal): Promise<QuickResearchDetails> {
     const trimmed = question.trim();
     if (!trimmed || trimmed.length > 2000) throw new MedResearchApiError("Quick question must contain 1..2000 characters", "validation");
+    if (!/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(idempotencyKey) || idempotencyKey === "00000000-0000-0000-0000-000000000000")
+      throw new MedResearchApiError("A non-empty submission UUID is required", "validation");
     return this.requestJson("/api/quick-research", quickResearchDetailsSchema.parse,
-      { method: "POST", signal, cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ question: trimmed }) });
+      { method: "POST", signal, cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ question: trimmed }) });
   }
 
   public listQuickResearch(page = 1, signal?: AbortSignal): Promise<QuickResearchHistory> {

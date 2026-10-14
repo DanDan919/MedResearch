@@ -1146,7 +1146,10 @@ export interface operations {
     CreateQuickResearch: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Owner-scoped idempotency UUID. Reuse for the same deliberate operation. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1187,6 +1190,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Research database temporarily unavailable */
             503: {

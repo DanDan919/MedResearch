@@ -51,19 +51,20 @@ describe("Quick read contracts", () => {
     expect(mock.mock.calls[2][0]).toBe("/api/backend/api/quick-research?page=1&pageSize=20");
     expect(() => client.listQuickResearch(0)).toThrow();
   });
-  it("creates a bounded question once, without retry/key or owner in the transport", async () => {
+  it("creates with an explicit key, no automatic retry and no owner in the transport", async () => {
     const accepted = { ...quickProcessing(), status: "Queued", startedAt: null };
     const mock = vi.fn<typeof fetch>().mockResolvedValue(Response.json(accepted, { status: 202 }));
     const api = new MedResearchApiClient({ baseUrl: "/api/backend", fetch: mock });
     const signal = new AbortController().signal;
-    await api.createQuickResearch("  Как влияет сон на память?  ", signal);
+    await api.createQuickResearch("  Как влияет сон на память?  ", quickRunId, signal);
     expect(mock).toHaveBeenCalledTimes(1);
     expect(mock.mock.calls[0][0]).toBe("/api/backend/api/quick-research");
     expect(mock.mock.calls[0][1]).toMatchObject({ method: "POST", cache: "no-store", signal, body: JSON.stringify({ question: "Как влияет сон на память?" }) });
-    expect(new Headers(mock.mock.calls[0][1]?.headers).has("idempotency-key")).toBe(false);
-    expect(() => api.createQuickResearch(" ")).toThrow(); expect(() => api.createQuickResearch("x".repeat(2001))).toThrow();
+    expect(new Headers(mock.mock.calls[0][1]?.headers).get("idempotency-key")).toBe(quickRunId);
+    expect(() => api.createQuickResearch(" ", quickRunId)).toThrow(); expect(() => api.createQuickResearch("x".repeat(2001), quickRunId)).toThrow();
+    expect(() => api.createQuickResearch("Question", "bad")).toThrow();
     mock.mockResolvedValue(Response.json({ title: "Unavailable" }, { status: 503 }));
-    await expect(api.createQuickResearch("Another question")).rejects.toMatchObject({ status: 503 });
+    await expect(api.createQuickResearch("Another question", quickRunId)).rejects.toMatchObject({ status: 503 });
     expect(mock).toHaveBeenCalledTimes(2);
   });
 });

@@ -68,6 +68,21 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task InvalidOrMissingKey_IsRejectedBeforePersistence()
+    {
+        using var host = new QuickApiFactory();
+        foreach (var key in new[] { "", "bad", Guid.Empty.ToString(), Guid.NewGuid().ToString("N") })
+        {
+            using var client = host.ForOwner("q41-owner");
+            client.DefaultRequestHeaders.Remove("Idempotency-Key");
+            if (key.Length != 0) client.DefaultRequestHeaders.Add("Idempotency-Key", key);
+            var response = await client.PostAsJsonAsync("/api/quick-research", new { question = "Valid question" });
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("admission-invalid-key", await response.Content.ReadAsStringAsync());
+        }
+    }
+
+    [Fact]
     public async Task AnonymousQuickEndpoints_AreUnauthorized()
     {
         using var host = new QuickApiFactory();
@@ -175,13 +190,14 @@ public sealed class QuickResearchApiTests(PostgreSqlFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false,
+    internal sealed class QuickApiFactory(PostgreSqlFixture? database = null, bool processing = false,
         IQuickScientificSources? retrievalSources = null, IStructuredLlmClient? answerClient = null) : WebApplicationFactory<Program>
     {
-        public HttpClient ForOwner(string subject)
+        public HttpClient ForOwner(string subject, Guid? key = null)
         {
             var client = CreateClient();
             client.DefaultRequestHeaders.Add("X-Q0-Test-Subject", subject);
+            client.DefaultRequestHeaders.Add("Idempotency-Key", (key ?? Guid.NewGuid()).ToString());
             return client;
         }
 

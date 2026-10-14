@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using MedResearch.Application.QuickResearch;
 using MedResearch.Api.Security;
 using Microsoft.AspNetCore.Mvc;
+using MedResearch.Application.Research.Admission;
 
 namespace MedResearch.Api.QuickResearch;
 
@@ -19,12 +20,13 @@ public static class QuickResearchEndpoints
                 context.HttpContext.Response.Headers.CacheControl = "private, no-store";
                 return await next(context);
             });
-        quick.MapPost("/", async (CreateQuickResearchRequest request, QuickResearchService service, CancellationToken token) =>
+        quick.MapPost("/", async (CreateQuickResearchRequest request, [FromHeader(Name = "Idempotency-Key")] string? key,
+            QuickResearchService service, CancellationToken token) =>
         {
-            var result = await service.SubmitAsync(request.Question, token);
+            var result = await service.SubmitAsync(request.Question, ResearchCreateIdentity.ParseKey(key), token);
             return Results.Accepted($"/api/quick-research/{result.Id}", result);
         }).WithName("CreateQuickResearch").Produces<QuickResearchDetails>(StatusCodes.Status202Accepted)
-            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest);
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest).Produces<ProblemDetails>(StatusCodes.Status409Conflict);
         quick.MapGet("/{id:guid}", async (Guid id, QuickResearchService service, CancellationToken token) =>
             await service.FindAsync(id, token) is { } result ? Results.Ok(result) : Results.NotFound())
             .WithName("GetQuickResearch").Produces<QuickResearchDetails>().Produces(StatusCodes.Status404NotFound);

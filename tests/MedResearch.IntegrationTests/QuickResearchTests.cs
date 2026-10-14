@@ -23,7 +23,7 @@ public sealed class QuickResearchTests(PostgreSqlFixture fixture)
         await using (var db = fixture.CreateDbContext())
         {
             var store = new EfQuickResearchStore(db);
-            await store.CreateAsync(run, CancellationToken.None);
+            await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
             var claim = await store.ClaimAsync("writer", TimeSpan.FromMinutes(1), CancellationToken.None);
             Assert.Equal(run.Id, claim!.RunId);
             Assert.True(await store.CompleteAsync(claim, result, CancellationToken.None));
@@ -46,7 +46,7 @@ public sealed class QuickResearchTests(PostgreSqlFixture fixture)
         RequireDatabase();
         await using var db = fixture.CreateDbContext();
         var run = new QuickResearchRun("Synthetic concurrent question", "owner", DateTimeOffset.UtcNow);
-        await new EfQuickResearchStore(db).CreateAsync(run, CancellationToken.None);
+        await new EfQuickResearchStore(db).CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         var claims = await Task.WhenAll(Enumerable.Range(0, 10).Select(async index =>
         {
             await using var connection = fixture.CreateDbContext();
@@ -76,7 +76,7 @@ public sealed class QuickResearchTests(PostgreSqlFixture fixture)
         await db.SaveChangesAsync();
         var store = new EfQuickResearchStore(db);
         var quick = new QuickResearchRun("Synthetic only", "owner", DateTimeOffset.UtcNow);
-        await store.CreateAsync(quick, CancellationToken.None);
+        await store.CreateAsync(quick, Guid.NewGuid(), CancellationToken.None);
         Assert.True(await new QuickResearchProcessor(store, NullLogger<QuickResearchProcessor>.Instance).ProcessNextAsync("q0", TimeSpan.FromMinutes(1), CancellationToken.None));
         db.ChangeTracker.Clear();
         Assert.Equal(ResearchRunStatus.Queued, (await db.ResearchRuns.SingleAsync(x => x.Id == deep.Id)).Status);
@@ -94,7 +94,7 @@ public sealed class QuickResearchTests(PostgreSqlFixture fixture)
         await using var db = fixture.CreateDbContext();
         var run = new QuickResearchRun("Synthetic failure", "owner", DateTimeOffset.UtcNow);
         var store = new EfQuickResearchStore(db);
-        await store.CreateAsync(run, CancellationToken.None);
+        await store.CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         var claim = await store.ClaimAsync("failed-worker", TimeSpan.FromMinutes(1), CancellationToken.None);
         Assert.True(await store.FailAsync(claim!, CancellationToken.None));
         var failed = await store.FindAsync(run.Id, "owner", CancellationToken.None);
@@ -110,7 +110,7 @@ public sealed class QuickResearchTests(PostgreSqlFixture fixture)
         RequireDatabase();
         await using var db = fixture.CreateDbContext();
         var run = new QuickResearchRun("Synthetic invalid payload", "owner", DateTimeOffset.UtcNow);
-        await new EfQuickResearchStore(db).CreateAsync(run, CancellationToken.None);
+        await new EfQuickResearchStore(db).CreateAsync(run, Guid.NewGuid(), CancellationToken.None);
         await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE quick_research_runs SET status = 'Completed', completed_at = clock_timestamp(), result = '{{}}'::jsonb WHERE id = {run.Id}"));
         // Remove only this isolated test's queued row, so it cannot interfere with later claim tests.
         await db.QuickResearchRuns.Where(x => x.Id == run.Id).ExecuteDeleteAsync();

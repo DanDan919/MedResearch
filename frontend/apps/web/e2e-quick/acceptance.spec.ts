@@ -96,7 +96,7 @@ test("actual JWT/PG rejects User B private runs and sources; anonymous Quick nav
     await expect(pb.getByRole("heading", { name: "Result not available" })).toBeVisible();
     const foreign = await b.request.get(`/api/backend/api/quick-research/${id}`, { headers: { Authorization: "Bearer forged", "X-Owner-Id": "UserA" } });
     expect(foreign.status()).toBe(404); expect(await foreign.text()).not.toContain(details.retrieval.sources[0].id);
-    expect((await (await b.request.get("/api/backend/api/quick-research")).json()).items).toEqual([]);
+    expect((await (await b.request.get("/api/backend/api/quick-research")).json()).items.map((item: { id: string }) => item.id)).not.toContain(id);
     expect((await a.request.post("/api/backend/api/quick-research", { headers: { Origin: "https://evil.example" }, data: { question } })).status()).toBe(403);
   } finally { await a.close(); await b.close(); }
 });
@@ -114,4 +114,56 @@ test("actual PostgreSQL outage does not become empty history or an endless spinn
     expect((await page.request.post("/_fixture/control", { data: { action: "postgres-resume" } })).status()).toBe(200);
     await expect.poll(async () => (await page.request.get("/api/backend/health/ready")).status(), { timeout: 20000 }).toBe(200);
   }
+});
+
+test("actual committed POST response lost: browser reload replays the same key; deliberate next question gets a fresh key", async ({ page }) => {
+  await signIn(page); await scenario(page, "normal");
+  const before = await (await page.request.get("/api/backend/api/quick-research")).json();
+  let committedId = "", committedKey = "";
+  await page.route("**/api/backend/api/quick-research", async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    // Real upstream POST commits; only its delivery to this browser is fault-injected.
+    const response = await route.fetch(); expect(response.status()).toBe(202);
+    committedId = (await response.json()).id; committedKey = route.request().headers()["idempotency-key"];
+    await route.abort("connectionreset");
+  });
+  await page.getByLabel("Your question").fill(question); await page.getByRole("button", { name: "Ask question", exact: true }).click();
+  await expect(page.getByText(/Could not confirm whether your question was saved/)).toBeVisible();
+  expect(committedId).not.toBe(""); expect(committedKey).not.toBe("");
+  const saved = await page.evaluate(() => Object.values(sessionStorage));
+  expect(saved.join(" ")).not.toContain(question); expect(saved.join(" ")).toContain(committedKey);
+  await page.unroute("**/api/backend/api/quick-research"); await page.reload();
+  const replayRequest = page.waitForRequest(r => r.method() === "POST" && new URL(r.url()).pathname === "/api/backend/api/quick-research");
+  const replay = await submit(page);
+  expect((await replayRequest).headers()["idempotency-key"]).toBe(committedKey); expect(replay.id).toBe(committedId);
+  expect((await (await page.request.get("/api/backend/api/quick-research")).json()).totalCount).toBe(before.totalCount + 1);
+  const nextRequest = page.waitForRequest(r => r.method() === "POST" && new URL(r.url()).pathname === "/api/backend/api/quick-research");
+  const next = await submit(page);
+  expect(next.id).not.toBe(committedId); expect((await nextRequest).headers()["idempotency-key"]).not.toBe(committedKey);
+  await expect(page.getByRole("heading", { name: "Short answer" })).toBeVisible({ timeout: 10000 });
+});
+
+test("actual BFF/API/PostgreSQL concurrent replay and conflicts preserve one run per owner/key", async ({ page, browser }) => {
+  await signIn(page); await scenario(page, "normal"); const key = crypto.randomUUID();
+  const before = await (await page.request.get("/api/backend/api/quick-research")).json();
+  const results = await Promise.all(Array.from({ length: 12 }, async () => {
+    const response = await page.request.post("/api/backend/api/quick-research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question } });
+    expect(response.status()).toBe(202); return await response.json();
+  }));
+  const id = results[0].id; expect(new Set(results.map(r => r.id)).size).toBe(1);
+  const conflict = await page.request.post("/api/backend/api/quick-research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question: "Different private question" } });
+  expect(conflict.status()).toBe(409); expect((await conflict.json()).code).toBe("admission-idempotency-conflict");
+  expect((await (await page.request.get("/api/backend/api/quick-research")).json()).totalCount).toBe(before.totalCount + 1);
+  await expect.poll(async () => (await (await page.request.get(`/api/backend/api/quick-research/${id}`)).json()).status, { timeout: 20000 }).toBe("Completed");
+  const replay = await page.request.post("/api/backend/api/quick-research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question } });
+  expect((await replay.json()).status).toBe("Completed");
+  const b = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: process.platform === "win32" });
+  try {
+    const pb = await b.newPage(); await signIn(pb, "User B");
+    const created = await b.request.post("/api/backend/api/quick-research", { headers: { Origin: origin, "Idempotency-Key": key }, data: { question } });
+    expect(created.status()).toBe(202); const otherId = (await created.json()).id; expect(otherId).not.toBe(id);
+    expect((await b.request.get(`/api/backend/api/quick-research/${id}`)).status()).toBe(404);
+    expect((await page.request.get(`/api/backend/api/quick-research/${otherId}`)).status()).toBe(404);
+    await expect.poll(async () => (await (await b.request.get(`/api/backend/api/quick-research/${otherId}`)).json()).status, { timeout: 20000 }).toBe("Completed");
+  } finally { await b.close(); }
 });

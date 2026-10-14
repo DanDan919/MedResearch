@@ -96,7 +96,7 @@ internal static class WebReleaseHarness
                 || run.LeaseOwner is not null || run.LeaseExpiresAt is not null)
                 throw new InvalidOperationException($"Q4 persisted dispatch/terminal invariant failed: {run.Id}");
         }
-        if (process.ExitCode == 0 && current.Length != 10) throw new InvalidOperationException("Q4 did not exercise all ten submitted runs.");
+        if (process.ExitCode == 0 && current.Length != 14) throw new InvalidOperationException("Q4/Q4.1 did not exercise all fourteen unique submitted runs.");
         Console.WriteLine($"Q4 fresh-context verification: {current.Length} runs; two fake searches/run; at most one generation; no terminal leases.");
         string[] questions = [
             "Помогают ли антибиотики при обычной простуде?",

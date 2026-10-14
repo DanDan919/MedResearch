@@ -64,7 +64,7 @@ describe("read-only Quick BFF", () => {
     expect(safeReturnPath("/quick-research/../api/auth/login")).toBe("/");
     expect(safeReturnPath("//evil.example/quick-research")).toBe("/");
   });
-  it("creates only through exact authenticated same-origin POST, with private bearer and no fictitious idempotency", async () => {
+  it("creates only through exact authenticated same-origin POST, with private bearer and explicit idempotency", async () => {
     const d = deps();
     d.fetch.mockResolvedValue(Response.json({}, { status: 202, headers: { location: `/api/quick-research/${quickRunId}` } }));
     const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", origin: config.webOrigin, "content-type": "application/json",
@@ -73,7 +73,7 @@ describe("read-only Quick BFF", () => {
     expect(result.status).toBe(202); expect(result.headers.get("location")).toBe(`${base}/${quickRunId}`);
     const headers = new Headers(d.fetch.mock.calls[0][1]?.headers);
     expect(headers.get("authorization")).toBe(`Bearer ${data.accessToken}`);
-    expect(headers.has("x-owner-id")).toBe(false); expect(headers.has("idempotency-key")).toBe(false);
+    expect(headers.has("x-owner-id")).toBe(false); expect(headers.get("idempotency-key")).toBe(quickRunId);
     expect(result.headers.get("cache-control")).toContain("private, no-store");
   });
   it.each([{ question: " " }, { question: "x".repeat(2001) }, { question: "Valid", owner: "UserB" }, { question: 123 }, []])("rejects invalid Quick create payload %# before persistence", async payload => {
@@ -85,5 +85,10 @@ describe("read-only Quick BFF", () => {
     const d = deps(); const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", ...(origin ? { origin } : {}),
       "content-type": "application/json" }, body: JSON.stringify({ question: "Valid" }) });
     expect((await forwardBackend(req, d)).status).toBe(403); expect(d.fetch).not.toHaveBeenCalled();
+  });
+  it.each([undefined, "bad", "00000000-0000-0000-0000-000000000000"])("requires a valid explicit Quick key %s", async key => {
+    const d = deps(); const req = new Request(config.webOrigin + base, { method: "POST", headers: { host: "web.example.org", origin: config.webOrigin,
+      "content-type": "application/json", ...(key ? { "idempotency-key": key } : {}) }, body: JSON.stringify({ question: "Valid question" }) });
+    expect((await forwardBackend(req, d)).status).toBe(400); expect(d.fetch).not.toHaveBeenCalled();
   });
 });

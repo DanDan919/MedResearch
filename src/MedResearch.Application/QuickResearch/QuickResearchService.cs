@@ -1,5 +1,6 @@
 using MedResearch.Application.Security;
 using MedResearch.Domain.QuickResearch;
+using MedResearch.Application.Research.Admission;
 
 namespace MedResearch.Application.QuickResearch;
 
@@ -23,7 +24,7 @@ public sealed record QuickRetrievalResult(Guid QuickRunId, string QueryVersion, 
 
 public interface IQuickResearchStore
 {
-    Task CreateAsync(QuickResearchRun run, CancellationToken token);
+    Task<QuickResearchDetails> CreateAsync(QuickResearchRun run, Guid key, CancellationToken token);
     Task<QuickResearchDetails?> FindAsync(Guid runId, string owner, CancellationToken token);
     Task<QuickResearchHistory> ListAsync(string owner, int page, int pageSize, CancellationToken token);
     Task<QuickResearchClaim?> ClaimAsync(string workerId, TimeSpan leaseDuration, CancellationToken token);
@@ -34,11 +35,11 @@ public interface IQuickResearchStore
 
 public sealed class QuickResearchService(IQuickResearchStore store, ICurrentActor actor)
 {
-    public async Task<QuickResearchDetails> SubmitAsync(string question, CancellationToken token)
+    public async Task<QuickResearchDetails> SubmitAsync(string question, Guid key, CancellationToken token)
     {
+        if (key == Guid.Empty) throw new ResearchAdmissionException(ResearchAdmissionFailure.InvalidKey);
         var run = new QuickResearchRun(question, actor.RequireSubjectId(), DateTimeOffset.UtcNow);
-        await store.CreateAsync(run, token);
-        return new(run.Id, run.Question, run.Status.ToString(), run.CreatedAt, null, null, null, null);
+        return await store.CreateAsync(run, key, token);
     }
 
     public Task<QuickResearchDetails?> FindAsync(Guid id, CancellationToken token) => store.FindAsync(id, actor.RequireSubjectId(), token);
